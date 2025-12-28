@@ -5,22 +5,65 @@ import java.util.*;
 import java.util.logging.*;
 
 public abstract class AbstractDriver implements Driver {
+
+    /**
+     * Parse the URL and return the JdbcUrlParser, or null if invalid.
+     */
+    protected JdbcUrlParser parseUrl(String url) {
+        try {
+            return JdbcUrlParser.parse(url);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     protected String protocol (String url) {
-	return (""+url).split(":").length > 0 ? (""+url).split(":")[0].trim() : null;}
+        JdbcUrlParser parser = parseUrl(url);
+        return parser != null ? parser.getProtocol() : null;
+    }
 
     protected String subprotocol (String url) {
-	return (""+url).split(":").length > 1 ? (""+url).split(":")[1].trim() : null;}
+        JdbcUrlParser parser = parseUrl(url);
+        return parser != null ? parser.getSubprotocol() : null;
+    }
 
     protected String subname (String url) {
-	return (""+url).split(":").length > 2 ? join(slice(Arrays.asList((""+url).split(":")), 2), ":") : null;}
+        JdbcUrlParser parser = parseUrl(url);
+        return parser != null ? parser.getSubname() : null;
+    }
 
-    protected String join (List<String> items, String delimiter) {
-	return new ArrayList<String>(items).toString().replace("[", "").replace("]","").replace(", ", delimiter);}
+    /**
+     * Get a URL parameter value.
+     * @param url the JDBC URL
+     * @param key the parameter key
+     * @return the parameter value, or null if not found
+     */
+    protected String getUrlParameter(String url, String key) {
+        JdbcUrlParser parser = parseUrl(url);
+        return parser != null ? parser.getParameter(key) : null;
+    }
 
-    protected List<String> slice (List<String> items, int... interval) throws IllegalArgumentException {
-	if (interval.length==1) return items.subList(interval[0], items.size());
-	if (interval.length==2) return items.subList(interval[0], interval[1]);
-	throw new IllegalArgumentException("Wrong interval:  " + interval);}
+    /**
+     * Get a URL parameter value with a default.
+     * @param url the JDBC URL
+     * @param key the parameter key
+     * @param defaultValue the default value if not found
+     * @return the parameter value, or the default if not found
+     */
+    protected String getUrlParameter(String url, String key, String defaultValue) {
+        JdbcUrlParser parser = parseUrl(url);
+        return parser != null ? parser.getParameter(key, defaultValue) : defaultValue;
+    }
+
+    /**
+     * Get all URL parameters as a map.
+     * @param url the JDBC URL
+     * @return unmodifiable map of parameters, empty if none
+     */
+    protected Map<String, String> getUrlParameters(String url) {
+        JdbcUrlParser parser = parseUrl(url);
+        return parser != null ? parser.getParameters() : Collections.emptyMap();
+    }
 
     protected boolean acceptsProtocol (String protocol) {return "jdbc".equals(protocol);}
 
@@ -30,12 +73,13 @@ public abstract class AbstractDriver implements Driver {
 
     @Override
     public boolean acceptsURL (String url) {
-	String clean = (""+url).trim().replaceAll("(?s)\\s","").toLowerCase();
-	if (!clean.matches("(?is)jdbc\\s*:.*:.*")) return false;
-	if (!acceptsProtocol(protocol(clean))) return false;
-	if (!acceptsSubProtocol(subprotocol(clean))) return false;
-	if (!acceptsSubName(subname(clean))) return false;
-	return true;}
+        JdbcUrlParser parser = parseUrl(url);
+        if (parser == null) return false;
+        if (!acceptsProtocol(parser.getProtocol())) return false;
+        if (!acceptsSubProtocol(parser.getSubprotocol())) return false;
+        if (!acceptsSubName(parser.getSubname())) return false;
+        return true;
+    }
 
     @Override
     public int getMajorVersion () {return 1;}
@@ -50,4 +94,5 @@ public abstract class AbstractDriver implements Driver {
     public DriverPropertyInfo[] getPropertyInfo (String url, Properties info) throws SQLException {return new DriverPropertyInfo[]{};}
 
     @Override
-    public boolean jdbcCompliant () {return false;}}
+    public boolean jdbcCompliant () {return false;}
+}
