@@ -12,7 +12,7 @@ public class FilterDriver extends AbstractProxyDriver {
     public static abstract class AbstractFilter implements Filter {
         public String apply (String sql) {return sql;}}
 
-    protected static Filter fltr  = new AbstractFilter() {};
+    protected Filter fltr = new AbstractFilter() {};
 
     protected boolean acceptsSubProtocol (String subprotocol) {
         return "filter".equals(subprotocol);}
