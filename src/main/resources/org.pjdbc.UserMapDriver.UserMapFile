@@ -1,0 +1,6 @@
+# User mapping file for UserMapDriver
+# Format: originaluser=mappeduser/mappedpassword
+alice=alice_db/secret123
+bob=bob_database/password456
+testuser=mapped_user/mapped_pass
+admin=root/adminpass
