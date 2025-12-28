@@ -31,6 +31,9 @@ public class MockDriver extends AbstractDriver {
 	    return logs.get(url).getStream().toString().trim();}
 	return "";}
 
+    public static void clearLogs () {
+	logs.clear();}
+
     protected boolean acceptsSubProtocol (String subprotocol) {
 	return "mock".equals(subprotocol);}
 
