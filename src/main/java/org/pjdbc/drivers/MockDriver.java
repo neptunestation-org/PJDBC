@@ -17,10 +17,28 @@ public class MockDriver extends AbstractDriver {
 
     private static class LoggingInvocationHandler implements InvocationHandler {
 	private PrintWriter l;
-	public LoggingInvocationHandler (PrintWriter log) {
-	    this.l = log;}
+	private ClassLoader cl;
+	public LoggingInvocationHandler (PrintWriter log, ClassLoader classLoader) {
+	    this.l = log;
+	    this.cl = classLoader;}
 	public Object invoke (Object proxy, Method method, Object[] args) {
 	    l.println(method.getName() + (args!=null && args.length>0 ? Arrays.asList(args) : new ArrayList<Object>()));
+	    if ("executeQuery".equals(method.getName()) || "getResultSet".equals(method.getName()))
+		return (ResultSet)Proxy.newProxyInstance(cl, new Class<?>[]{ResultSet.class},
+		    new InvocationHandler() {
+			public Object invoke(Object p, Method m, Object[] a) {
+			    if ("close".equals(m.getName())) return null;
+			    if ("isClosed".equals(m.getName())) return false;
+			    if ("next".equals(m.getName())) return false;
+			    if ("getMetaData".equals(m.getName())) return null;
+			    return null;}});
+	    if ("close".equals(method.getName())) return null;
+	    if ("isClosed".equals(method.getName())) return false;
+	    if ("getConnection".equals(method.getName())) return null;
+	    if ("execute".equals(method.getName())) return false;
+	    if ("executeUpdate".equals(method.getName())) return 0;
+	    if ("getUpdateCount".equals(method.getName())) return -1;
+	    if ("getMoreResults".equals(method.getName())) return false;
 	    return null;}}
 
     private static Map<String, MyPrintWriter> logs = new HashMap<String, MyPrintWriter>();
@@ -50,17 +68,17 @@ public class MockDriver extends AbstractDriver {
 			return (Statement)
 			    Proxy.newProxyInstance(getClass().getClassLoader(),
 						   new Class<?>[]{Statement.class},
-						   new LoggingInvocationHandler(l));
+						   new LoggingInvocationHandler(l, getClass().getClassLoader()));
 		    if ("prepareCall".equals(method.getName()))
 			return (CallableStatement)
 			    Proxy.newProxyInstance(getClass().getClassLoader(),
 						   new Class<?>[]{CallableStatement.class},
-						   new LoggingInvocationHandler(l));
+						   new LoggingInvocationHandler(l, getClass().getClassLoader()));
 		    if ("prepareStatement".equals(method.getName()))
 			return (PreparedStatement)
 			    Proxy.newProxyInstance(getClass().getClassLoader(),
 						   new Class<?>[]{PreparedStatement.class},
-						   new LoggingInvocationHandler(l));
+						   new LoggingInvocationHandler(l, getClass().getClassLoader()));
 		    if ("getMetaData".equals(method.getName()))
 			return (DatabaseMetaData)
 			    Proxy.newProxyInstance(getClass().getClassLoader(),
