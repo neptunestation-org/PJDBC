@@ -22,6 +22,8 @@ public class UserMapDriver extends AbstractProxyDriver {
 	if (!acceptsURL(url)) return null;
 	String user = info.getProperty("user");
 	String[] mapping = p.getProperty(user).split("/");
-	info.setProperty("user", mapping[0]);
-	info.setProperty("password", mapping[1]);
-	return DriverManager.getConnection(subname(url), info);}}
+	Properties delegateInfo = new Properties();
+	delegateInfo.putAll(info);
+	delegateInfo.setProperty("user", mapping[0]);
+	delegateInfo.setProperty("password", mapping[1]);
+	return DriverManager.getConnection(subname(url), delegateInfo);}}
