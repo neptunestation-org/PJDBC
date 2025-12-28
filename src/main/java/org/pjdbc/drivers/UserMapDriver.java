@@ -5,11 +5,14 @@ import java.util.*;
 import org.pjdbc.sql.*;
 
 public class UserMapDriver extends AbstractProxyDriver {
-    private static Properties p = new Properties();
+    private static final Properties p = new Properties();
     static {
 	try {
+	    ClassLoader cl = Thread.currentThread().getContextClassLoader();
+	    if (cl == null) cl = UserMapDriver.class.getClassLoader();
+	    java.io.InputStream is = cl.getResourceAsStream("org.pjdbc.UserMapDriver.UserMapFile");
+	    if (is != null) {p.load(is); is.close();}
 	    DriverManager.registerDriver(new UserMapDriver());
-	    p.load(UserMapDriver.class.getClassLoader().getResourceAsStream("org.pjdbc.UserMapDriver.UserMapFile"));
 	} catch (Exception e) {throw new RuntimeException(e);}}
 
     protected boolean acceptsSubProtocol (String subprotocol) {
