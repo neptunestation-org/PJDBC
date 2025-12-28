@@ -618,7 +618,7 @@ public class DriverEdgeCasesTest {
     // ========== Cross-Driver Boundary Tests ==========
 
     @Test
-    public void allDrivers_rejectWrongSubprotocol() {
+    public void allDrivers_rejectWrongSubprotocol() throws SQLException {
         Driver[] drivers = {
             new FilterDriver(),
             new TeeDriver(),
