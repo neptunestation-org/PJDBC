@@ -8,13 +8,32 @@ import java.util.*;
 
 public abstract class AbstractResultSet extends AbstractWrapper implements ResultSet {
     private ResultSet d;
+    private Statement stmt;
 
     public AbstractResultSet (ResultSet rset) throws SQLException {
 	super(rset);
 	this.d = rset;}
 
     public AbstractResultSet (Statement stmt, ResultSet rset) throws SQLException {
-	this(rset);}
+	this(rset);
+	this.stmt = stmt;}
+
+    protected ResultSet getDelegate() {
+	return d;}
+
+    protected Statement getParentStatement() {
+	return stmt;}
+
+    /**
+     * Transform a value retrieved from the ResultSet.
+     * Subclasses can override this to apply transformations to output values.
+     * @param columnIndex 1-based column index
+     * @param value the original value from the delegate ResultSet
+     * @param sqlType SQL type from java.sql.Types (or 0 if unknown)
+     * @return the transformed value (default implementation returns value unchanged)
+     */
+    protected Object transformValue(int columnIndex, Object value, int sqlType) throws SQLException {
+	return value;}
 
     @Deprecated public BigDecimal getBigDecimal (String columnLabel, int scale) throws SQLException {return d.getBigDecimal(columnLabel, scale);}
     @Deprecated public BigDecimal getBigDecimal (int columnIndex, int scale) throws SQLException {return d.getBigDecimal(columnIndex, scale);}
@@ -36,10 +55,10 @@ public abstract class AbstractResultSet extends AbstractWrapper implements Resul
     public InputStream getBinaryStream (int columnIndex) throws SQLException {return d.getBinaryStream(columnIndex);}
     public NClob getNClob (String columnLabel) throws SQLException {return d.getNClob(columnLabel);}
     public NClob getNClob (int columnIndex) throws SQLException {return d.getNClob(columnIndex);}
-    public Object getObject (String columnLabel) throws SQLException {return d.getObject(columnLabel);}
-    public Object getObject (String columnLabel, Map<String,Class<?>> map) throws SQLException {return d.getObject(columnLabel, map);}
-    public Object getObject (int columnIndex) throws SQLException {return d.getObject(columnIndex);}
-    public Object getObject (int columnIndex, Map<String,Class<?>> map) throws SQLException {return d.getObject(columnIndex, map);}
+    public Object getObject (String columnLabel) throws SQLException {return transformValue(d.findColumn(columnLabel), d.getObject(columnLabel), Types.JAVA_OBJECT);}
+    public Object getObject (String columnLabel, Map<String,Class<?>> map) throws SQLException {return transformValue(d.findColumn(columnLabel), d.getObject(columnLabel, map), Types.JAVA_OBJECT);}
+    public Object getObject (int columnIndex) throws SQLException {return transformValue(columnIndex, d.getObject(columnIndex), Types.JAVA_OBJECT);}
+    public Object getObject (int columnIndex, Map<String,Class<?>> map) throws SQLException {return transformValue(columnIndex, d.getObject(columnIndex, map), Types.JAVA_OBJECT);}
     public Reader getCharacterStream (String columnLabel) throws SQLException {return d.getCharacterStream(columnLabel);}
     public Reader getCharacterStream (int columnIndex) throws SQLException {return d.getCharacterStream(columnIndex);}
     public Reader getNCharacterStream (String columnLabel) throws SQLException {return d.getNCharacterStream(columnLabel);}
@@ -56,8 +75,8 @@ public abstract class AbstractResultSet extends AbstractWrapper implements Resul
     public String getCursorName () throws SQLException {return d.getCursorName();}
     public String getNString (String columnLabel) throws SQLException {return d.getNString(columnLabel);}
     public String getNString (int columnIndex) throws SQLException {return d.getNString(columnIndex);}
-    public String getString (String columnLabel) throws SQLException {return d.getString(columnLabel);}
-    public String getString (int columnIndex) throws SQLException {return d.getString(columnIndex);}
+    public String getString (String columnLabel) throws SQLException {return (String)transformValue(d.findColumn(columnLabel), d.getString(columnLabel), Types.VARCHAR);}
+    public String getString (int columnIndex) throws SQLException {return (String)transformValue(columnIndex, d.getString(columnIndex), Types.VARCHAR);}
     public Time getTime (String columnLabel) throws SQLException {return d.getTime(columnLabel);}
     public Time getTime (String columnLabel, Calendar cal) throws SQLException {return d.getTime(columnLabel, cal);}
     public Time getTime (int columnIndex) throws SQLException {return d.getTime(columnIndex);}
@@ -70,8 +89,8 @@ public abstract class AbstractResultSet extends AbstractWrapper implements Resul
     public URL getURL (int columnIndex) throws SQLException {return d.getURL(columnIndex);}
     public boolean absolute (int row) throws SQLException {return d.absolute(row);}
     public boolean first () throws SQLException {return d.first();}
-    public boolean getBoolean (String columnLabel) throws SQLException {return d.getBoolean(columnLabel);}
-    public boolean getBoolean (int columnIndex) throws SQLException {return d.getBoolean(columnIndex);}
+    public boolean getBoolean (String columnLabel) throws SQLException {return (Boolean)transformValue(d.findColumn(columnLabel), d.getBoolean(columnLabel), Types.BOOLEAN);}
+    public boolean getBoolean (int columnIndex) throws SQLException {return (Boolean)transformValue(columnIndex, d.getBoolean(columnIndex), Types.BOOLEAN);}
     public boolean isAfterLast () throws SQLException {return d.isAfterLast();}
     public boolean isBeforeFirst () throws SQLException {return d.isBeforeFirst();}
     public boolean isClosed () throws SQLException {return d.isClosed();}
@@ -89,25 +108,25 @@ public abstract class AbstractResultSet extends AbstractWrapper implements Resul
     public byte getByte (int columnIndex) throws SQLException {return d.getByte(columnIndex);}
     public byte[] getBytes (String columnLabel) throws SQLException {return d.getBytes(columnLabel);}
     public byte[] getBytes (int columnIndex) throws SQLException {return d.getBytes(columnIndex);}
-    public double getDouble (String columnLabel) throws SQLException {return d.getDouble(columnLabel);}
-    public double getDouble (int columnIndex) throws SQLException {return d.getDouble(columnIndex);}
-    public float getFloat (String columnLabel) throws SQLException {return d.getFloat(columnLabel);}
-    public float getFloat (int columnIndex) throws SQLException {return d.getFloat(columnIndex);}
+    public double getDouble (String columnLabel) throws SQLException {return (Double)transformValue(d.findColumn(columnLabel), d.getDouble(columnLabel), Types.DOUBLE);}
+    public double getDouble (int columnIndex) throws SQLException {return (Double)transformValue(columnIndex, d.getDouble(columnIndex), Types.DOUBLE);}
+    public float getFloat (String columnLabel) throws SQLException {return (Float)transformValue(d.findColumn(columnLabel), d.getFloat(columnLabel), Types.FLOAT);}
+    public float getFloat (int columnIndex) throws SQLException {return (Float)transformValue(columnIndex, d.getFloat(columnIndex), Types.FLOAT);}
     public int findColumn (String columnLabel) throws SQLException {return d.findColumn(columnLabel);}
     public int getConcurrency () throws SQLException {return d.getConcurrency();}
     public int getFetchDirection () throws SQLException {return d.getFetchDirection();}
     public int getFetchSize () throws SQLException {return d.getFetchSize();}
     public int getHoldability () throws SQLException {return d.getHoldability();}
-    public int getInt (String columnLabel) throws SQLException {return d.getInt(columnLabel);}
-    public int getInt (int columnIndex) throws SQLException {return d.getInt(columnIndex);}
+    public int getInt (String columnLabel) throws SQLException {return (Integer)transformValue(d.findColumn(columnLabel), d.getInt(columnLabel), Types.INTEGER);}
+    public int getInt (int columnIndex) throws SQLException {return (Integer)transformValue(columnIndex, d.getInt(columnIndex), Types.INTEGER);}
     public int getRow () throws SQLException {return d.getRow();}
     public int getType () throws SQLException {return d.getType();}
     public java.sql.Date getDate (String columnLabel) throws SQLException {return d.getDate(columnLabel);}
     public java.sql.Date getDate (String columnLabel, Calendar cal) throws SQLException {return d.getDate(columnLabel, cal);}
     public java.sql.Date getDate (int columnIndex) throws SQLException {return d.getDate(columnIndex);}
     public java.sql.Date getDate (int columnIndex, Calendar cal) throws SQLException {return d.getDate(columnIndex, cal);}
-    public long getLong (String columnLabel) throws SQLException {return d.getLong(columnLabel);}
-    public long getLong (int columnIndex) throws SQLException {return d.getLong(columnIndex);}
+    public long getLong (String columnLabel) throws SQLException {return (Long)transformValue(d.findColumn(columnLabel), d.getLong(columnLabel), Types.BIGINT);}
+    public long getLong (int columnIndex) throws SQLException {return (Long)transformValue(columnIndex, d.getLong(columnIndex), Types.BIGINT);}
     public short getShort (String columnLabel) throws SQLException {return d.getShort(columnLabel);}
     public short getShort (int columnIndex) throws SQLException {return d.getShort(columnIndex);}
     public void afterLast () throws SQLException {d.afterLast();}
