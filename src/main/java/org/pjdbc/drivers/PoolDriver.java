@@ -9,30 +9,114 @@ import org.pjdbc.sql.*;
 public class PoolDriver extends AbstractProxyDriver {
     static {try {DriverManager.registerDriver(new PoolDriver());} catch (Exception e) {throw new RuntimeException(e);}}
 
-    private static final ConcurrentHashMap<Properties, BlockingQueue<Connection>> pools = new ConcurrentHashMap<Properties, BlockingQueue<Connection>>();
+    private static final ConcurrentHashMap<String, BlockingQueue<Connection>> pools = new ConcurrentHashMap<String, BlockingQueue<Connection>>();
+    private static final ConcurrentHashMap<String, PoolConfig> configs = new ConcurrentHashMap<String, PoolConfig>();
 
-    protected Properties getPoolKey (String url, Properties info) throws SQLException {
-	Properties key = new Properties(info);
-	key.setProperty("url", url);
-	return key;}
+    // Default configuration values
+    private static final int DEFAULT_MIN = 0;
+    private static final int DEFAULT_MAX = -1; // unlimited
+    private static final long DEFAULT_TIMEOUT = 1000L; // 1 second
+
+    /**
+     * Pool configuration parsed from URL parameters.
+     */
+    protected static class PoolConfig {
+        final int min;
+        final int max;
+        final long timeout;
+
+        PoolConfig(int min, int max, long timeout) {
+            this.min = min;
+            this.max = max;
+            this.timeout = timeout;
+        }
+    }
+
+    /**
+     * Parse pool configuration from URL parameters.
+     * Supports: min, max, timeout (case-insensitive)
+     */
+    protected PoolConfig parseConfig(String url) {
+        int min = DEFAULT_MIN;
+        int max = DEFAULT_MAX;
+        long timeout = DEFAULT_TIMEOUT;
+
+        try {
+            JdbcUrlParser parser = parseUrl(url);
+            Map<String, String> params = parser.getParameters();
+
+            for (Map.Entry<String, String> entry : params.entrySet()) {
+                String key = entry.getKey().toLowerCase();
+                String value = entry.getValue();
+                try {
+                    switch (key) {
+                        case "min":
+                            min = Integer.parseInt(value);
+                            break;
+                        case "max":
+                            max = Integer.parseInt(value);
+                            break;
+                        case "timeout":
+                            timeout = Long.parseLong(value);
+                            break;
+                    }
+                } catch (NumberFormatException e) {
+                    // Invalid value, use default
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            // URL parsing failed, use defaults
+        }
+
+        return new PoolConfig(min, max, timeout);
+    }
+
+    protected String getPoolKey(String url, Properties info) throws SQLException {
+        // Use subname as pool key (the underlying URL)
+        return subname(url);
+    }
 
     protected boolean acceptsSubProtocol (String subprotocol) {
 	return "pool".equals(subprotocol);}
 
     protected Connection proxyConnection (final Connection conn, final String url, final Properties info, Driver driver) throws SQLException {
+        final String poolKey = getPoolKey(url, info);
+        final PoolConfig config = configs.get(poolKey);
+        final BlockingQueue<Connection> pool = pools.get(poolKey);
+
 	return (Connection)Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{Connection.class}, new InvocationHandler() {
 		public Object invoke (Object proxy, Method method, Object[] args) throws SQLException {
-		    if ("close".equals(method.getName())) {pools.get(getPoolKey(url, info)).add(conn); return proxy;}
-		    if (!"close".equals(method.getName())) if (pools.get(getPoolKey(url, info)).contains(conn)) throw new SQLException();
+		    if ("close".equals(method.getName())) {
+                        // If max is set and pool is full, don't return to pool
+                        if (config != null && config.max > 0 && pool.size() >= config.max) {
+                            try { conn.close(); } catch (SQLException e) {}
+                        } else {
+                            pool.add(conn);
+                        }
+                        return proxy;
+                    }
+		    if (!"close".equals(method.getName())) if (pool.contains(conn)) throw new SQLException();
 		    if ("toString".equals(method.getName())) return conn.toString();
 		    if ("equals".equals(method.getName())) return proxy==args[0];
 		    try {return method.invoke(conn, args);} catch (Exception e) {throw new SQLException(e);}}});}
 
     public Connection connect (String url, Properties info) throws SQLException {
 	if (!acceptsURL(url)) return null;
-	Properties key = getPoolKey(subname(url), info);
-	Connection conn = null;
-	pools.putIfAbsent(key, new LinkedBlockingQueue<Connection>());
-	try {conn = pools.get(key).poll(1L, TimeUnit.SECONDS);} catch (InterruptedException e) {}
+        String poolKey = getPoolKey(url, info);
+        String targetUrl = subname(url);
+
+        // Parse and cache configuration
+        configs.putIfAbsent(poolKey, parseConfig(url));
+        PoolConfig config = configs.get(poolKey);
+
+        // Create pool if not exists
+        pools.putIfAbsent(poolKey, new LinkedBlockingQueue<Connection>());
+        BlockingQueue<Connection> pool = pools.get(poolKey);
+
+        // Try to get connection from pool with configured timeout
+        Connection conn = null;
+	try {conn = pool.poll(config.timeout, TimeUnit.MILLISECONDS);} catch (InterruptedException e) {}
 	if (conn!=null) return conn;
-	return proxyConnection(DriverManager.getConnection(subname(url)), subname(url), info, this);}}
+
+        // Create new connection
+	return proxyConnection(DriverManager.getConnection(targetUrl, info), url, info, this);}}
