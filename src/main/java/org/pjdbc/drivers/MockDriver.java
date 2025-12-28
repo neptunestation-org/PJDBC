@@ -72,4 +72,10 @@ public class MockDriver extends AbstractDriver {
 		    if ("equals".equals(method.getName())) return proxy==args[0];
 		    if ("isWrapperFor".equals(method.getName())) return false;
 		    if ("unwrap".equals(method.getName()) && args.length==1 && Connection.class.isInstance(args[0])) return this;
+		    if ("close".equals(method.getName())) return null;
+		    if ("isClosed".equals(method.getName())) return false;
+		    if ("getAutoCommit".equals(method.getName())) return true;
+		    if ("setAutoCommit".equals(method.getName())) return null;
+		    if ("commit".equals(method.getName())) return null;
+		    if ("rollback".equals(method.getName())) return null;
 		    throw new SQLException(String.format("%s unimplemented by MockDriver", method.getName()));}});}}
