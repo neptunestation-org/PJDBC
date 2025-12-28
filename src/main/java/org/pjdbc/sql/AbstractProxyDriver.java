@@ -55,16 +55,30 @@ public abstract class AbstractProxyDriver extends AbstractDriver {
 	return new AbstractConnection(delegates, this, url, info){};}
 
     protected Statement proxyStatement (Statement delegate, Connection conn) throws SQLException {
-	return new AbstractStatement(delegate, conn) {};}
+	final AbstractProxyDriver driver = this;
+	return new AbstractStatement(delegate, conn) {
+	    @Override
+	    protected ResultSet wrap (ResultSet r) throws SQLException {
+		return driver.proxyResultSet(this, r);}};}
+
 
     protected CallableStatement proxyCallableStatement (CallableStatement delegate, Connection conn) throws SQLException {
-	return new AbstractCallableStatement(delegate, conn) {};}
+	final AbstractProxyDriver driver = this;
+	return new AbstractCallableStatement(delegate, conn) {
+	    @Override
+	    protected ResultSet wrap (ResultSet r) throws SQLException {
+		return driver.proxyResultSet(this, r);}};}
 
     protected PreparedStatement proxyPreparedStatement (PreparedStatement delegate, Connection conn) throws SQLException {
-	return new AbstractPreparedStatement(delegate, conn) {};}
+	final AbstractProxyDriver driver = this;
+	return new AbstractPreparedStatement(delegate, conn) {
+	    @Override
+	    protected ResultSet wrap (ResultSet r) throws SQLException {
+		return driver.proxyResultSet(this, r);}};}
+
 
     protected ResultSet proxyResultSet (Statement stmt, ResultSet delegate) throws SQLException {
-	return delegate;}
+	return new AbstractResultSet(stmt, delegate) {};}
 
     @Override
     public Connection connect (String url, Properties info) throws SQLException {
