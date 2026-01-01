@@ -239,6 +239,120 @@ Parameters:
 - `invalidateOnWrite`: Clear cache on writes (default: true)
 - `enabled`: Enable caching (default: true)
 
+### RedisCachingDriver (`jdbc:rediscache:...`)
+
+Caches SELECT query results in Redis for distributed caching across multiple application instances.
+
+```java
+// Basic Redis caching (localhost:6379)
+Connection conn = DriverManager.getConnection(
+    "jdbc:rediscache:jdbc:postgresql://localhost/mydb"
+);
+
+// Custom Redis host and TTL
+Connection conn = DriverManager.getConnection(
+    "jdbc:rediscache[host=redis.example.com,ttl=300]:jdbc:postgresql://localhost/mydb"
+);
+
+// With authentication and key prefix
+Connection conn = DriverManager.getConnection(
+    "jdbc:rediscache[host=redis.example.com,password=secret,keyPrefix=myapp:]:jdbc:postgresql://localhost/mydb"
+);
+
+// Access cache statistics
+RedisQueryCache cache = RedisCachingDriver.getCache(conn);
+double hitRatio = cache.getHitRatio();
+```
+
+Parameters:
+- `host`: Redis server hostname (default: localhost)
+- `port`: Redis server port (default: 6379)
+- `password`: Redis password (default: none)
+- `database`: Redis database number (default: 0)
+- `keyPrefix`: Prefix for cache keys (default: "pjdbc:")
+- `ttl`: Time-to-live in seconds (default: 60)
+- `maxPoolSize`: Maximum connections in pool (default: 8)
+- `invalidateOnWrite`: Clear cache on writes (default: true)
+- `enabled`: Enable caching (default: true)
+
+**Note:** Requires the `jedis` dependency (included as optional).
+
+### MemcachedCachingDriver (`jdbc:memcache:...`)
+
+Caches SELECT query results in Memcached for distributed caching across multiple application instances.
+
+```java
+// Basic Memcached caching (localhost:11211)
+Connection conn = DriverManager.getConnection(
+    "jdbc:memcache:jdbc:postgresql://localhost/mydb"
+);
+
+// Multiple Memcached servers
+Connection conn = DriverManager.getConnection(
+    "jdbc:memcache[servers=cache1:11211;cache2:11211]:jdbc:postgresql://localhost/mydb"
+);
+
+// With custom TTL and key prefix
+Connection conn = DriverManager.getConnection(
+    "jdbc:memcache[ttl=300,keyPrefix=myapp:]:jdbc:postgresql://localhost/mydb"
+);
+
+// Access cache statistics
+MemcachedQueryCache cache = MemcachedCachingDriver.getCache(conn);
+double hitRatio = cache.getHitRatio();
+```
+
+Parameters:
+- `servers`: Semicolon-separated list of host:port (default: localhost:11211)
+- `keyPrefix`: Prefix for cache keys (default: "pjdbc:")
+- `ttl`: Time-to-live in seconds (default: 60)
+- `invalidateOnWrite`: Clear cache on writes (default: true)
+- `enabled`: Enable caching (default: true)
+
+**Note:** Requires the `spymemcached` dependency (included as optional).
+
+### HazelcastCachingDriver (`jdbc:hazelcast:...`)
+
+Caches SELECT query results in Hazelcast for distributed caching with automatic cluster discovery and replication.
+
+```java
+// Basic Hazelcast caching (embedded mode)
+Connection conn = DriverManager.getConnection(
+    "jdbc:hazelcast:jdbc:postgresql://localhost/mydb"
+);
+
+// Client mode connecting to existing cluster
+Connection conn = DriverManager.getConnection(
+    "jdbc:hazelcast[mode=client,members=hz1:5701;hz2:5701]:jdbc:postgresql://localhost/mydb"
+);
+
+// Custom cluster name and map
+Connection conn = DriverManager.getConnection(
+    "jdbc:hazelcast[clusterName=my-cluster,mapName=query_cache]:jdbc:postgresql://localhost/mydb"
+);
+
+// With TTL and max idle time
+Connection conn = DriverManager.getConnection(
+    "jdbc:hazelcast[ttl=300,maxIdle=60]:jdbc:postgresql://localhost/mydb"
+);
+
+// Access cache statistics
+HazelcastQueryCache cache = HazelcastCachingDriver.getCache(conn);
+double hitRatio = cache.getHitRatio();
+```
+
+Parameters:
+- `mode`: "embedded" (default) or "client" for connecting to external cluster
+- `clusterName`: Hazelcast cluster name (default: "pjdbc-cache")
+- `members`: Semicolon-separated member addresses (default: "127.0.0.1:5701")
+- `mapName`: IMap name for caching (default: "pjdbc_query_cache")
+- `ttl`: Time-to-live in seconds (default: 60)
+- `maxIdle`: Maximum idle time in seconds, 0 to disable (default: 0)
+- `invalidateOnWrite`: Clear cache on writes (default: true)
+- `enabled`: Enable caching (default: true)
+
+**Note:** Requires the `hazelcast` dependency (included as optional). Call `HazelcastCachingDriver.shutdownAll()` on application shutdown to clean up Hazelcast instances.
+
 ### TracingDriver (`jdbc:trace:...`)
 
 Provides distributed tracing for JDBC operations. Useful for observability in microservices architectures.

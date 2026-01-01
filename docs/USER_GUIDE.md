@@ -259,6 +259,177 @@ System.out.println("Hits: " + cache.getHits());
 System.out.println("Misses: " + cache.getMisses());
 ```
 
+### RedisCachingDriver (Distributed Redis Caching)
+
+Caches SELECT query results in Redis for distributed caching across multiple application instances.
+
+**URL Format:** `jdbc:rediscache[param=value,...]:target-url`
+
+**Parameters:**
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `host` | Redis server hostname | localhost |
+| `port` | Redis server port | 6379 |
+| `password` | Redis password | (none) |
+| `database` | Redis database number | 0 |
+| `keyPrefix` | Prefix for cache keys (namespace isolation) | pjdbc: |
+| `ttl` | Time-to-live in seconds for cache entries | 60 |
+| `maxPoolSize` | Maximum connections in Redis pool | 8 |
+| `invalidateOnWrite` | Clear cache on INSERT/UPDATE/DELETE | true |
+| `enabled` | Enable caching | true |
+
+**Features:**
+- Distributed caching across multiple application instances
+- TTL support via Redis SETEX
+- Connection pooling with JedisPool
+- Key prefix for namespace isolation
+- Cache statistics (hits, misses, hit ratio)
+- Thread-safe implementation
+- Automatic invalidation on write operations
+
+**Examples:**
+```java
+// Basic Redis caching (localhost:6379)
+Connection c = DriverManager.getConnection(
+    "jdbc:rediscache:jdbc:postgresql://localhost/db");
+
+// Remote Redis with custom TTL
+Connection c = DriverManager.getConnection(
+    "jdbc:rediscache[host=redis.example.com,ttl=300]:jdbc:postgresql://localhost/db");
+
+// With authentication
+Connection c = DriverManager.getConnection(
+    "jdbc:rediscache[host=redis.example.com,password=secret]:jdbc:postgresql://localhost/db");
+
+// Custom key prefix for namespace isolation
+Connection c = DriverManager.getConnection(
+    "jdbc:rediscache[keyPrefix=myapp:]:jdbc:postgresql://localhost/db");
+
+// Use different Redis database
+Connection c = DriverManager.getConnection(
+    "jdbc:rediscache[database=2]:jdbc:postgresql://localhost/db");
+
+// Access cache statistics
+RedisQueryCache cache = RedisCachingDriver.getCache(conn);
+System.out.println("Hit ratio: " + cache.getHitRatio());
+System.out.println("Hits: " + cache.getHits());
+System.out.println("Misses: " + cache.getMisses());
+```
+
+**Note:** Requires the `jedis` dependency (included as optional in the PJDBC pom.xml).
+
+### MemcachedCachingDriver (Distributed Memcached Caching)
+
+Caches SELECT query results in Memcached for distributed caching across multiple application instances.
+
+**URL Format:** `jdbc:memcache[param=value,...]:target-url`
+
+**Parameters:**
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `servers` | Semicolon-separated list of host:port servers | localhost:11211 |
+| `keyPrefix` | Prefix for cache keys (namespace isolation) | pjdbc: |
+| `ttl` | Time-to-live in seconds for cache entries | 60 |
+| `invalidateOnWrite` | Clear cache on INSERT/UPDATE/DELETE | true |
+| `enabled` | Enable caching | true |
+
+**Features:**
+- Distributed caching across multiple application instances
+- TTL support via Memcached expiration
+- Support for multiple Memcached servers (consistent hashing)
+- Key prefix for namespace isolation
+- Cache statistics (hits, misses, hit ratio)
+- Thread-safe implementation
+- Automatic invalidation on write operations
+
+**Examples:**
+```java
+// Basic Memcached caching (localhost:11211)
+Connection c = DriverManager.getConnection(
+    "jdbc:memcache:jdbc:postgresql://localhost/db");
+
+// Multiple Memcached servers for high availability
+Connection c = DriverManager.getConnection(
+    "jdbc:memcache[servers=cache1:11211;cache2:11211;cache3:11211]:jdbc:postgresql://localhost/db");
+
+// Custom TTL
+Connection c = DriverManager.getConnection(
+    "jdbc:memcache[ttl=300]:jdbc:postgresql://localhost/db");
+
+// Custom key prefix for namespace isolation
+Connection c = DriverManager.getConnection(
+    "jdbc:memcache[keyPrefix=myapp:]:jdbc:postgresql://localhost/db");
+
+// Access cache statistics
+MemcachedQueryCache cache = MemcachedCachingDriver.getCache(conn);
+System.out.println("Hit ratio: " + cache.getHitRatio());
+System.out.println("Hits: " + cache.getHits());
+System.out.println("Misses: " + cache.getMisses());
+```
+
+**Note:** Requires the `spymemcached` dependency (included as optional in the PJDBC pom.xml).
+
+### HazelcastCachingDriver (Distributed Hazelcast Caching)
+
+Caches SELECT query results in Hazelcast for distributed caching with automatic cluster discovery and replication.
+
+**URL Format:** `jdbc:hazelcast[param=value,...]:target-url`
+
+**Parameters:**
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `mode` | "embedded" for local instance or "client" for connecting to cluster | embedded |
+| `clusterName` | Hazelcast cluster name | pjdbc-cache |
+| `members` | Semicolon-separated list of host:port addresses | 127.0.0.1:5701 |
+| `mapName` | IMap name for caching | pjdbc_query_cache |
+| `ttl` | Time-to-live in seconds for cache entries | 60 |
+| `maxIdle` | Maximum idle time in seconds (0 to disable) | 0 |
+| `invalidateOnWrite` | Clear cache on INSERT/UPDATE/DELETE | true |
+| `enabled` | Enable caching | true |
+
+**Features:**
+- Distributed caching with automatic cluster discovery and replication
+- Support for embedded mode (simple setup) and client mode (connect to external cluster)
+- TTL and max idle time support via Hazelcast IMap
+- Shared Hazelcast instances across connections with same configuration
+- Cache statistics (hits, misses, hit ratio)
+- Thread-safe implementation
+- Automatic invalidation on write operations
+
+**Examples:**
+```java
+// Basic Hazelcast caching (embedded mode)
+Connection c = DriverManager.getConnection(
+    "jdbc:hazelcast:jdbc:postgresql://localhost/db");
+
+// Client mode connecting to existing Hazelcast cluster
+Connection c = DriverManager.getConnection(
+    "jdbc:hazelcast[mode=client,members=hz1:5701;hz2:5701]:jdbc:postgresql://localhost/db");
+
+// Custom cluster name
+Connection c = DriverManager.getConnection(
+    "jdbc:hazelcast[clusterName=my-app-cache]:jdbc:postgresql://localhost/db");
+
+// Custom map name for isolation
+Connection c = DriverManager.getConnection(
+    "jdbc:hazelcast[mapName=user_queries]:jdbc:postgresql://localhost/db");
+
+// TTL and max idle time
+Connection c = DriverManager.getConnection(
+    "jdbc:hazelcast[ttl=300,maxIdle=60]:jdbc:postgresql://localhost/db");
+
+// Access cache statistics
+HazelcastQueryCache cache = HazelcastCachingDriver.getCache(conn);
+System.out.println("Hit ratio: " + cache.getHitRatio());
+System.out.println("Hits: " + cache.getHits());
+System.out.println("Misses: " + cache.getMisses());
+
+// Shutdown all Hazelcast instances on application exit
+HazelcastCachingDriver.shutdownAll();
+```
+
+**Note:** Requires the `hazelcast` dependency (included as optional in the PJDBC pom.xml).
+
 ### TracingDriver (Distributed Tracing)
 
 Provides distributed tracing for JDBC operations with pluggable tracer support.
