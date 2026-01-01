@@ -81,8 +81,8 @@ public class MetricsDriver extends AbstractProxyDriver {
      * Returns null if the connection is not a metrics connection.
      */
     public static Metrics getMetrics(Connection conn) {
-        if (conn instanceof MetricsConnection) {
-            return ((MetricsConnection) conn).getMetrics();
+        if (conn instanceof MetricsConnection mc) {
+            return mc.getMetrics();
         }
         return null;
     }

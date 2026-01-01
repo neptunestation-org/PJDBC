@@ -20,17 +20,7 @@ public class PoolDriver extends AbstractProxyDriver {
     /**
      * Pool configuration parsed from URL parameters.
      */
-    protected static class PoolConfig {
-        final int min;
-        final int max;
-        final long timeout;
-
-        PoolConfig(int min, int max, long timeout) {
-            this.min = min;
-            this.max = max;
-            this.timeout = timeout;
-        }
-    }
+    protected record PoolConfig(int min, int max, long timeout) { }
 
     /**
      * Parse pool configuration from URL parameters.
@@ -50,15 +40,10 @@ public class PoolDriver extends AbstractProxyDriver {
                 String value = entry.getValue();
                 try {
                     switch (key) {
-                        case "min":
-                            min = Integer.parseInt(value);
-                            break;
-                        case "max":
-                            max = Integer.parseInt(value);
-                            break;
-                        case "timeout":
-                            timeout = Long.parseLong(value);
-                            break;
+                        case "min" -> min = Integer.parseInt(value);
+                        case "max" -> max = Integer.parseInt(value);
+                        case "timeout" -> timeout = Long.parseLong(value);
+                        default -> { }
                     }
                 } catch (NumberFormatException e) {
                     // Invalid value, use default

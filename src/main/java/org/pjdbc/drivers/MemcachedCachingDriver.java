@@ -258,8 +258,8 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
                     return null;
                 }
                 hits.incrementAndGet();
-                if (data instanceof byte[]) {
-                    return SerializableCachedResultSet.deserialize((byte[]) data);
+                if (data instanceof byte[] bytes) {
+                    return SerializableCachedResultSet.deserialize(bytes);
                 }
                 return null;
             } catch (Exception e) {
@@ -362,7 +362,7 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
         public int getInt(int columnIndex) throws SQLException {
             Object val = getObject(columnIndex);
             if (val == null) return 0;
-            if (val instanceof Number) return ((Number) val).intValue();
+            if (val instanceof Number n) return n.intValue();
             return Integer.parseInt(val.toString());
         }
 
@@ -375,7 +375,7 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
         public long getLong(int columnIndex) throws SQLException {
             Object val = getObject(columnIndex);
             if (val == null) return 0;
-            if (val instanceof Number) return ((Number) val).longValue();
+            if (val instanceof Number n) return n.longValue();
             return Long.parseLong(val.toString());
         }
 
@@ -388,7 +388,7 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
         public double getDouble(int columnIndex) throws SQLException {
             Object val = getObject(columnIndex);
             if (val == null) return 0.0;
-            if (val instanceof Number) return ((Number) val).doubleValue();
+            if (val instanceof Number n) return n.doubleValue();
             return Double.parseDouble(val.toString());
         }
 
@@ -401,7 +401,7 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
         public boolean getBoolean(int columnIndex) throws SQLException {
             Object val = getObject(columnIndex);
             if (val == null) return false;
-            if (val instanceof Boolean) return (Boolean) val;
+            if (val instanceof Boolean b) return b;
             return Boolean.parseBoolean(val.toString());
         }
 
@@ -519,8 +519,8 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
      * Returns null if the connection is not a MemcachedCachingConnection.
      */
     public static MemcachedQueryCache getCache(Connection conn) {
-        if (conn instanceof MemcachedCachingConnection) {
-            return ((MemcachedCachingConnection) conn).getCache();
+        if (conn instanceof MemcachedCachingConnection mcc) {
+            return mcc.getCache();
         }
         return null;
     }

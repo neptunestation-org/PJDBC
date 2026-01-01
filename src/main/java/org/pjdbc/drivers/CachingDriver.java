@@ -316,7 +316,7 @@ public class CachingDriver extends AbstractProxyDriver {
         public int getInt(int columnIndex) throws SQLException {
             Object val = getObject(columnIndex);
             if (val == null) return 0;
-            if (val instanceof Number) return ((Number) val).intValue();
+            if (val instanceof Number n) return n.intValue();
             return Integer.parseInt(val.toString());
         }
 
@@ -329,7 +329,7 @@ public class CachingDriver extends AbstractProxyDriver {
         public long getLong(int columnIndex) throws SQLException {
             Object val = getObject(columnIndex);
             if (val == null) return 0;
-            if (val instanceof Number) return ((Number) val).longValue();
+            if (val instanceof Number n) return n.longValue();
             return Long.parseLong(val.toString());
         }
 
@@ -342,7 +342,7 @@ public class CachingDriver extends AbstractProxyDriver {
         public double getDouble(int columnIndex) throws SQLException {
             Object val = getObject(columnIndex);
             if (val == null) return 0.0;
-            if (val instanceof Number) return ((Number) val).doubleValue();
+            if (val instanceof Number n) return n.doubleValue();
             return Double.parseDouble(val.toString());
         }
 
@@ -355,7 +355,7 @@ public class CachingDriver extends AbstractProxyDriver {
         public boolean getBoolean(int columnIndex) throws SQLException {
             Object val = getObject(columnIndex);
             if (val == null) return false;
-            if (val instanceof Boolean) return (Boolean) val;
+            if (val instanceof Boolean b) return b;
             return Boolean.parseBoolean(val.toString());
         }
 
@@ -473,8 +473,8 @@ public class CachingDriver extends AbstractProxyDriver {
      * Returns null if the connection is not a caching connection.
      */
     public static QueryCache getCache(Connection conn) {
-        if (conn instanceof CachingConnection) {
-            return ((CachingConnection) conn).getCache();
+        if (conn instanceof CachingConnection cc) {
+            return cc.getCache();
         }
         return null;
     }

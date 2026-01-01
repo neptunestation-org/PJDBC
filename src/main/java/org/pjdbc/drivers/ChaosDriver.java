@@ -90,8 +90,7 @@ public class ChaosDriver extends AbstractProxyDriver {
     @Override
     protected ResultSet proxyResultSet(Statement stmt, ResultSet delegate) throws SQLException {
         Connection conn = stmt.getConnection();
-        if (conn instanceof ChaosConnection) {
-            ChaosConnection chaosConn = (ChaosConnection) conn;
+        if (conn instanceof ChaosConnection chaosConn) {
             return new ChaosResultSet(stmt, delegate, chaosConn.getConfig());
         }
         return delegate;

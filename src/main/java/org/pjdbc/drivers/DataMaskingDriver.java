@@ -100,8 +100,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
     @Override
     protected ResultSet proxyResultSet(Statement stmt, ResultSet delegate) throws SQLException {
         Connection conn = stmt.getConnection();
-        if (conn instanceof MaskingConnection) {
-            MaskingConnection maskConn = (MaskingConnection) conn;
+        if (conn instanceof MaskingConnection maskConn) {
             return new MaskingResultSet(stmt, delegate, maskConn.getConfig());
         }
         return delegate;
@@ -192,25 +191,14 @@ public class DataMaskingDriver extends AbstractProxyDriver {
             if (value == null) return null;
             if (value.isEmpty()) return value;
 
-            switch (strategy) {
-                case FULL:
-                    return repeat(maskChar, value.length());
-
-                case PARTIAL:
-                    return maskPartial(value);
-
-                case EMAIL:
-                    return maskEmail(value);
-
-                case REDACT:
-                    return "[REDACTED]";
-
-                case HASH:
-                    return maskHash(value);
-
-                default:
-                    return maskPartial(value);
-            }
+            return switch (strategy) {
+                case FULL -> repeat(maskChar, value.length());
+                case PARTIAL -> maskPartial(value);
+                case EMAIL -> maskEmail(value);
+                case REDACT -> "[REDACTED]";
+                case HASH -> maskHash(value);
+                default -> maskPartial(value);
+            };
         }
 
         private String maskPartial(String value) {
@@ -448,8 +436,8 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         @Override
         public Object getObject(int columnIndex) throws SQLException {
             Object value = super.getObject(columnIndex);
-            if (shouldMaskColumn(columnIndex) && value instanceof String) {
-                return config.maskValue((String) value);
+            if (shouldMaskColumn(columnIndex) && value instanceof String s) {
+                return config.maskValue(s);
             }
             return value;
         }
@@ -457,8 +445,8 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         @Override
         public Object getObject(String columnLabel) throws SQLException {
             Object value = super.getObject(columnLabel);
-            if (config.shouldMask(columnLabel) && value instanceof String) {
-                return config.maskValue((String) value);
+            if (config.shouldMask(columnLabel) && value instanceof String s) {
+                return config.maskValue(s);
             }
             return value;
         }

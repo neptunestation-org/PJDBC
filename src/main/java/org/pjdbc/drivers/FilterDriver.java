@@ -86,8 +86,8 @@ public class FilterDriver extends AbstractProxyDriver {
      */
     @Deprecated
     public Filter getFilter () {
-        if (transformer instanceof FilterAdapter) {
-            return ((FilterAdapter) transformer).filter;
+        if (transformer instanceof FilterAdapter fa) {
+            return fa.filter;
         }
         return null;}
 
