@@ -215,6 +215,57 @@ Connection c = DriverManager.getConnection(
     "jdbc:mask[columns=ssn,strategy=FULL,mask=X]:jdbc:postgresql://localhost/db");
 ```
 
+### TracingDriver (Distributed Tracing)
+
+Provides distributed tracing for JDBC operations with pluggable tracer support.
+
+**URL Format:** `jdbc:trace[param=value,...]:target-url`
+
+**Parameters:**
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `tracerName` | Name of registered tracer to use | jdbc |
+| `spanPrefix` | Prefix for span names | db. |
+| `includeSql` | Include SQL statement in span attributes | true |
+| `includeParams` | Include parameter values (security risk) | false |
+| `includeRowCount` | Include row counts in span attributes | true |
+
+**Span Attributes:**
+- `db.system` - Always "jdbc"
+- `db.operation` - Operation type (query, update, execute, batch, call)
+- `db.statement` - SQL statement (if includeSql=true)
+- `db.parameters` - Parameter values (if includeParams=true)
+- `db.rows_affected` - Row count for updates (if includeRowCount=true)
+- `db.batch_size` - Batch size for batch operations
+- `error`, `error.type`, `error.message` - On errors
+
+**Examples:**
+```java
+// Basic tracing
+Connection c = DriverManager.getConnection(
+    "jdbc:trace:jdbc:postgresql://localhost/db");
+
+// Custom span prefix
+Connection c = DriverManager.getConnection(
+    "jdbc:trace[spanPrefix=sql.]:jdbc:postgresql://localhost/db");
+
+// Include parameters (use with caution)
+Connection c = DriverManager.getConnection(
+    "jdbc:trace[includeParams=true]:jdbc:postgresql://localhost/db");
+
+// Disable SQL for security
+Connection c = DriverManager.getConnection(
+    "jdbc:trace[includeSql=false]:jdbc:postgresql://localhost/db");
+
+// Access spans from default tracer (for testing)
+List<SpanData> spans = TracingDriver.getDefaultTracer().getSpans();
+
+// Register custom tracer (e.g., for OpenTelemetry)
+TracingDriver.setTracer("otel", myOpenTelemetryTracer);
+Connection c = DriverManager.getConnection(
+    "jdbc:trace[tracerName=otel]:jdbc:postgresql://localhost/db");
+```
+
 ### ChaosDriver (Resilience Testing)
 
 Injects failures and latency to test application resilience.

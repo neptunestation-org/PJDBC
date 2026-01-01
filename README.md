@@ -213,6 +213,38 @@ Parameters:
 - `resultSetLatency`: Delay in ms for each ResultSet.next() call (default: 0)
 - `exceptionMessage`: Custom exception message (default: "ChaosDriver: Induced failure")
 
+### TracingDriver (`jdbc:trace:...`)
+
+Provides distributed tracing for JDBC operations. Useful for observability in microservices architectures.
+
+```java
+// Basic tracing
+Connection conn = DriverManager.getConnection(
+    "jdbc:trace:jdbc:postgresql://localhost/mydb"
+);
+
+// Custom span prefix
+Connection conn = DriverManager.getConnection(
+    "jdbc:trace[spanPrefix=sql.]:jdbc:postgresql://localhost/mydb"
+);
+
+// Access spans for testing
+List<SpanData> spans = TracingDriver.getDefaultTracer().getSpans();
+
+// Register custom tracer (e.g., OpenTelemetry)
+TracingDriver.setTracer("otel", myOpenTelemetryTracer);
+Connection conn = DriverManager.getConnection(
+    "jdbc:trace[tracerName=otel]:jdbc:postgresql://localhost/mydb"
+);
+```
+
+Parameters:
+- `tracerName`: Registered tracer name (default: jdbc)
+- `spanPrefix`: Prefix for span names (default: db.)
+- `includeSql`: Include SQL in spans (default: true)
+- `includeParams`: Include parameter values (default: false, for security)
+- `includeRowCount`: Include row counts (default: true)
+
 ### DataMaskingDriver (`jdbc:mask:...`)
 
 Masks sensitive data in query results on-the-fly. Useful for data privacy, development/testing with production data, or compliance requirements.
