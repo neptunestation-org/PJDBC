@@ -13,6 +13,11 @@ PJDBC is a pluggable JDBC driver framework that enables intercepting, transformi
 - **User Mapping**: Map application users to database credentials
 - **Extensible**: Create custom drivers by extending base classes
 
+## Requirements
+
+- Java 11 or higher
+- Maven 3.6+
+
 ## Installation
 
 Add to your `pom.xml`:
@@ -21,7 +26,7 @@ Add to your `pom.xml`:
 <dependency>
   <groupId>org.pjdbc</groupId>
   <artifactId>PJDBC</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>1.0</version>
 </dependency>
 ```
 
