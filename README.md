@@ -1,5 +1,7 @@
 # PJDBC - Proxying JDBC Driver
 
+[![CI](https://github.com/neptunestation-org/PJDBC/actions/workflows/ci.yml/badge.svg)](https://github.com/neptunestation-org/PJDBC/actions/workflows/ci.yml)
+
 PJDBC is a pluggable JDBC driver framework that enables intercepting, transforming, and extending database operations through composable proxy drivers.
 
 ## Features
