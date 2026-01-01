@@ -56,8 +56,14 @@ public abstract class AbstractConnection extends AbstractWrapper implements Conn
 	this.info = info;
 	this.driver = driver;}
 
+    public String getURL() {
+        return this.url;
+    }
+
     @Override
     public Array createArrayOf (String typeName, Object[] elements) throws SQLException {for (Connection d : getConnections()) return d.createArrayOf(typeName, elements); throw new SQLException();}
+
+
     @Override
     public Blob createBlob () throws SQLException {for (Connection d : getConnections()) return d.createBlob(); throw new SQLException();}
     @Override

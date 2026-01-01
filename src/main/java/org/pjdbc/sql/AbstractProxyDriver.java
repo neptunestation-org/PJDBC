@@ -83,7 +83,7 @@ public abstract class AbstractProxyDriver extends AbstractDriver {
     @Override
     public Connection connect (String url, Properties info) throws SQLException {
 	if (!acceptsURL(url)) return null;
-	return proxyConnection(DriverManager.getConnection(subname(url)), subname(url), info, this);}
+	return proxyConnection(DriverManager.getConnection(subname(url)), url, info, this);}
 
     @Override
     public DriverPropertyInfo[] getPropertyInfo (String url, Properties info) throws SQLException {
