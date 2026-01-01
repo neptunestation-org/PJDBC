@@ -6,3 +6,4 @@ org.pjdbc.drivers.SinkDriver
 org.pjdbc.drivers.FilterDriver
 org.pjdbc.drivers.PoolDriver
 org.pjdbc.drivers.UserMapDriver
+org.pjdbc.drivers.HikariPoolDriver
