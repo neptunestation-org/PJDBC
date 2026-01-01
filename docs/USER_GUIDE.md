@@ -92,6 +92,41 @@ Connection c = DriverManager.getConnection("jdbc:mapuser:jdbc:postgresql://local
 
 Requires a properties file `org.pjdbc.UserMapDriver.UserMapFile` in the classpath.
 
+### ChaosDriver (Resilience Testing)
+
+Injects failures and latency to test application resilience.
+
+**URL Format:** `jdbc:chaos[param=value,...]:target-url`
+
+**Parameters:**
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `failureRate` | Probability (0.0-1.0) of throwing SQLException | 0.0 |
+| `latency` | Fixed delay in ms before each query | 0 |
+| `latencyVariance` | Random additional delay up to this value in ms | 0 |
+| `connectionDropRate` | Probability of closing connection unexpectedly | 0.0 |
+| `resultSetLatency` | Delay in ms for each ResultSet.next() call | 0 |
+| `exceptionMessage` | Custom exception message | "ChaosDriver: Induced failure" |
+
+**Examples:**
+```java
+// 10% failure rate
+Connection c = DriverManager.getConnection(
+    "jdbc:chaos[failureRate=0.1]:jdbc:postgresql://localhost/db");
+
+// Simulate slow network (100-200ms latency)
+Connection c = DriverManager.getConnection(
+    "jdbc:chaos[latency=100,latencyVariance=100]:jdbc:postgresql://localhost/db");
+
+// Slow result iteration for large result sets
+Connection c = DriverManager.getConnection(
+    "jdbc:chaos[resultSetLatency=10]:jdbc:postgresql://localhost/db");
+
+// Combination for chaos testing
+Connection c = DriverManager.getConnection(
+    "jdbc:chaos[failureRate=0.05,latency=50,connectionDropRate=0.01]:jdbc:postgresql://localhost/db");
+```
+
 ## Chaining Drivers
 
 Drivers can be chained together:

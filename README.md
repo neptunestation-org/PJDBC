@@ -137,6 +137,35 @@ Connection conn = DriverManager.getConnection("jdbc:mock:testdb");
 String log = MockDriver.getLog("jdbc:mock:testdb");
 ```
 
+### ChaosDriver (`jdbc:chaos:...`)
+
+Injects configurable failures and latency for resilience testing. Use this driver to test how your application handles database errors, slow queries, and connection drops.
+
+```java
+// 10% failure rate
+Connection conn = DriverManager.getConnection(
+    "jdbc:chaos[failureRate=0.1]:jdbc:postgresql://localhost/mydb"
+);
+
+// 100ms latency with 50ms variance
+Connection conn = DriverManager.getConnection(
+    "jdbc:chaos[latency=100,latencyVariance=50]:jdbc:postgresql://localhost/mydb"
+);
+
+// Slow result set iteration (50ms per row)
+Connection conn = DriverManager.getConnection(
+    "jdbc:chaos[resultSetLatency=50]:jdbc:postgresql://localhost/mydb"
+);
+```
+
+Parameters:
+- `failureRate`: Probability (0.0-1.0) of throwing SQLException per query (default: 0.0)
+- `latency`: Fixed delay in milliseconds before each query (default: 0)
+- `latencyVariance`: Random additional delay up to this value in ms (default: 0)
+- `connectionDropRate`: Probability (0.0-1.0) of closing connection unexpectedly (default: 0.0)
+- `resultSetLatency`: Delay in ms for each ResultSet.next() call (default: 0)
+- `exceptionMessage`: Custom exception message (default: "ChaosDriver: Induced failure")
+
 ## Chaining Drivers
 
 Drivers can be composed by nesting URLs:
