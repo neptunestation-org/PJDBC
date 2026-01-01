@@ -137,6 +137,27 @@ Connection conn = DriverManager.getConnection("jdbc:mock:testdb");
 String log = MockDriver.getLog("jdbc:mock:testdb");
 ```
 
+### ReadonlyDriver (`jdbc:readonly:...`)
+
+Enforces read-only database access by blocking write operations.
+
+```java
+// Block all writes (DML and DDL)
+Connection conn = DriverManager.getConnection(
+    "jdbc:readonly:jdbc:postgresql://localhost/mydb"
+);
+
+// Allow DDL but block DML
+Connection conn = DriverManager.getConnection(
+    "jdbc:readonly[allowDDL=true]:jdbc:postgresql://localhost/mydb"
+);
+```
+
+Parameters:
+- `allowDDL`: Allow DDL statements (CREATE, ALTER, DROP) (default: false)
+- `allowDML`: Allow DML statements (INSERT, UPDATE, DELETE) (default: false)
+- `message`: Custom error message for blocked operations
+
 ### RetryDriver (`jdbc:retry:...`)
 
 Automatically retries failed queries on transient errors like connection failures and deadlocks.

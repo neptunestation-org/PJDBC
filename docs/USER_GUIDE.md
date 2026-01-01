@@ -92,6 +92,39 @@ Connection c = DriverManager.getConnection("jdbc:mapuser:jdbc:postgresql://local
 
 Requires a properties file `org.pjdbc.UserMapDriver.UserMapFile` in the classpath.
 
+### ReadonlyDriver (Read-Only Access)
+
+Enforces read-only database access by blocking write operations.
+
+**URL Format:** `jdbc:readonly[param=value,...]:target-url`
+
+**Parameters:**
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `allowDDL` | Allow DDL statements (CREATE, ALTER, DROP) | false |
+| `allowDML` | Allow DML statements (INSERT, UPDATE, DELETE) | false |
+| `message` | Custom error message for blocked operations | (default message) |
+
+**Blocked Operations:**
+- DML: INSERT, UPDATE, DELETE, MERGE, UPSERT, REPLACE, TRUNCATE
+- DDL: CREATE, ALTER, DROP, RENAME
+- DCL: GRANT, REVOKE (always blocked)
+
+**Examples:**
+```java
+// Block all writes
+Connection c = DriverManager.getConnection(
+    "jdbc:readonly:jdbc:postgresql://localhost/db");
+
+// Allow DDL for schema migrations
+Connection c = DriverManager.getConnection(
+    "jdbc:readonly[allowDDL=true]:jdbc:postgresql://localhost/db");
+
+// Custom error message
+Connection c = DriverManager.getConnection(
+    "jdbc:readonly[message=Reporting database is read-only]:jdbc:postgresql://localhost/db");
+```
+
 ### RetryDriver (Automatic Retries)
 
 Automatically retries failed queries on transient errors.
