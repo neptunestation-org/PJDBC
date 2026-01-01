@@ -12,3 +12,4 @@ org.pjdbc.drivers.RetryDriver
 org.pjdbc.drivers.ReadonlyDriver
 org.pjdbc.drivers.DataMaskingDriver
 org.pjdbc.drivers.TracingDriver
+org.pjdbc.drivers.CachingDriver

@@ -213,6 +213,32 @@ Parameters:
 - `resultSetLatency`: Delay in ms for each ResultSet.next() call (default: 0)
 - `exceptionMessage`: Custom exception message (default: "ChaosDriver: Induced failure")
 
+### CachingDriver (`jdbc:cache:...`)
+
+Caches SELECT query results in memory to reduce database load.
+
+```java
+// Basic caching (60s TTL, 1000 max entries)
+Connection conn = DriverManager.getConnection(
+    "jdbc:cache:jdbc:postgresql://localhost/mydb"
+);
+
+// Custom TTL and size
+Connection conn = DriverManager.getConnection(
+    "jdbc:cache[ttl=300,maxSize=5000]:jdbc:postgresql://localhost/mydb"
+);
+
+// Access cache statistics
+QueryCache cache = CachingDriver.getCache(conn);
+double hitRatio = cache.getHitRatio();
+```
+
+Parameters:
+- `ttl`: Time-to-live in seconds (default: 60)
+- `maxSize`: Maximum cached queries with LRU eviction (default: 1000)
+- `invalidateOnWrite`: Clear cache on writes (default: true)
+- `enabled`: Enable caching (default: true)
+
 ### TracingDriver (`jdbc:trace:...`)
 
 Provides distributed tracing for JDBC operations. Useful for observability in microservices architectures.

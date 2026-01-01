@@ -215,6 +215,50 @@ Connection c = DriverManager.getConnection(
     "jdbc:mask[columns=ssn,strategy=FULL,mask=X]:jdbc:postgresql://localhost/db");
 ```
 
+### CachingDriver (Query Result Caching)
+
+Caches SELECT query results in memory to reduce database load.
+
+**URL Format:** `jdbc:cache[param=value,...]:target-url`
+
+**Parameters:**
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `ttl` | Time-to-live in seconds for cache entries | 60 |
+| `maxSize` | Maximum number of cached queries (LRU eviction) | 1000 |
+| `invalidateOnWrite` | Clear cache on INSERT/UPDATE/DELETE | true |
+| `enabled` | Enable caching | true |
+
+**Features:**
+- Caches SELECT query results in memory
+- LRU eviction when maxSize is exceeded
+- TTL-based expiration
+- Automatic invalidation on write operations
+- Cache statistics (hits, misses, evictions, hit ratio)
+- Thread-safe implementation
+- Parameter-aware caching for PreparedStatements
+
+**Examples:**
+```java
+// Basic caching with defaults (60s TTL, 1000 max entries)
+Connection c = DriverManager.getConnection(
+    "jdbc:cache:jdbc:postgresql://localhost/db");
+
+// Custom TTL and max size
+Connection c = DriverManager.getConnection(
+    "jdbc:cache[ttl=300,maxSize=5000]:jdbc:postgresql://localhost/db");
+
+// Disable invalidation on writes (for read-only workloads)
+Connection c = DriverManager.getConnection(
+    "jdbc:cache[invalidateOnWrite=false]:jdbc:postgresql://localhost/db");
+
+// Access cache statistics
+QueryCache cache = CachingDriver.getCache(conn);
+System.out.println("Hit ratio: " + cache.getHitRatio());
+System.out.println("Hits: " + cache.getHits());
+System.out.println("Misses: " + cache.getMisses());
+```
+
 ### TracingDriver (Distributed Tracing)
 
 Provides distributed tracing for JDBC operations with pluggable tracer support.
