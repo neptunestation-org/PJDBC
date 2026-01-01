@@ -166,6 +166,55 @@ Connection c = DriverManager.getConnection(
     "jdbc:retry[maxRetries=3]:jdbc:log:jdbc:postgresql://localhost/db");
 ```
 
+### DataMaskingDriver (Sensitive Data Anonymization)
+
+Masks sensitive data in query results on-the-fly for data privacy and security.
+
+**URL Format:** `jdbc:mask[param=value,...]:target-url`
+
+**Parameters:**
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `columns` | Semicolon-separated column name patterns (regex) to mask | (none) |
+| `strategy` | Masking strategy: FULL, PARTIAL, EMAIL, REDACT, HASH | PARTIAL |
+| `mask` | Character to use for masking | * |
+| `showLast` | Characters to show at end for PARTIAL strategy | 4 |
+| `showFirst` | Characters to show at start for PARTIAL strategy | 0 |
+
+**Masking Strategies:**
+- **FULL** - Replace entire value with mask characters (e.g., "********")
+- **PARTIAL** - Show first/last N characters (e.g., "****1234")
+- **EMAIL** - Mask email preserving first char and domain (e.g., "j***@example.com")
+- **REDACT** - Replace with "[REDACTED]"
+- **HASH** - Replace with hash prefix (e.g., "a1b2c3d4...")
+
+**Examples:**
+```java
+// Mask SSN and credit card columns (show last 4 digits)
+Connection c = DriverManager.getConnection(
+    "jdbc:mask[columns=ssn;credit_card,showLast=4]:jdbc:postgresql://localhost/db");
+
+// Full masking for passwords
+Connection c = DriverManager.getConnection(
+    "jdbc:mask[columns=password;secret,strategy=FULL]:jdbc:postgresql://localhost/db");
+
+// Email masking (preserves domain)
+Connection c = DriverManager.getConnection(
+    "jdbc:mask[columns=.*email.*,strategy=EMAIL]:jdbc:postgresql://localhost/db");
+
+// Redact sensitive columns
+Connection c = DriverManager.getConnection(
+    "jdbc:mask[columns=ssn;salary,strategy=REDACT]:jdbc:postgresql://localhost/db");
+
+// Show first and last 4 characters of credit card
+Connection c = DriverManager.getConnection(
+    "jdbc:mask[columns=card_number,showFirst=4,showLast=4]:jdbc:mysql://localhost/db");
+
+// Use X instead of * for masking
+Connection c = DriverManager.getConnection(
+    "jdbc:mask[columns=ssn,strategy=FULL,mask=X]:jdbc:postgresql://localhost/db");
+```
+
 ### ChaosDriver (Resilience Testing)
 
 Injects failures and latency to test application resilience.

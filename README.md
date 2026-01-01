@@ -213,6 +213,39 @@ Parameters:
 - `resultSetLatency`: Delay in ms for each ResultSet.next() call (default: 0)
 - `exceptionMessage`: Custom exception message (default: "ChaosDriver: Induced failure")
 
+### DataMaskingDriver (`jdbc:mask:...`)
+
+Masks sensitive data in query results on-the-fly. Useful for data privacy, development/testing with production data, or compliance requirements.
+
+```java
+// Mask SSN and credit card columns (show last 4 digits)
+Connection conn = DriverManager.getConnection(
+    "jdbc:mask[columns=ssn;credit_card]:jdbc:postgresql://localhost/mydb"
+);
+
+// Redact all password fields
+Connection conn = DriverManager.getConnection(
+    "jdbc:mask[columns=password;secret,strategy=REDACT]:jdbc:postgresql://localhost/mydb"
+);
+
+// Mask emails preserving domain
+Connection conn = DriverManager.getConnection(
+    "jdbc:mask[columns=.*email.*,strategy=EMAIL]:jdbc:postgresql://localhost/mydb"
+);
+```
+
+Parameters:
+- `columns`: Semicolon-separated column name patterns (regex) to mask
+- `strategy`: Masking strategy (default: PARTIAL)
+  - `FULL`: Replace entire value with mask chars (e.g., "********")
+  - `PARTIAL`: Show first/last N characters (e.g., "****1234")
+  - `EMAIL`: Preserve first char and domain (e.g., "j***@example.com")
+  - `REDACT`: Replace with "[REDACTED]"
+  - `HASH`: Replace with hash prefix (e.g., "a1b2c3d4...")
+- `mask`: Mask character (default: *)
+- `showFirst`: Characters to show at start for PARTIAL (default: 0)
+- `showLast`: Characters to show at end for PARTIAL (default: 4)
+
 ## Chaining Drivers
 
 Drivers can be composed by nesting URLs:

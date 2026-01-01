@@ -10,3 +10,4 @@ org.pjdbc.drivers.HikariPoolDriver
 org.pjdbc.drivers.ChaosDriver
 org.pjdbc.drivers.RetryDriver
 org.pjdbc.drivers.ReadonlyDriver
+org.pjdbc.drivers.DataMaskingDriver
