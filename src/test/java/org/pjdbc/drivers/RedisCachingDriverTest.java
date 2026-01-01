@@ -5,7 +5,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeTrue;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -16,24 +15,30 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Test;
-
-import redis.clients.jedis.Jedis;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.utility.DockerImageName;
 
 public class RedisCachingDriverTest {
+
+    @ClassRule
+    @SuppressWarnings("rawtypes")
+    public static GenericContainer redis = new GenericContainer(
+        DockerImageName.parse("redis:7-alpine"))
+        .withExposedPorts(6379);
 
     @BeforeClass
     public static void loadDriver() throws ClassNotFoundException {
         Class.forName("org.pjdbc.drivers.RedisCachingDriver");
     }
 
-    private static boolean isRedisAvailable() {
-        try (Jedis jedis = new Jedis("localhost", 6379)) {
-            jedis.ping();
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+    private static String getRedisHost() {
+        return redis.getHost();
+    }
+
+    private static int getRedisPort() {
+        return redis.getFirstMappedPort();
     }
 
     private void setupTestTable(String dbName) throws SQLException {
@@ -298,10 +303,11 @@ public class RedisCachingDriverTest {
 
     @Test
     public void testBasicConnectionWithRedis() throws SQLException {
-        assumeTrue("Redis not available", isRedisAvailable());
         setupTestTable("redis_int_basic");
 
-        String url = "jdbc:rediscache[keyPrefix=test_basic:]:jdbc:h2:mem:redis_int_basic;DB_CLOSE_DELAY=-1";
+        String url = String.format(
+            "jdbc:rediscache[host=%s,port=%d,keyPrefix=test_basic:]:jdbc:h2:mem:redis_int_basic;DB_CLOSE_DELAY=-1",
+            getRedisHost(), getRedisPort());
         try (Connection conn = DriverManager.getConnection(url)) {
             assertNotNull(conn);
             RedisCachingDriver.RedisQueryCache cache = RedisCachingDriver.getCache(conn);
@@ -311,10 +317,11 @@ public class RedisCachingDriverTest {
 
     @Test
     public void testQueryCachingWithRedis() throws SQLException {
-        assumeTrue("Redis not available", isRedisAvailable());
         setupTestTable("redis_int_query");
 
-        String url = "jdbc:rediscache[keyPrefix=test_query:]:jdbc:h2:mem:redis_int_query;DB_CLOSE_DELAY=-1";
+        String url = String.format(
+            "jdbc:rediscache[host=%s,port=%d,keyPrefix=test_query:]:jdbc:h2:mem:redis_int_query;DB_CLOSE_DELAY=-1",
+            getRedisHost(), getRedisPort());
         try (Connection conn = DriverManager.getConnection(url)) {
             RedisCachingDriver.RedisQueryCache cache = RedisCachingDriver.getCache(conn);
             cache.clear(); // Clear any existing entries
@@ -343,10 +350,11 @@ public class RedisCachingDriverTest {
 
     @Test
     public void testCacheInvalidationWithRedis() throws SQLException {
-        assumeTrue("Redis not available", isRedisAvailable());
         setupTestTable("redis_int_invalidate");
 
-        String url = "jdbc:rediscache[keyPrefix=test_inv:]:jdbc:h2:mem:redis_int_invalidate;DB_CLOSE_DELAY=-1";
+        String url = String.format(
+            "jdbc:rediscache[host=%s,port=%d,keyPrefix=test_inv:]:jdbc:h2:mem:redis_int_invalidate;DB_CLOSE_DELAY=-1",
+            getRedisHost(), getRedisPort());
         try (Connection conn = DriverManager.getConnection(url)) {
             RedisCachingDriver.RedisQueryCache cache = RedisCachingDriver.getCache(conn);
             cache.clear();
@@ -372,10 +380,11 @@ public class RedisCachingDriverTest {
 
     @Test
     public void testPreparedStatementCachingWithRedis() throws SQLException {
-        assumeTrue("Redis not available", isRedisAvailable());
         setupTestTable("redis_int_pstmt");
 
-        String url = "jdbc:rediscache[keyPrefix=test_pstmt:]:jdbc:h2:mem:redis_int_pstmt;DB_CLOSE_DELAY=-1";
+        String url = String.format(
+            "jdbc:rediscache[host=%s,port=%d,keyPrefix=test_pstmt:]:jdbc:h2:mem:redis_int_pstmt;DB_CLOSE_DELAY=-1",
+            getRedisHost(), getRedisPort());
         try (Connection conn = DriverManager.getConnection(url)) {
             RedisCachingDriver.RedisQueryCache cache = RedisCachingDriver.getCache(conn);
             cache.clear();
@@ -414,10 +423,11 @@ public class RedisCachingDriverTest {
 
     @Test
     public void testCacheStatisticsWithRedis() throws SQLException {
-        assumeTrue("Redis not available", isRedisAvailable());
         setupTestTable("redis_int_stats");
 
-        String url = "jdbc:rediscache[keyPrefix=test_stats:]:jdbc:h2:mem:redis_int_stats;DB_CLOSE_DELAY=-1";
+        String url = String.format(
+            "jdbc:rediscache[host=%s,port=%d,keyPrefix=test_stats:]:jdbc:h2:mem:redis_int_stats;DB_CLOSE_DELAY=-1",
+            getRedisHost(), getRedisPort());
         try (Connection conn = DriverManager.getConnection(url)) {
             RedisCachingDriver.RedisQueryCache cache = RedisCachingDriver.getCache(conn);
             cache.clear();
@@ -438,10 +448,11 @@ public class RedisCachingDriverTest {
 
     @Test
     public void testDisabledCacheWithRedis() throws SQLException {
-        assumeTrue("Redis not available", isRedisAvailable());
         setupTestTable("redis_int_disabled");
 
-        String url = "jdbc:rediscache[keyPrefix=test_disabled:,enabled=false]:jdbc:h2:mem:redis_int_disabled;DB_CLOSE_DELAY=-1";
+        String url = String.format(
+            "jdbc:rediscache[host=%s,port=%d,keyPrefix=test_disabled:,enabled=false]:jdbc:h2:mem:redis_int_disabled;DB_CLOSE_DELAY=-1",
+            getRedisHost(), getRedisPort());
         try (Connection conn = DriverManager.getConnection(url)) {
             RedisCachingDriver.RedisQueryCache cache = RedisCachingDriver.getCache(conn);
             cache.resetStats();
@@ -458,11 +469,12 @@ public class RedisCachingDriverTest {
 
     @Test
     public void testCacheTTLWithRedis() throws SQLException, InterruptedException {
-        assumeTrue("Redis not available", isRedisAvailable());
         setupTestTable("redis_int_ttl");
 
         // TTL of 1 second
-        String url = "jdbc:rediscache[keyPrefix=test_ttl:,ttl=1]:jdbc:h2:mem:redis_int_ttl;DB_CLOSE_DELAY=-1";
+        String url = String.format(
+            "jdbc:rediscache[host=%s,port=%d,keyPrefix=test_ttl:,ttl=1]:jdbc:h2:mem:redis_int_ttl;DB_CLOSE_DELAY=-1",
+            getRedisHost(), getRedisPort());
         try (Connection conn = DriverManager.getConnection(url)) {
             RedisCachingDriver.RedisQueryCache cache = RedisCachingDriver.getCache(conn);
             cache.clear();

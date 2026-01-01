@@ -97,5 +97,11 @@
       <version>5.3.6</version>
       <optional>true</optional>
     </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers</artifactId>
+      <version>1.19.8</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>
