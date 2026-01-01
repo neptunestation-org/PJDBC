@@ -87,6 +87,22 @@ Parameters:
 - `max`: Maximum pool size (default: unlimited)
 - `timeout`: Connection acquisition timeout in milliseconds (default: 1000)
 
+### HikariPoolDriver (`jdbc:hikaricp:...`)
+
+A more advanced connection pooling driver that uses HikariCP.
+
+```java
+// Basic usage
+Connection conn = DriverManager.getConnection("jdbc:hikaricp:jdbc:postgresql://localhost/mydb");
+
+// With configuration
+Connection conn = DriverManager.getConnection(
+    "jdbc:hikaricp:jdbc:postgresql://localhost/mydb?maximumPoolSize=10"
+);
+```
+
+All HikariCP configuration parameters can be passed in the URL query string.
+
 ### TeeDriver (`jdbc:tee:...`)
 
 Replicates operations across multiple database connections. Specify two JDBC URLs separated by semicolon.

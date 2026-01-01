@@ -55,7 +55,7 @@ public abstract class AbstractStatement extends AbstractWrapper implements State
     public void cancel () throws SQLException {for (Statement s : getStatements()) s.cancel(); throw new SQLException();}
     public void clearBatch () throws SQLException {for (Statement s : getStatements()) s.clearBatch(); throw new SQLException();}
     public void clearWarnings () throws SQLException {for (Statement s : getStatements()) s.clearWarnings(); throw new SQLException();}
-    public void close () throws SQLException {for (Statement s : getStatements()) s.close(); throw new SQLException();}
+    public void close () throws SQLException {for (Statement s : getStatements()) s.close();}
     public void closeOnCompletion () throws SQLException {for (Statement s : getStatements()) s.closeOnCompletion(); throw new SQLException();}
     public void setCursorName (String name) throws SQLException {for (Statement s : getStatements()) s.setCursorName(name); throw new SQLException();}
     public void setEscapeProcessing (boolean enable) throws SQLException {for (Statement s : getStatements()) s.setEscapeProcessing(enable); throw new SQLException();}
