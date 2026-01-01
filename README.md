@@ -271,6 +271,39 @@ Parameters:
 - `includeParams`: Include parameter values (default: false, for security)
 - `includeRowCount`: Include row counts (default: true)
 
+### MetricsDriver (`jdbc:metrics:...`)
+
+Collects performance metrics for JDBC operations including query counts, timing, error rates, and per-operation-type statistics.
+
+```java
+// Basic metrics collection
+Connection conn = DriverManager.getConnection(
+    "jdbc:metrics:jdbc:postgresql://localhost/mydb"
+);
+
+// Custom slow query threshold
+Connection conn = DriverManager.getConnection(
+    "jdbc:metrics[slowThreshold=500]:jdbc:postgresql://localhost/mydb"
+);
+
+// Access metrics
+MetricsDriver.Metrics metrics = MetricsDriver.getMetrics(conn);
+System.out.println("Queries: " + metrics.getTotalQueries());
+System.out.println("Avg time: " + metrics.getAvgTimeMs() + "ms");
+System.out.println("Error rate: " + metrics.getErrorRate());
+
+// Global metrics across all connections
+MetricsDriver.Metrics global = MetricsDriver.getGlobalMetrics();
+System.out.println("Active connections: " + global.getActiveConnections());
+```
+
+Parameters:
+- `enabled`: Enable metrics collection (default: true)
+- `slowThreshold`: Threshold in ms for slow query detection (default: 1000)
+- `trackByType`: Track metrics by operation type (default: true)
+
+Metrics include: total operations, queries, updates, errors, slow queries, timing statistics (min/max/avg), rows affected, and per-type breakdowns (SELECT, INSERT, UPDATE, DELETE).
+
 ### DataMaskingDriver (`jdbc:mask:...`)
 
 Masks sensitive data in query results on-the-fly. Useful for data privacy, development/testing with production data, or compliance requirements.

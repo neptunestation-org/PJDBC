@@ -310,6 +310,61 @@ Connection c = DriverManager.getConnection(
     "jdbc:trace[tracerName=otel]:jdbc:postgresql://localhost/db");
 ```
 
+### MetricsDriver (Performance Monitoring)
+
+Collects performance metrics for JDBC operations including query counts, timing, and error rates.
+
+**URL Format:** `jdbc:metrics[param=value,...]:target-url`
+
+**Parameters:**
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `enabled` | Enable metrics collection | true |
+| `slowThreshold` | Threshold in ms for slow query detection | 1000 |
+| `trackByType` | Track metrics by operation type (SELECT, INSERT, etc.) | true |
+
+**Metrics Available:**
+- Total queries, updates, executes, and operations
+- Total errors and error rate
+- Slow query count and rate
+- Timing statistics (min, max, avg, total)
+- Rows affected
+- Active and total connections (global)
+- Per-operation-type metrics (SELECT, INSERT, UPDATE, DELETE, OTHER)
+
+**Examples:**
+```java
+// Basic metrics collection
+Connection c = DriverManager.getConnection(
+    "jdbc:metrics:jdbc:postgresql://localhost/db");
+
+// Custom slow query threshold (500ms)
+Connection c = DriverManager.getConnection(
+    "jdbc:metrics[slowThreshold=500]:jdbc:postgresql://localhost/db");
+
+// Disable metrics temporarily
+Connection c = DriverManager.getConnection(
+    "jdbc:metrics[enabled=false]:jdbc:postgresql://localhost/db");
+
+// Access connection-specific metrics
+MetricsDriver.Metrics metrics = MetricsDriver.getMetrics(conn);
+System.out.println("Total queries: " + metrics.getTotalQueries());
+System.out.println("Avg time: " + metrics.getAvgTimeMs() + "ms");
+System.out.println("Error rate: " + metrics.getErrorRate());
+
+// Access per-type metrics
+TypeMetrics selectMetrics = metrics.getTypeMetrics(MetricsDriver.OperationType.SELECT);
+System.out.println("SELECT count: " + selectMetrics.getCount());
+
+// Access global metrics (across all connections)
+MetricsDriver.Metrics global = MetricsDriver.getGlobalMetrics();
+System.out.println("Active connections: " + global.getActiveConnections());
+System.out.println("Total connections: " + global.getTotalConnections());
+
+// Reset metrics
+metrics.reset();
+```
+
 ### ChaosDriver (Resilience Testing)
 
 Injects failures and latency to test application resilience.
