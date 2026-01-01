@@ -137,6 +137,32 @@ Connection conn = DriverManager.getConnection("jdbc:mock:testdb");
 String log = MockDriver.getLog("jdbc:mock:testdb");
 ```
 
+### RetryDriver (`jdbc:retry:...`)
+
+Automatically retries failed queries on transient errors like connection failures and deadlocks.
+
+```java
+// Basic usage with defaults (3 retries, exponential backoff)
+Connection conn = DriverManager.getConnection(
+    "jdbc:retry:jdbc:postgresql://localhost/mydb"
+);
+
+// Custom retry configuration
+Connection conn = DriverManager.getConnection(
+    "jdbc:retry[maxRetries=5,initialDelay=200,maxDelay=10000]:jdbc:postgresql://localhost/mydb"
+);
+```
+
+Parameters:
+- `maxRetries`: Maximum retry attempts (default: 3)
+- `initialDelay`: Initial delay in ms before first retry (default: 100)
+- `maxDelay`: Maximum delay cap in ms (default: 5000)
+- `backoffMultiplier`: Multiplier for exponential backoff (default: 2.0)
+- `jitter`: Add random jitter to delays: true/false (default: true)
+- `retryOnSqlStates`: Semicolon-separated SQL states to retry on (default: transient errors)
+
+Default retryable SQL states: 08001, 08003, 08004, 08006, 08007 (connection errors), 40001, 40P01 (deadlock), 57P01 (admin shutdown), HYT00, HYT01 (timeouts).
+
 ### ChaosDriver (`jdbc:chaos:...`)
 
 Injects configurable failures and latency for resilience testing. Use this driver to test how your application handles database errors, slow queries, and connection drops.

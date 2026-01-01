@@ -92,6 +92,47 @@ Connection c = DriverManager.getConnection("jdbc:mapuser:jdbc:postgresql://local
 
 Requires a properties file `org.pjdbc.UserMapDriver.UserMapFile` in the classpath.
 
+### RetryDriver (Automatic Retries)
+
+Automatically retries failed queries on transient errors.
+
+**URL Format:** `jdbc:retry[param=value,...]:target-url`
+
+**Parameters:**
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `maxRetries` | Maximum retry attempts | 3 |
+| `initialDelay` | Initial delay in ms | 100 |
+| `maxDelay` | Maximum delay cap in ms | 5000 |
+| `backoffMultiplier` | Multiplier for exponential backoff | 2.0 |
+| `jitter` | Add random jitter to delays | true |
+| `retryOnSqlStates` | Semicolon-separated SQL states to retry | (transient errors) |
+
+**Default Retryable SQL States:**
+- 08001, 08003, 08004, 08006, 08007 - Connection errors
+- 40001, 40P01 - Deadlock/serialization failures
+- 57P01 - Admin shutdown
+- HYT00, HYT01 - Timeout errors
+
+**Examples:**
+```java
+// Basic usage with defaults
+Connection c = DriverManager.getConnection(
+    "jdbc:retry:jdbc:postgresql://localhost/db");
+
+// Custom retry settings
+Connection c = DriverManager.getConnection(
+    "jdbc:retry[maxRetries=5,initialDelay=200,maxDelay=10000]:jdbc:postgresql://localhost/db");
+
+// Custom retryable states (only retry on deadlock)
+Connection c = DriverManager.getConnection(
+    "jdbc:retry[retryOnSqlStates=40001;40P01]:jdbc:postgresql://localhost/db");
+
+// Combine with other drivers
+Connection c = DriverManager.getConnection(
+    "jdbc:retry[maxRetries=3]:jdbc:log:jdbc:postgresql://localhost/db");
+```
+
 ### ChaosDriver (Resilience Testing)
 
 Injects failures and latency to test application resilience.
