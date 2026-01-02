@@ -28,3 +28,11 @@ jobs:
 
     - name: Package
       run: mvn -B package -DskipTests
+
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom
+        path: |
+          target/bom.json
+          target/bom.xml

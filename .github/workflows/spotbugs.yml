@@ -1,0 +1,41 @@
+name: SpotBugs
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  spotbugs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build and run SpotBugs
+      run: mvn -B compile spotbugs:spotbugs -Pspotbugs
+
+    - name: Upload SpotBugs report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: spotbugs-report
+        path: target/spotbugs/
+
+    - name: Upload SARIF to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: target/spotbugs/spotbugsXml.sarif
