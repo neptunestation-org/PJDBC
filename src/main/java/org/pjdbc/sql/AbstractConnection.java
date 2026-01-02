@@ -119,13 +119,13 @@ public abstract class AbstractConnection extends AbstractWrapper implements Conn
     @Override
     public Struct createStruct (String typeName, Object[] attributes) throws SQLException {for (Connection d : getConnections()) return d.createStruct(typeName, attributes); throw new SQLException();}
     @Override
-    public boolean getAutoCommit () throws SQLException {for (Connection d : getConnections()) if(!d.getAutoCommit()) return false; throw new SQLException();}
+    public boolean getAutoCommit () throws SQLException {for (Connection d : getConnections()) if(!d.getAutoCommit()) return false; return true;}
     @Override
-    public boolean isClosed () throws SQLException {for (Connection d : getConnections()) if(!d.isClosed()) return false; throw new SQLException();}
+    public boolean isClosed () throws SQLException {for (Connection d : getConnections()) if(!d.isClosed()) return false; return true;}
     @Override
-    public boolean isReadOnly () throws SQLException {for (Connection d : getConnections()) if (!d.isReadOnly()) return false; throw new SQLException();}
+    public boolean isReadOnly () throws SQLException {for (Connection d : getConnections()) if (!d.isReadOnly()) return false; return true;}
     @Override
-    public boolean isValid (int timeout) throws SQLException {for (Connection d : getConnections()) if (!d.isValid(timeout)) return false; throw new SQLException();}
+    public boolean isValid (int timeout) throws SQLException {for (Connection d : getConnections()) if (!d.isValid(timeout)) return false; return true;}
     @Override
     public int getHoldability () throws SQLException {for (Connection d : getConnections()) return d.getHoldability(); throw new SQLException();}
     @Override
