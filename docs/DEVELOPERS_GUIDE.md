@@ -154,12 +154,12 @@ PJDBC includes conformance tests that verify drivers behave according to their d
 
 ### Test Categories
 
-| Test Class | Purpose |
-|------------|---------|
-| `UrlParsingConformanceTest` | Verifies URL parsing, prefix handling, parameter syntax |
-| `ParameterDefaultConformanceTest` | Validates parameter defaults, types, ranges |
-| `SideEffectConformanceTest` | Checks side effect declarations match behavior |
-| `PerformanceInvariantConformanceTest` | Ensures bounded connection times, minimal overhead |
+| Test Class                            | Purpose                                                 |
+|---------------------------------------|---------------------------------------------------------|
+| `UrlParsingConformanceTest`           | Verifies URL parsing, prefix handling, parameter syntax |
+| `ParameterDefaultConformanceTest`     | Validates parameter defaults, types, ranges             |
+| `SideEffectConformanceTest`           | Checks side effect declarations match behavior          |
+| `PerformanceInvariantConformanceTest` | Ensures bounded connection times, minimal overhead      |
 
 ### Running Conformance Tests
 

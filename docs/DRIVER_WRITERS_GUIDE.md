@@ -83,13 +83,13 @@ protected ResultSet proxyResultSet(Statement stmt, ResultSet delegate)
 
 ## Available Proxy Points
 
-| Method | Purpose |
-|--------|---------|
-| `proxyConnection` | Wrap Connection objects |
-| `proxyStatement` | Wrap Statement objects |
+| Method                   | Purpose                        |
+|--------------------------|--------------------------------|
+| `proxyConnection`        | Wrap Connection objects        |
+| `proxyStatement`         | Wrap Statement objects         |
 | `proxyPreparedStatement` | Wrap PreparedStatement objects |
 | `proxyCallableStatement` | Wrap CallableStatement objects |
-| `proxyResultSet` | Wrap ResultSet objects |
+| `proxyResultSet`         | Wrap ResultSet objects         |
 
 ## URL Parameters
 

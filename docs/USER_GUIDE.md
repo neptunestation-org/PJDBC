@@ -27,11 +27,11 @@ Provides connection pooling with configurable parameters.
 **URL Format:** `jdbc:pool[param=value,...]:target-url`
 
 **Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `min` | Minimum pool size | 0 |
-| `max` | Maximum pool size | unlimited |
-| `timeout` | Wait timeout (ms) | 1000 |
+| Parameter | Description       | Default   |
+|-----------|-------------------|-----------|
+| `min`     | Minimum pool size | 0         |
+| `max`     | Maximum pool size | unlimited |
+| `timeout` | Wait timeout (ms) | 1000      |
 
 **Examples:**
 ```java
@@ -99,11 +99,11 @@ Enforces read-only database access by blocking write operations.
 **URL Format:** `jdbc:readonly[param=value,...]:target-url`
 
 **Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `allowDDL` | Allow DDL statements (CREATE, ALTER, DROP) | false |
-| `allowDML` | Allow DML statements (INSERT, UPDATE, DELETE) | false |
-| `message` | Custom error message for blocked operations | (default message) |
+| Parameter  | Description                                   | Default           |
+|------------|-----------------------------------------------|-------------------|
+| `allowDDL` | Allow DDL statements (CREATE, ALTER, DROP)    | false             |
+| `allowDML` | Allow DML statements (INSERT, UPDATE, DELETE) | false             |
+| `message`  | Custom error message for blocked operations   | (default message) |
 
 **Blocked Operations:**
 - DML: INSERT, UPDATE, DELETE, MERGE, UPSERT, REPLACE, TRUNCATE
@@ -132,14 +132,14 @@ Automatically retries failed queries on transient errors.
 **URL Format:** `jdbc:retry[param=value,...]:target-url`
 
 **Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `maxRetries` | Maximum retry attempts | 3 |
-| `initialDelay` | Initial delay in ms | 100 |
-| `maxDelay` | Maximum delay cap in ms | 5000 |
-| `backoffMultiplier` | Multiplier for exponential backoff | 2.0 |
-| `jitter` | Add random jitter to delays | true |
-| `retryOnSqlStates` | Semicolon-separated SQL states to retry | (transient errors) |
+| Parameter           | Description                             | Default            |
+|---------------------|-----------------------------------------|--------------------|
+| `maxRetries`        | Maximum retry attempts                  | 3                  |
+| `initialDelay`      | Initial delay in ms                     | 100                |
+| `maxDelay`          | Maximum delay cap in ms                 | 5000               |
+| `backoffMultiplier` | Multiplier for exponential backoff      | 2.0                |
+| `jitter`            | Add random jitter to delays             | true               |
+| `retryOnSqlStates`  | Semicolon-separated SQL states to retry | (transient errors) |
 
 **Default Retryable SQL States:**
 - 08001, 08003, 08004, 08006, 08007 - Connection errors
@@ -173,13 +173,13 @@ Masks sensitive data in query results on-the-fly for data privacy and security.
 **URL Format:** `jdbc:mask[param=value,...]:target-url`
 
 **Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `columns` | Semicolon-separated column name patterns (regex) to mask | (none) |
-| `strategy` | Masking strategy: FULL, PARTIAL, EMAIL, REDACT, HASH | PARTIAL |
-| `mask` | Character to use for masking | * |
-| `showLast` | Characters to show at end for PARTIAL strategy | 4 |
-| `showFirst` | Characters to show at start for PARTIAL strategy | 0 |
+| Parameter   | Description                                              | Default |
+|-------------|----------------------------------------------------------|---------|
+| `columns`   | Semicolon-separated column name patterns (regex) to mask | (none)  |
+| `strategy`  | Masking strategy: FULL, PARTIAL, EMAIL, REDACT, HASH     | PARTIAL |
+| `mask`      | Character to use for masking                             | *       |
+| `showLast`  | Characters to show at end for PARTIAL strategy           | 4       |
+| `showFirst` | Characters to show at start for PARTIAL strategy         | 0       |
 
 **Masking Strategies:**
 - **FULL** - Replace entire value with mask characters (e.g., "********")
@@ -222,12 +222,12 @@ Caches SELECT query results in memory to reduce database load.
 **URL Format:** `jdbc:cache[param=value,...]:target-url`
 
 **Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `ttl` | Time-to-live in seconds for cache entries | 60 |
-| `maxSize` | Maximum number of cached queries (LRU eviction) | 1000 |
-| `invalidateOnWrite` | Clear cache on INSERT/UPDATE/DELETE | true |
-| `enabled` | Enable caching | true |
+| Parameter           | Description                                     | Default |
+|---------------------|-------------------------------------------------|---------|
+| `ttl`               | Time-to-live in seconds for cache entries       | 60      |
+| `maxSize`           | Maximum number of cached queries (LRU eviction) | 1000    |
+| `invalidateOnWrite` | Clear cache on INSERT/UPDATE/DELETE             | true    |
+| `enabled`           | Enable caching                                  | true    |
 
 **Features:**
 - Caches SELECT query results in memory
@@ -266,17 +266,17 @@ Caches SELECT query results in Redis for distributed caching across multiple app
 **URL Format:** `jdbc:rediscache[param=value,...]:target-url`
 
 **Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `host` | Redis server hostname | localhost |
-| `port` | Redis server port | 6379 |
-| `password` | Redis password | (none) |
-| `database` | Redis database number | 0 |
-| `keyPrefix` | Prefix for cache keys (namespace isolation) | pjdbc: |
-| `ttl` | Time-to-live in seconds for cache entries | 60 |
-| `maxPoolSize` | Maximum connections in Redis pool | 8 |
-| `invalidateOnWrite` | Clear cache on INSERT/UPDATE/DELETE | true |
-| `enabled` | Enable caching | true |
+| Parameter           | Description                                 | Default   |
+|---------------------|---------------------------------------------|-----------|
+| `host`              | Redis server hostname                       | localhost |
+| `port`              | Redis server port                           | 6379      |
+| `password`          | Redis password                              | (none)    |
+| `database`          | Redis database number                       | 0         |
+| `keyPrefix`         | Prefix for cache keys (namespace isolation) | pjdbc:    |
+| `ttl`               | Time-to-live in seconds for cache entries   | 60        |
+| `maxPoolSize`       | Maximum connections in Redis pool           | 8         |
+| `invalidateOnWrite` | Clear cache on INSERT/UPDATE/DELETE         | true      |
+| `enabled`           | Enable caching                              | true      |
 
 **Features:**
 - Distributed caching across multiple application instances
@@ -325,13 +325,13 @@ Caches SELECT query results in Memcached for distributed caching across multiple
 **URL Format:** `jdbc:memcache[param=value,...]:target-url`
 
 **Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `servers` | Semicolon-separated list of host:port servers | localhost:11211 |
-| `keyPrefix` | Prefix for cache keys (namespace isolation) | pjdbc: |
-| `ttl` | Time-to-live in seconds for cache entries | 60 |
-| `invalidateOnWrite` | Clear cache on INSERT/UPDATE/DELETE | true |
-| `enabled` | Enable caching | true |
+| Parameter           | Description                                   | Default         |
+|---------------------|-----------------------------------------------|-----------------|
+| `servers`           | Semicolon-separated list of host:port servers | localhost:11211 |
+| `keyPrefix`         | Prefix for cache keys (namespace isolation)   | pjdbc:          |
+| `ttl`               | Time-to-live in seconds for cache entries     | 60              |
+| `invalidateOnWrite` | Clear cache on INSERT/UPDATE/DELETE           | true            |
+| `enabled`           | Enable caching                                | true            |
 
 **Features:**
 - Distributed caching across multiple application instances
@@ -376,16 +376,16 @@ Caches SELECT query results in Hazelcast for distributed caching with automatic 
 **URL Format:** `jdbc:hazelcast[param=value,...]:target-url`
 
 **Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `mode` | "embedded" for local instance or "client" for connecting to cluster | embedded |
-| `clusterName` | Hazelcast cluster name | pjdbc-cache |
-| `members` | Semicolon-separated list of host:port addresses | 127.0.0.1:5701 |
-| `mapName` | IMap name for caching | pjdbc_query_cache |
-| `ttl` | Time-to-live in seconds for cache entries | 60 |
-| `maxIdle` | Maximum idle time in seconds (0 to disable) | 0 |
-| `invalidateOnWrite` | Clear cache on INSERT/UPDATE/DELETE | true |
-| `enabled` | Enable caching | true |
+| Parameter           | Description                                                         | Default           |
+|---------------------|---------------------------------------------------------------------|-------------------|
+| `mode`              | "embedded" for local instance or "client" for connecting to cluster | embedded          |
+| `clusterName`       | Hazelcast cluster name                                              | pjdbc-cache       |
+| `members`           | Semicolon-separated list of host:port addresses                     | 127.0.0.1:5701    |
+| `mapName`           | IMap name for caching                                               | pjdbc_query_cache |
+| `ttl`               | Time-to-live in seconds for cache entries                           | 60                |
+| `maxIdle`           | Maximum idle time in seconds (0 to disable)                         | 0                 |
+| `invalidateOnWrite` | Clear cache on INSERT/UPDATE/DELETE                                 | true              |
+| `enabled`           | Enable caching                                                      | true              |
 
 **Features:**
 - Distributed caching with automatic cluster discovery and replication
@@ -437,13 +437,13 @@ Provides distributed tracing for JDBC operations with pluggable tracer support.
 **URL Format:** `jdbc:trace[param=value,...]:target-url`
 
 **Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `tracerName` | Name of registered tracer to use | jdbc |
-| `spanPrefix` | Prefix for span names | db. |
-| `includeSql` | Include SQL statement in span attributes | true |
-| `includeParams` | Include parameter values (security risk) | false |
-| `includeRowCount` | Include row counts in span attributes | true |
+| Parameter         | Description                              | Default |
+|-------------------|------------------------------------------|---------|
+| `tracerName`      | Name of registered tracer to use         | jdbc    |
+| `spanPrefix`      | Prefix for span names                    | db.     |
+| `includeSql`      | Include SQL statement in span attributes | true    |
+| `includeParams`   | Include parameter values (security risk) | false   |
+| `includeRowCount` | Include row counts in span attributes    | true    |
 
 **Span Attributes:**
 - `db.system` - Always "jdbc"
@@ -488,11 +488,11 @@ Collects performance metrics for JDBC operations including query counts, timing,
 **URL Format:** `jdbc:metrics[param=value,...]:target-url`
 
 **Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `enabled` | Enable metrics collection | true |
-| `slowThreshold` | Threshold in ms for slow query detection | 1000 |
-| `trackByType` | Track metrics by operation type (SELECT, INSERT, etc.) | true |
+| Parameter       | Description                                            | Default |
+|-----------------|--------------------------------------------------------|---------|
+| `enabled`       | Enable metrics collection                              | true    |
+| `slowThreshold` | Threshold in ms for slow query detection               | 1000    |
+| `trackByType`   | Track metrics by operation type (SELECT, INSERT, etc.) | true    |
 
 **Metrics Available:**
 - Total queries, updates, executes, and operations
@@ -543,14 +543,14 @@ Injects failures and latency to test application resilience.
 **URL Format:** `jdbc:chaos[param=value,...]:target-url`
 
 **Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `failureRate` | Probability (0.0-1.0) of throwing SQLException | 0.0 |
-| `latency` | Fixed delay in ms before each query | 0 |
-| `latencyVariance` | Random additional delay up to this value in ms | 0 |
-| `connectionDropRate` | Probability of closing connection unexpectedly | 0.0 |
-| `resultSetLatency` | Delay in ms for each ResultSet.next() call | 0 |
-| `exceptionMessage` | Custom exception message | "ChaosDriver: Induced failure" |
+| Parameter            | Description                                    | Default                        |
+|----------------------|------------------------------------------------|--------------------------------|
+| `failureRate`        | Probability (0.0-1.0) of throwing SQLException | 0.0                            |
+| `latency`            | Fixed delay in ms before each query            | 0                              |
+| `latencyVariance`    | Random additional delay up to this value in ms | 0                              |
+| `connectionDropRate` | Probability of closing connection unexpectedly | 0.0                            |
+| `resultSetLatency`   | Delay in ms for each ResultSet.next() call     | 0                              |
+| `exceptionMessage`   | Custom exception message                       | "ChaosDriver: Induced failure" |
 
 **Examples:**
 ```java
