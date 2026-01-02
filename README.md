@@ -553,18 +553,18 @@ url.append("jdbc:postgresql://localhost/mydb");
 
 Drivers are tagged with capabilities for easy discovery:
 
-| Tag | Description | Drivers |
-|-----|-------------|---------|
-| `caching` | Query result caching | cache, rediscache, memcache, hazelcast |
-| `pooling` | Connection pooling | pool, hikaricp |
-| `logging` | SQL statement logging | log |
-| `tracing` | Distributed tracing | trace |
-| `metrics` | Performance metrics | metrics |
-| `resilience` | Fault tolerance | retry, chaos |
-| `security` | Access control | readonly, mapuser, mask |
-| `testing` | Test utilities | mock, sink, chaos |
-| `transformation` | SQL modification | filter |
-| `masking` | Data masking | mask |
+| Tag              | Description           | Drivers                                |
+|------------------|-----------------------|----------------------------------------|
+| `caching`        | Query result caching  | cache, rediscache, memcache, hazelcast |
+| `pooling`        | Connection pooling    | pool, hikaricp                         |
+| `logging`        | SQL statement logging | log                                    |
+| `tracing`        | Distributed tracing   | trace                                  |
+| `metrics`        | Performance metrics   | metrics                                |
+| `resilience`     | Fault tolerance       | retry, chaos                           |
+| `security`       | Access control        | readonly, mapuser, mask                |
+| `testing`        | Test utilities        | mock, sink, chaos                      |
+| `transformation` | SQL modification      | filter                                 |
+| `masking`        | Data masking          | mask                                   |
 
 ## Creating Custom Drivers
 

@@ -20,30 +20,30 @@ PJDBC/
 
 ### org.pjdbc.sql (Abstract Layer)
 
-| Class | Purpose |
-|-------|---------|
-| `AbstractDriver` | Base JDBC Driver with URL parsing |
-| `AbstractProxyDriver` | Proxying infrastructure |
-| `AbstractConnection` | Connection wrapper with delegation |
-| `AbstractStatement` | Statement wrapper |
-| `AbstractPreparedStatement` | PreparedStatement wrapper with parameter hooks |
-| `AbstractCallableStatement` | CallableStatement wrapper |
-| `AbstractResultSet` | ResultSet wrapper with value hooks |
-| `JdbcTransformer` | Interface for SQL/parameter/result transformation |
-| `AbstractJdbcTransformer` | Default no-op transformer |
-| `JdbcUrlParser` | URL parsing with parameter support |
+| Class                       | Purpose                                           |
+|-----------------------------|---------------------------------------------------|
+| `AbstractDriver`            | Base JDBC Driver with URL parsing                 |
+| `AbstractProxyDriver`       | Proxying infrastructure                           |
+| `AbstractConnection`        | Connection wrapper with delegation                |
+| `AbstractStatement`         | Statement wrapper                                 |
+| `AbstractPreparedStatement` | PreparedStatement wrapper with parameter hooks    |
+| `AbstractCallableStatement` | CallableStatement wrapper                         |
+| `AbstractResultSet`         | ResultSet wrapper with value hooks                |
+| `JdbcTransformer`           | Interface for SQL/parameter/result transformation |
+| `AbstractJdbcTransformer`   | Default no-op transformer                         |
+| `JdbcUrlParser`             | URL parsing with parameter support                |
 
 ### org.pjdbc.drivers (Implementations)
 
-| Driver | Subprotocol | Purpose |
-|--------|-------------|---------|
-| `CatDriver` | `cat` | Passthrough |
-| `PoolDriver` | `pool` | Connection pooling |
-| `FilterDriver` | `filter` | SQL transformation |
-| `LogDriver` | `log` | SQL logging |
-| `TeeDriver` | `tee` | Dual-write |
-| `UserMapDriver` | `mapuser` | Credential mapping |
-| `MockDriver` | `mock` | Testing |
+| Driver          | Subprotocol | Purpose            |
+|-----------------|-------------|--------------------|
+| `CatDriver`     | `cat`       | Passthrough        |
+| `PoolDriver`    | `pool`      | Connection pooling |
+| `FilterDriver`  | `filter`    | SQL transformation |
+| `LogDriver`     | `log`       | SQL logging        |
+| `TeeDriver`     | `tee`       | Dual-write         |
+| `UserMapDriver` | `mapuser`   | Credential mapping |
+| `MockDriver`    | `mock`      | Testing            |
 
 ## Building
 
@@ -148,6 +148,60 @@ Brief summary (imperative mood)
 - Detail 2
 ```
 
+## Conformance Tests
+
+PJDBC includes conformance tests that verify drivers behave according to their declared capabilities in the manifest. These tests are in `src/test/java/org/pjdbc/conformance/`.
+
+### Test Categories
+
+| Test Class | Purpose |
+|------------|---------|
+| `UrlParsingConformanceTest` | Verifies URL parsing, prefix handling, parameter syntax |
+| `ParameterDefaultConformanceTest` | Validates parameter defaults, types, ranges |
+| `SideEffectConformanceTest` | Checks side effect declarations match behavior |
+| `PerformanceInvariantConformanceTest` | Ensures bounded connection times, minimal overhead |
+
+### Running Conformance Tests
+
+```bash
+# Run all conformance tests
+mvn test -Dtest="org.pjdbc.conformance.*"
+
+# Run specific conformance category
+mvn test -Dtest="UrlParsingConformanceTest"
+```
+
+### Writing Conformance Tests
+
+Extend `DriverConformanceTest` for access to helpers:
+
+```java
+public class MyConformanceTest extends DriverConformanceTest {
+
+    @Test
+    void myTest() {
+        // Get all drivers
+        for (DriverCapability driver : capabilities.getAllDrivers()) {
+            // Test each driver
+        }
+
+        // Or filter by capability
+        for (DriverCapability driver : getDriversWithCapability("caching")) {
+            String url = buildUrl(driver, H2_URL);
+            // Test driver
+        }
+    }
+}
+```
+
+### When to Add Conformance Tests
+
+Add conformance tests when:
+- Adding a new driver (verify manifest entry is correct)
+- Adding new parameters (verify defaults are documented)
+- Adding new capabilities (verify consistency across drivers)
+- Adding new side effects (verify declarations match behavior)
+
 ## Testing Checklist
 
 Before submitting:
@@ -156,3 +210,5 @@ Before submitting:
 - [ ] Edge cases covered (null, empty, invalid input)
 - [ ] Driver registration works
 - [ ] URL parsing works for new parameters
+- [ ] Conformance tests pass for new/modified drivers
+- [ ] Capabilities manifest updated if adding drivers
