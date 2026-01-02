@@ -114,6 +114,16 @@
           <autoReleaseAfterClose>true</autoReleaseAfterClose>
         </configuration>
       </plugin>
+      <plugin>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.2.5</version>
+        <configuration>
+          <includes>
+            <include>**/*Test.java</include>
+            <include>**/*Properties.java</include>
+          </includes>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 
@@ -184,15 +194,21 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.pholser</groupId>
-      <artifactId>junit-quickcheck-core</artifactId>
-      <version>1.0</version>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.10.2</version>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.pholser</groupId>
-      <artifactId>junit-quickcheck-generators</artifactId>
-      <version>1.0</version>
+      <groupId>org.junit.vintage</groupId>
+      <artifactId>junit-vintage-engine</artifactId>
+      <version>5.10.2</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.jqwik</groupId>
+      <artifactId>jqwik</artifactId>
+      <version>1.8.2</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
