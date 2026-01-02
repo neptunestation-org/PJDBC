@@ -98,10 +98,12 @@ public class PoolDriver extends AbstractProxyDriver {
         pools.putIfAbsent(poolKey, new LinkedBlockingQueue<Connection>());
         BlockingQueue<Connection> pool = pools.get(poolKey);
 
-        // Try to get connection from pool with configured timeout
+        // Try to get connection from pool - only wait if pool has connections
         Connection conn = null;
-	try {conn = pool.poll(config.timeout, TimeUnit.MILLISECONDS);} catch (InterruptedException e) {}
-	if (conn!=null) return proxyConnection(conn, url, info, this);
+	if (!pool.isEmpty()) {
+	    try {conn = pool.poll(config.timeout, TimeUnit.MILLISECONDS);} catch (InterruptedException e) {}
+	    if (conn!=null) return proxyConnection(conn, url, info, this);
+	}
 
         // Create new connection
 	return proxyConnection(DriverManager.getConnection(targetUrl, info), url, info, this);}}
