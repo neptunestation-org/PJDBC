@@ -35,15 +35,27 @@ PJDBC/
 
 ### org.pjdbc.drivers (Implementations)
 
-| Driver          | Subprotocol | Purpose            |
-|-----------------|-------------|--------------------|
-| `CatDriver`     | `cat`       | Passthrough        |
-| `PoolDriver`    | `pool`      | Connection pooling |
-| `FilterDriver`  | `filter`    | SQL transformation |
-| `LogDriver`     | `log`       | SQL logging        |
-| `TeeDriver`     | `tee`       | Dual-write         |
-| `UserMapDriver` | `mapuser`   | Credential mapping |
-| `MockDriver`    | `mock`      | Testing            |
+| Driver                   | Subprotocol   | Purpose                          |
+|--------------------------|---------------|----------------------------------|
+| `CachingDriver`          | `cache`       | In-memory query caching          |
+| `CatDriver`              | `cat`         | Passthrough                      |
+| `ChaosDriver`            | `chaos`       | Fault injection for testing      |
+| `DataMaskingDriver`      | `mask`        | Sensitive data masking           |
+| `FilterDriver`           | `filter`      | SQL transformation               |
+| `HazelcastCachingDriver` | `hazelcast`   | Distributed caching (Hazelcast)  |
+| `HikariPoolDriver`       | `hikaricp`    | Connection pooling (HikariCP)    |
+| `LogDriver`              | `log`         | SQL logging                      |
+| `MemcachedCachingDriver` | `memcache`    | Distributed caching (Memcached)  |
+| `MetricsDriver`          | `metrics`     | Performance metrics              |
+| `MockDriver`             | `mock`        | Testing                          |
+| `PoolDriver`             | `pool`        | Connection pooling               |
+| `ReadonlyDriver`         | `readonly`    | Read-only access enforcement     |
+| `RedisCachingDriver`     | `rediscache`  | Distributed caching (Redis)      |
+| `RetryDriver`            | `retry`       | Automatic query retries          |
+| `SinkDriver`             | `sink`        | Null output (discards all)       |
+| `TeeDriver`              | `tee`         | Dual-write                       |
+| `TracingDriver`          | `trace`       | Distributed tracing              |
+| `UserMapDriver`          | `mapuser`     | Credential mapping               |
 
 ## Building
 
