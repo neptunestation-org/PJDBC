@@ -29,6 +29,9 @@ public class MemcachedCachingDriverTest {
         .withExposedPorts(11211)
         .withReuse(true);
 
+    // Unique prefix per test run to avoid collisions with parallel tests
+    private static final String TEST_RUN_ID = String.valueOf(System.nanoTime());
+
     static {
         memcached.start();
     }
@@ -40,6 +43,10 @@ public class MemcachedCachingDriverTest {
 
     private static String getMemcachedServer() {
         return memcached.getHost() + ":" + memcached.getFirstMappedPort();
+    }
+
+    private static String uniquePrefix(String base) {
+        return TEST_RUN_ID + "_" + base;
     }
 
     private void setupTestTable(String dbName) throws SQLException {
@@ -326,8 +333,8 @@ public class MemcachedCachingDriverTest {
         setupTestTable("memcache_int_basic");
 
         String url = String.format(
-            "jdbc:memcache[servers=%s,keyPrefix=test_basic:]:jdbc:h2:mem:memcache_int_basic;DB_CLOSE_DELAY=-1",
-            getMemcachedServer());
+            "jdbc:memcache[servers=%s,keyPrefix=%s]:jdbc:h2:mem:memcache_int_basic;DB_CLOSE_DELAY=-1",
+            getMemcachedServer(), uniquePrefix("test_basic:"));
         try (Connection conn = DriverManager.getConnection(url)) {
             assertNotNull(conn);
             MemcachedCachingDriver.MemcachedQueryCache cache = MemcachedCachingDriver.getCache(conn);
@@ -340,8 +347,8 @@ public class MemcachedCachingDriverTest {
         setupTestTable("memcache_int_query");
 
         String url = String.format(
-            "jdbc:memcache[servers=%s,keyPrefix=test_query:]:jdbc:h2:mem:memcache_int_query;DB_CLOSE_DELAY=-1",
-            getMemcachedServer());
+            "jdbc:memcache[servers=%s,keyPrefix=%s]:jdbc:h2:mem:memcache_int_query;DB_CLOSE_DELAY=-1",
+            getMemcachedServer(), uniquePrefix("test_query:"));
         try (Connection conn = DriverManager.getConnection(url)) {
             MemcachedCachingDriver.MemcachedQueryCache cache = MemcachedCachingDriver.getCache(conn);
             cache.clear(); // Clear any existing entries
@@ -373,8 +380,8 @@ public class MemcachedCachingDriverTest {
         setupTestTable("memcache_int_invalidate");
 
         String url = String.format(
-            "jdbc:memcache[servers=%s,keyPrefix=test_inv:]:jdbc:h2:mem:memcache_int_invalidate;DB_CLOSE_DELAY=-1",
-            getMemcachedServer());
+            "jdbc:memcache[servers=%s,keyPrefix=%s]:jdbc:h2:mem:memcache_int_invalidate;DB_CLOSE_DELAY=-1",
+            getMemcachedServer(), uniquePrefix("test_inv:"));
         try (Connection conn = DriverManager.getConnection(url)) {
             MemcachedCachingDriver.MemcachedQueryCache cache = MemcachedCachingDriver.getCache(conn);
             cache.clear();
@@ -403,8 +410,8 @@ public class MemcachedCachingDriverTest {
         setupTestTable("memcache_int_pstmt");
 
         String url = String.format(
-            "jdbc:memcache[servers=%s,keyPrefix=test_pstmt:]:jdbc:h2:mem:memcache_int_pstmt;DB_CLOSE_DELAY=-1",
-            getMemcachedServer());
+            "jdbc:memcache[servers=%s,keyPrefix=%s]:jdbc:h2:mem:memcache_int_pstmt;DB_CLOSE_DELAY=-1",
+            getMemcachedServer(), uniquePrefix("test_pstmt:"));
         try (Connection conn = DriverManager.getConnection(url)) {
             MemcachedCachingDriver.MemcachedQueryCache cache = MemcachedCachingDriver.getCache(conn);
             cache.clear();
@@ -446,8 +453,8 @@ public class MemcachedCachingDriverTest {
         setupTestTable("memcache_int_stats");
 
         String url = String.format(
-            "jdbc:memcache[servers=%s,keyPrefix=test_stats:]:jdbc:h2:mem:memcache_int_stats;DB_CLOSE_DELAY=-1",
-            getMemcachedServer());
+            "jdbc:memcache[servers=%s,keyPrefix=%s]:jdbc:h2:mem:memcache_int_stats;DB_CLOSE_DELAY=-1",
+            getMemcachedServer(), uniquePrefix("test_stats:"));
         try (Connection conn = DriverManager.getConnection(url)) {
             MemcachedCachingDriver.MemcachedQueryCache cache = MemcachedCachingDriver.getCache(conn);
             cache.clear();
@@ -471,8 +478,8 @@ public class MemcachedCachingDriverTest {
         setupTestTable("memcache_int_disabled");
 
         String url = String.format(
-            "jdbc:memcache[servers=%s,keyPrefix=test_disabled:,enabled=false]:jdbc:h2:mem:memcache_int_disabled;DB_CLOSE_DELAY=-1",
-            getMemcachedServer());
+            "jdbc:memcache[servers=%s,keyPrefix=%s,enabled=false]:jdbc:h2:mem:memcache_int_disabled;DB_CLOSE_DELAY=-1",
+            getMemcachedServer(), uniquePrefix("test_disabled:"));
         try (Connection conn = DriverManager.getConnection(url)) {
             MemcachedCachingDriver.MemcachedQueryCache cache = MemcachedCachingDriver.getCache(conn);
             cache.resetStats();
@@ -493,8 +500,8 @@ public class MemcachedCachingDriverTest {
 
         // TTL of 1 second
         String url = String.format(
-            "jdbc:memcache[servers=%s,keyPrefix=test_ttl:,ttl=1]:jdbc:h2:mem:memcache_int_ttl;DB_CLOSE_DELAY=-1",
-            getMemcachedServer());
+            "jdbc:memcache[servers=%s,keyPrefix=%s,ttl=1]:jdbc:h2:mem:memcache_int_ttl;DB_CLOSE_DELAY=-1",
+            getMemcachedServer(), uniquePrefix("test_ttl:"));
         try (Connection conn = DriverManager.getConnection(url)) {
             MemcachedCachingDriver.MemcachedQueryCache cache = MemcachedCachingDriver.getCache(conn);
             cache.clear();
