@@ -101,7 +101,7 @@ public class PoolDriver extends AbstractProxyDriver {
         // Try to get connection from pool with configured timeout
         Connection conn = null;
 	try {conn = pool.poll(config.timeout, TimeUnit.MILLISECONDS);} catch (InterruptedException e) {}
-	if (conn!=null) return conn;
+	if (conn!=null) return proxyConnection(conn, url, info, this);
 
         // Create new connection
 	return proxyConnection(DriverManager.getConnection(targetUrl, info), url, info, this);}}

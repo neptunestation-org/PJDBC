@@ -583,8 +583,6 @@ class PoolDriverProperties {
 
     /**
      * Property: Pool connection lifecycle works (get, use, close, get again).
-     * Note: Due to PoolDriver limitation where returned connections aren't re-proxied,
-     * we verify basic connectivity on each cycle rather than data persistence.
      */
     @Property(tries = 10)
     void poolConnectionLifecycle(
@@ -601,6 +599,39 @@ class PoolDriverProperties {
 
                 assertTrue(rs.next(), "Cycle " + i + " should return result");
                 assertEquals(i, rs.getInt(1), "Cycle " + i + " should return correct value");
+            }
+        }
+    }
+
+    /**
+     * Property: H2 data persists across pool connection returns.
+     * This verifies the fix for PJDBC-jzy where pooled connections weren't re-proxied.
+     */
+    @Property(tries = 10)
+    void h2DataPersistsAcrossPoolReturns(
+            @ForAll @IntRange(min = 2, max = 4) int iterations) throws SQLException {
+
+        String poolName = createUniquePoolName();
+        String poolUrl = "jdbc:pool[max=1]:jdbc:h2:mem:" + poolName;
+
+        // First connection creates table
+        try (Connection conn = DriverManager.getConnection(poolUrl);
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE TABLE persist_test (id INT)");
+        }
+
+        // Subsequent connections insert and verify - data should persist
+        for (int i = 0; i < iterations; i++) {
+            try (Connection conn = DriverManager.getConnection(poolUrl);
+                 Statement stmt = conn.createStatement()) {
+
+                stmt.executeUpdate("INSERT INTO persist_test VALUES (" + i + ")");
+
+                try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM persist_test")) {
+                    assertTrue(rs.next());
+                    assertEquals(i + 1, rs.getInt(1),
+                        "Should have " + (i + 1) + " rows after iteration " + i);
+                }
             }
         }
     }
