@@ -17,18 +17,21 @@ import java.sql.Statement;
 import java.util.List;
 
 import org.junit.BeforeClass;
-import org.junit.ClassRule;
 import org.junit.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 
 public class MemcachedCachingDriverTest {
 
-    @ClassRule
     @SuppressWarnings("rawtypes")
     public static GenericContainer memcached = new GenericContainer(
         DockerImageName.parse("memcached:1.6-alpine"))
-        .withExposedPorts(11211);
+        .withExposedPorts(11211)
+        .withReuse(true);
+
+    static {
+        memcached.start();
+    }
 
     @BeforeClass
     public static void loadDriver() throws ClassNotFoundException {

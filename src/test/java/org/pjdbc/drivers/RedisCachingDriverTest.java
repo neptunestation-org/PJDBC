@@ -15,18 +15,21 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 import org.junit.BeforeClass;
-import org.junit.ClassRule;
 import org.junit.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 
 public class RedisCachingDriverTest {
 
-    @ClassRule
     @SuppressWarnings("rawtypes")
     public static GenericContainer redis = new GenericContainer(
         DockerImageName.parse("redis:7-alpine"))
-        .withExposedPorts(6379);
+        .withExposedPorts(6379)
+        .withReuse(true);
+
+    static {
+        redis.start();
+    }
 
     @BeforeClass
     public static void loadDriver() throws ClassNotFoundException {
