@@ -122,6 +122,9 @@
             <include>**/*Test.java</include>
             <include>**/*Properties.java</include>
           </includes>
+          <parallel>classes</parallel>
+          <threadCount>4</threadCount>
+          <perCoreThreadCount>true</perCoreThreadCount>
         </configuration>
       </plugin>
     </plugins>

@@ -2,7 +2,6 @@ package org.pjdbc.properties;
 
 import net.jqwik.api.*;
 import net.jqwik.api.constraints.*;
-import net.jqwik.api.lifecycle.*;
 
 import org.pjdbc.drivers.*;
 
@@ -28,11 +27,6 @@ class CatDriverProperties {
 
     private String createUniqueDbName() {
         return "cat_prop_" + dbCounter.incrementAndGet() + "_" + System.nanoTime();
-    }
-
-    @BeforeProperty
-    void clearMockLogs() {
-        MockDriver.clearLogs();
     }
 
     // ========== IDENTITY BEHAVIOR ==========

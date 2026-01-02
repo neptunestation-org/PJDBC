@@ -36,7 +36,6 @@ class FilterDriverProperties {
 
     @BeforeProperty
     void setup() throws SQLException {
-        MockDriver.clearLogs();
         // Get the registered FilterDriver instance
         filterDriver = (FilterDriver) DriverManager.getDriver("jdbc:filter:jdbc:mock:test");
         // Reset to identity transformer
@@ -55,7 +54,6 @@ class FilterDriverProperties {
 
         filterDriver.setTransformer(new AbstractJdbcTransformer() {});
 
-        MockDriver.clearLogs();
 
         String filterUrl = "jdbc:filter:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(filterUrl)) {
@@ -77,7 +75,6 @@ class FilterDriverProperties {
 
         filterDriver.setTransformer(new AbstractJdbcTransformer() {});
 
-        MockDriver.clearLogs();
 
         // Execute directly
         try (Connection conn = DriverManager.getConnection(mockUrl)) {
@@ -85,7 +82,6 @@ class FilterDriverProperties {
         }
         String directLog = MockDriver.getLog(mockUrl);
 
-        MockDriver.clearLogs();
 
         // Execute through filter with identity transformer
         String filterUrl = "jdbc:filter:" + mockUrl;
@@ -115,7 +111,6 @@ class FilterDriverProperties {
             }
         });
 
-        MockDriver.clearLogs();
 
         String filterUrl = "jdbc:filter:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(filterUrl)) {
@@ -144,7 +139,6 @@ class FilterDriverProperties {
             }
         });
 
-        MockDriver.clearLogs();
 
         String filterUrl = "jdbc:filter:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(filterUrl)) {
@@ -174,7 +168,6 @@ class FilterDriverProperties {
             }
         });
 
-        MockDriver.clearLogs();
 
         String sql = "SELECT * FROM " + oldTable;
         String filterUrl = "jdbc:filter:" + mockUrl;
@@ -224,7 +217,6 @@ class FilterDriverProperties {
             }
         });
 
-        MockDriver.clearLogs();
 
         String filterUrl = "jdbc:filter:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(filterUrl)) {
@@ -253,7 +245,6 @@ class FilterDriverProperties {
             }
         });
 
-        MockDriver.clearLogs();
 
         // filter:X
         String filterUrl = "jdbc:filter:" + mockUrl;
@@ -262,7 +253,6 @@ class FilterDriverProperties {
         }
         String filterLog = MockDriver.getLog(mockUrl);
 
-        MockDriver.clearLogs();
 
         // cat:filter:X
         String catFilterUrl = "jdbc:cat:jdbc:filter:" + mockUrl;
@@ -290,7 +280,6 @@ class FilterDriverProperties {
             }
         });
 
-        MockDriver.clearLogs();
 
         // filter:X
         String filterUrl = "jdbc:filter:" + mockUrl;
@@ -299,7 +288,6 @@ class FilterDriverProperties {
         }
         String filterLog = MockDriver.getLog(mockUrl);
 
-        MockDriver.clearLogs();
 
         // filter:cat:X
         String filterCatUrl = "jdbc:filter:jdbc:cat:" + mockUrl;
@@ -327,7 +315,6 @@ class FilterDriverProperties {
             }
         });
 
-        MockDriver.clearLogs();
 
         // filter:X
         String filterUrl = "jdbc:filter:" + mockUrl;
@@ -336,7 +323,6 @@ class FilterDriverProperties {
         }
         String filterLog = MockDriver.getLog(mockUrl);
 
-        MockDriver.clearLogs();
 
         // log:filter:X
         String logFilterUrl = "jdbc:log:jdbc:filter:" + mockUrl;
@@ -364,7 +350,6 @@ class FilterDriverProperties {
             }
         });
 
-        MockDriver.clearLogs();
 
         String sinkFilterUrl = "jdbc:sink:jdbc:filter:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(sinkFilterUrl)) {
@@ -396,7 +381,6 @@ class FilterDriverProperties {
 
         // Apply once
         filterDriver.setTransformer(uppercase);
-        MockDriver.clearLogs();
         String filterUrl = "jdbc:filter:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(filterUrl)) {
             conn.createStatement().executeQuery(sql);
@@ -410,7 +394,6 @@ class FilterDriverProperties {
                 return uppercase.transformSql(uppercase.transformSql(s));
             }
         });
-        MockDriver.clearLogs();
         try (Connection conn = DriverManager.getConnection(filterUrl)) {
             conn.createStatement().executeQuery(sql);
         }
@@ -440,7 +423,6 @@ class FilterDriverProperties {
             }
         });
 
-        MockDriver.clearLogs();
 
         String filterUrl = "jdbc:filter:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(filterUrl);
@@ -467,7 +449,6 @@ class FilterDriverProperties {
 
         filterDriver.setTransformer(new AbstractJdbcTransformer() {});
 
-        MockDriver.clearLogs();
 
         String filterUrl = "jdbc:filter:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(filterUrl);
@@ -500,7 +481,6 @@ class FilterDriverProperties {
             }
         });
 
-        MockDriver.clearLogs();
 
         String filterUrl = "jdbc:filter:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(filterUrl);
@@ -527,7 +507,6 @@ class FilterDriverProperties {
 
         filterDriver.setTransformer(new AbstractJdbcTransformer() {});
 
-        MockDriver.clearLogs();
 
         String filterUrl = "jdbc:filter:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(filterUrl);
@@ -560,7 +539,6 @@ class FilterDriverProperties {
             }
         });
 
-        MockDriver.clearLogs();
 
         String filterUrl = "jdbc:filter:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(filterUrl);
@@ -596,7 +574,6 @@ class FilterDriverProperties {
             }
         });
 
-        MockDriver.clearLogs();
 
         String filterUrl = "jdbc:filter:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(filterUrl);
@@ -693,7 +670,6 @@ class FilterDriverProperties {
             }
         });
 
-        MockDriver.clearLogs();
 
         String filterUrl = "jdbc:filter:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(filterUrl);

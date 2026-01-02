@@ -407,7 +407,6 @@ class PoolDriverProperties {
         String poolUrl1 = "jdbc:pool:jdbc:mock:" + poolName1;
         String poolUrl2 = "jdbc:pool:jdbc:mock:" + poolName2;
 
-        MockDriver.clearLogs();
 
         // Execute SQL on pool 1
         try (Connection conn1 = DriverManager.getConnection(poolUrl1);
@@ -444,7 +443,6 @@ class PoolDriverProperties {
         String mockUrl = "jdbc:mock:" + poolName;
         String poolUrl = "jdbc:pool:" + mockUrl;
 
-        MockDriver.clearLogs();
 
         try (Connection conn = DriverManager.getConnection(poolUrl);
              Statement stmt = conn.createStatement()) {
@@ -467,7 +465,6 @@ class PoolDriverProperties {
         String mockUrl = "jdbc:mock:" + poolName;
         String poolUrl = "jdbc:pool:" + mockUrl;
 
-        MockDriver.clearLogs();
 
         try (Connection conn = DriverManager.getConnection(poolUrl);
              Statement stmt = conn.createStatement()) {
@@ -490,7 +487,6 @@ class PoolDriverProperties {
         String mockUrl = "jdbc:mock:" + poolName;
         String poolUrl = "jdbc:pool:" + mockUrl;
 
-        MockDriver.clearLogs();
 
         try (Connection conn = DriverManager.getConnection(poolUrl);
              Statement stmt = conn.createStatement()) {
@@ -513,7 +509,6 @@ class PoolDriverProperties {
         String mockUrl = "jdbc:mock:" + poolName;
         String poolUrl = "jdbc:pool:" + mockUrl;
 
-        MockDriver.clearLogs();
 
         try (Connection conn = DriverManager.getConnection(poolUrl);
              Statement stmt = conn.createStatement()) {

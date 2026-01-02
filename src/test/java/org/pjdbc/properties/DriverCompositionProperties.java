@@ -2,7 +2,6 @@ package org.pjdbc.properties;
 
 import net.jqwik.api.*;
 import net.jqwik.api.constraints.*;
-import net.jqwik.api.lifecycle.*;
 import org.pjdbc.drivers.*;
 import org.pjdbc.testing.PjdbcArbitraries;
 
@@ -21,11 +20,6 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class DriverCompositionProperties {
 
-    @BeforeProperty
-    void clearMockLogs() {
-        MockDriver.clearLogs();
-    }
-
     // ========== IDENTITY LAWS ==========
 
     /**
@@ -39,7 +33,6 @@ class DriverCompositionProperties {
             @ForAll("mockUrls") String mockUrl,
             @ForAll("sqlStatements") String sql) throws SQLException {
 
-        MockDriver.clearLogs();
 
         // Execute against direct mock connection
         try (Connection directConn = DriverManager.getConnection(mockUrl)) {
@@ -47,7 +40,6 @@ class DriverCompositionProperties {
         }
         String directLog = MockDriver.getLog(mockUrl);
 
-        MockDriver.clearLogs();
 
         // Execute against cat-wrapped connection
         String catUrl = "jdbc:cat:" + mockUrl;
@@ -71,7 +63,6 @@ class DriverCompositionProperties {
             @ForAll("sqlStatements") String sql,
             @ForAll @IntRange(min = 1, max = 5) int catDepth) throws SQLException {
 
-        MockDriver.clearLogs();
 
         // Single cat wrapper
         String singleCatUrl = "jdbc:cat:" + mockUrl;
@@ -80,7 +71,6 @@ class DriverCompositionProperties {
         }
         String singleLog = MockDriver.getLog(mockUrl);
 
-        MockDriver.clearLogs();
 
         // Multiple cat wrappers
         StringBuilder multiCatUrl = new StringBuilder();
@@ -110,7 +100,6 @@ class DriverCompositionProperties {
             @ForAll("mockUrls") String mockUrl,
             @ForAll("sqlStatements") String sql) throws SQLException {
 
-        MockDriver.clearLogs();
 
         // Execute directly
         try (Connection directConn = DriverManager.getConnection(mockUrl)) {
@@ -118,7 +107,6 @@ class DriverCompositionProperties {
         }
         String directLog = MockDriver.getLog(mockUrl);
 
-        MockDriver.clearLogs();
 
         // Execute through log driver
         String logUrl = "jdbc:log:" + mockUrl;
@@ -145,7 +133,6 @@ class DriverCompositionProperties {
         // Extract the terminal mock URL
         String mockUrl = extractMockUrl(chainUrl);
 
-        MockDriver.clearLogs();
 
         // Execute through chain
         try (Connection conn = DriverManager.getConnection(chainUrl)) {
@@ -153,7 +140,6 @@ class DriverCompositionProperties {
         }
         String chainLog = MockDriver.getLog(mockUrl);
 
-        MockDriver.clearLogs();
 
         // Execute directly
         try (Connection directConn = DriverManager.getConnection(mockUrl)) {
@@ -177,7 +163,6 @@ class DriverCompositionProperties {
             @ForAll("mockUrls") String mockUrl,
             @ForAll("sqlStatements") String sql) throws SQLException {
 
-        MockDriver.clearLogs();
 
         String sinkUrl = "jdbc:sink:" + mockUrl;
         try (Connection conn = DriverManager.getConnection(sinkUrl)) {
@@ -201,7 +186,6 @@ class DriverCompositionProperties {
             @ForAll("mockUrls") String mockUrl,
             @ForAll("sqlStatements") String sql) throws SQLException {
 
-        MockDriver.clearLogs();
 
         // sink:X
         String sinkUrl = "jdbc:sink:" + mockUrl;
@@ -210,7 +194,6 @@ class DriverCompositionProperties {
         }
         String sinkLog = MockDriver.getLog(mockUrl);
 
-        MockDriver.clearLogs();
 
         // cat:sink:X
         String catSinkUrl = "jdbc:cat:jdbc:sink:" + mockUrl;

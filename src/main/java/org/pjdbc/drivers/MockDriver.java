@@ -4,6 +4,7 @@ import java.io.*;
 import java.lang.reflect.*;
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.*;
 import org.pjdbc.sql.*;
 
 public class MockDriver extends AbstractDriver {
@@ -41,7 +42,7 @@ public class MockDriver extends AbstractDriver {
 	    if ("getMoreResults".equals(method.getName())) return false;
 	    return null;}}
 
-    private static Map<String, MyPrintWriter> logs = new HashMap<String, MyPrintWriter>();
+    private static Map<String, MyPrintWriter> logs = new ConcurrentHashMap<String, MyPrintWriter>();
 
     public static String getLog (String url) {
 	if (logs.containsKey(url)) {
@@ -51,6 +52,9 @@ public class MockDriver extends AbstractDriver {
 
     public static void clearLogs () {
 	logs.clear();}
+
+    public static void clearLog (String url) {
+	logs.remove(url);}
 
     protected boolean acceptsSubProtocol (String subprotocol) {
 	return "mock".equals(subprotocol);}

@@ -2,7 +2,6 @@ package org.pjdbc.properties;
 
 import net.jqwik.api.*;
 import net.jqwik.api.constraints.*;
-import net.jqwik.api.lifecycle.*;
 import org.pjdbc.drivers.*;
 import org.pjdbc.testing.PjdbcArbitraries;
 
@@ -35,11 +34,6 @@ class TeeDriverProperties {
         return "tee_prop_" + dbCounter.incrementAndGet() + "_" + System.nanoTime();
     }
 
-    @BeforeProperty
-    void clearMockLogs() {
-        MockDriver.clearLogs();
-    }
-
     /**
      * TeeDriver broadcasts to both targets.
      *
@@ -53,7 +47,6 @@ class TeeDriverProperties {
 
         Assume.that(!db1.equals(db2)); // Ensure different databases
 
-        MockDriver.clearLogs();
 
         String url1 = "jdbc:mock:" + db1;
         String url2 = "jdbc:mock:" + db2;
@@ -86,7 +79,6 @@ class TeeDriverProperties {
 
         Assume.that(!liveDb.equals(deadDb));
 
-        MockDriver.clearLogs();
 
         String liveUrl = "jdbc:mock:" + liveDb;
         String deadUrl = "jdbc:mock:" + deadDb;
@@ -122,7 +114,6 @@ class TeeDriverProperties {
         String url2 = "jdbc:mock:" + db2;
 
         // First order: db1;db2
-        MockDriver.clearLogs();
         String teeUrl1 = "jdbc:tee:" + url1 + ";" + url2;
         try (Connection conn = DriverManager.getConnection(teeUrl1)) {
             conn.createStatement().executeQuery(sql);
@@ -131,7 +122,6 @@ class TeeDriverProperties {
         String log2_order1 = MockDriver.getLog(url2);
 
         // Second order: db2;db1
-        MockDriver.clearLogs();
         String teeUrl2 = "jdbc:tee:" + url2 + ";" + url1;
         try (Connection conn = DriverManager.getConnection(teeUrl2)) {
             conn.createStatement().executeQuery(sql);
@@ -162,7 +152,6 @@ class TeeDriverProperties {
         String url2 = "jdbc:mock:" + db2;
 
         // Direct tee
-        MockDriver.clearLogs();
         String teeUrl = "jdbc:tee:" + url1 + ";" + url2;
         try (Connection conn = DriverManager.getConnection(teeUrl)) {
             conn.createStatement().executeQuery(sql);
@@ -171,7 +160,6 @@ class TeeDriverProperties {
         String log2_tee = MockDriver.getLog(url2);
 
         // Cat wrapped tee
-        MockDriver.clearLogs();
         String catTeeUrl = "jdbc:cat:" + teeUrl;
         try (Connection conn = DriverManager.getConnection(catTeeUrl)) {
             conn.createStatement().executeQuery(sql);
@@ -231,7 +219,6 @@ class TeeDriverProperties {
     void executeQueryBroadcastsToAll(
             @ForAll("sqlStatements") String sql) throws SQLException {
 
-        MockDriver.clearLogs();
 
         String dbName1 = createUniqueDbName();
         String dbName2 = createUniqueDbName();
@@ -265,7 +252,6 @@ class TeeDriverProperties {
     void executeUpdateGoesToFirstTarget(
             @ForAll("updateStatements") String sql) throws SQLException {
 
-        MockDriver.clearLogs();
 
         String dbName1 = createUniqueDbName();
         String dbName2 = createUniqueDbName();
@@ -319,7 +305,6 @@ class TeeDriverProperties {
     void logTeeComposition(
             @ForAll("sqlStatements") String sql) throws SQLException {
 
-        MockDriver.clearLogs();
 
         String dbName1 = createUniqueDbName();
         String dbName2 = createUniqueDbName();
@@ -401,7 +386,6 @@ class TeeDriverProperties {
      */
     @Property(tries = 10)
     void connectionClosePropagates() throws SQLException {
-        MockDriver.clearLogs();
 
         String dbName1 = createUniqueDbName();
         String dbName2 = createUniqueDbName();
@@ -436,8 +420,7 @@ class TeeDriverProperties {
             @ForAll @IntRange(min = 2, max = 4) int cycles) throws SQLException {
 
         for (int i = 0; i < cycles; i++) {
-            MockDriver.clearLogs();
-
+    
             String dbName1 = createUniqueDbName();
             String dbName2 = createUniqueDbName();
             String url1 = "jdbc:mock:" + dbName1;
