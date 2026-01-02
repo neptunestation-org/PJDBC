@@ -1,7 +1,7 @@
 # PRD: Agent-First Distribution for PJDBC (Open-Source Ecosystem)
 
-Owner: PJDBC maintainers  
-Status: Draft  
+Owner: PJDBC maintainers
+Status: Approved
 Last updated: 2026-01-01  
 Target project: PJDBC (Java JDBC proxy library)
 
@@ -261,13 +261,13 @@ Mitigation: Start small (one DB), use stable images, add retries/timeouts, keep 
 Risk: Backward compatibility challenges if behavior is underspecified today.  
 Mitigation: Codify current behavior explicitly; for changes, version manifest and document breaking changes with migration notes.
 
-## 11. Open Questions
+## 11. Decisions (Resolved)
 
-1. Which release channel is authoritative today (Maven Central vs GitHub Packages)?  
-2. Which Java versions are officially supported (baseline currently stated as Java 21+ in docs; confirm and enforce in CI)?  
-3. What set of built-in drivers should be considered “stable contract” vs “experimental”?  
-4. Do we want to formally declare driver stability levels in the manifest (e.g., `stability: stable|experimental`)?  
-5. Should conformance suite include performance invariants (timeouts, pooling semantics) or only functional behavior?
+1. **Release channel:** Maven Central is the authoritative release channel.
+2. **Java version:** Java 21 is the supported baseline.
+3. **Driver stability:** All built-in drivers are considered "stable contract".
+4. **Stability levels in manifest:** Yes, include `stability` field in driver manifest entries.
+5. **Performance invariants:** Yes, conformance suite will include performance invariants (timeouts, pooling semantics) in addition to functional behavior.
 
 ## 12. Appendix A: Capability Manifest Structure (Proposed)
 
@@ -288,7 +288,8 @@ Driver object (minimum):
 - `sideEffects`: array of strings
 - `riskFlags`: array of strings
 - `examples`: array of strings (optional)
-- `stability`: string (optional)
+- `stability`: string (required, one of: "stable", "experimental")
+- `performanceInvariants`: object (optional, for conformance testing)
 
 ## 13. Appendix B: Initial Backlog (Issue Seeds)
 
