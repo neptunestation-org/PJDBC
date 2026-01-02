@@ -571,6 +571,87 @@ Connection c = DriverManager.getConnection(
     "jdbc:chaos[failureRate=0.05,latency=50,connectionDropRate=0.01]:jdbc:postgresql://localhost/db");
 ```
 
+### HikariPoolDriver (HikariCP Connection Pooling)
+
+A high-performance connection pooling driver using HikariCP.
+
+**URL Format:** `jdbc:hikaricp:target-url?param=value`
+
+**Parameters:**
+All HikariCP configuration parameters can be passed in the URL query string:
+| Parameter         | Description                    | Default |
+|-------------------|--------------------------------|---------|
+| `maximumPoolSize` | Maximum pool size              | 10      |
+| `minimumIdle`     | Minimum idle connections       | same as maximumPoolSize |
+| `connectionTimeout` | Connection timeout (ms)      | 30000   |
+| `idleTimeout`     | Idle connection timeout (ms)   | 600000  |
+| `maxLifetime`     | Maximum connection lifetime (ms) | 1800000 |
+
+**Examples:**
+```java
+// Basic usage with defaults
+Connection c = DriverManager.getConnection(
+    "jdbc:hikaricp:jdbc:postgresql://localhost/db");
+
+// Custom pool size
+Connection c = DriverManager.getConnection(
+    "jdbc:hikaricp:jdbc:postgresql://localhost/db?maximumPoolSize=20");
+
+// Multiple parameters
+Connection c = DriverManager.getConnection(
+    "jdbc:hikaricp:jdbc:postgresql://localhost/db?maximumPoolSize=20&minimumIdle=5&connectionTimeout=10000");
+```
+
+**Note:** Requires the `HikariCP` dependency (included as optional in the PJDBC pom.xml).
+
+### SinkDriver (Null Output)
+
+Discards all SQL operations silently. Useful for testing, benchmarking, or dry-run scenarios where you want to measure application overhead without database interaction.
+
+**URL Format:** `jdbc:sink:target-url`
+
+**Examples:**
+```java
+// Discard all operations to the underlying database
+Connection c = DriverManager.getConnection(
+    "jdbc:sink:jdbc:postgresql://localhost/db");
+
+// Useful in testing to suppress actual database writes
+Connection c = DriverManager.getConnection("jdbc:sink:jdbc:mock:test");
+```
+
+### MockDriver (Testing)
+
+In-memory mock driver for testing. Records all SQL operations for later verification without requiring an actual database.
+
+**URL Format:** `jdbc:mock:identifier`
+
+**Features:**
+- Records all SQL statements executed
+- Returns empty result sets for queries
+- No actual database connection required
+- Useful for unit testing JDBC code
+
+**Examples:**
+```java
+// Create a mock connection
+Connection c = DriverManager.getConnection("jdbc:mock:testdb");
+
+// Execute some operations
+Statement stmt = c.createStatement();
+stmt.executeQuery("SELECT * FROM users");
+stmt.executeUpdate("INSERT INTO users (name) VALUES ('test')");
+
+// Retrieve the log of operations
+String log = MockDriver.getLog("jdbc:mock:testdb");
+// log contains: "executeQuery[SELECT * FROM users]\nexecuteUpdate[INSERT INTO users (name) VALUES ('test')]"
+
+// Clear logs between tests
+MockDriver.clearLog("jdbc:mock:testdb");
+// Or clear all logs
+MockDriver.clearLogs();
+```
+
 ## Chaining Drivers
 
 Drivers can be chained together:
