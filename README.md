@@ -529,7 +529,7 @@ mvn clean install
 
 ## Requirements
 
-- Java 8 or higher
+- Java 21 or higher
 - Maven 3.x
 
 ## Author
