@@ -469,6 +469,103 @@ Connection conn = DriverManager.getConnection(
 );
 ```
 
+## Agent-First Usage
+
+PJDBC includes a capabilities manifest and introspection API designed for AI agents and automated tooling. Agents can programmatically discover available drivers, their parameters, and capabilities without parsing documentation.
+
+### Capabilities Manifest
+
+The `pjdbc.capabilities.json` manifest describes all drivers in a machine-readable format:
+
+```json
+{
+  "version": "1.0",
+  "drivers": [
+    {
+      "name": "CachingDriver",
+      "prefix": "cache",
+      "class": "org.pjdbc.drivers.CachingDriver",
+      "description": "Caches SELECT query results in memory",
+      "capabilities": ["caching"],
+      "parameters": [
+        {"name": "ttl", "type": "integer", "default": 60, "description": "Time-to-live in seconds"},
+        {"name": "maxSize", "type": "integer", "default": 1000, "description": "Maximum cached queries"}
+      ],
+      "sideEffects": {"stateful": true}
+    }
+  ]
+}
+```
+
+### Runtime Introspection API
+
+Use `PjdbcCapabilities` to query driver metadata at runtime:
+
+```java
+import org.pjdbc.capabilities.PjdbcCapabilities;
+import org.pjdbc.capabilities.DriverCapability;
+
+// Load capabilities (cached singleton)
+PjdbcCapabilities caps = PjdbcCapabilities.load();
+
+// Find all caching drivers
+List<DriverCapability> cachingDrivers = caps.findByCapability("caching");
+// Returns: [CachingDriver, RedisCachingDriver, MemcachedCachingDriver, HazelcastCachingDriver]
+
+// Get a specific driver by prefix
+Optional<DriverCapability> pool = caps.findByPrefix("pool");
+pool.ifPresent(d -> {
+    System.out.println("URL prefix: " + d.getUrlPrefix());  // jdbc:pool:
+    System.out.println("Parameters: " + d.parameters());
+});
+
+// Find drivers with external dependencies
+List<DriverCapability> withDeps = caps.findWithDependencies();
+// Returns: [HikariPoolDriver, RedisCachingDriver, MemcachedCachingDriver, HazelcastCachingDriver]
+
+// Find drivers that make network calls
+List<DriverCapability> networkDrivers = caps.findBySideEffect("network");
+
+// Check available capability tags
+List<String> allTags = caps.getAllCapabilityTags();
+// Returns: [caching, filtering, logging, masking, metrics, passthrough, pooling, ...]
+```
+
+### Agent URL Construction
+
+Agents can construct valid JDBC URLs programmatically:
+
+```java
+DriverCapability driver = caps.findByPrefix("retry").orElseThrow();
+
+// Build URL with parameters
+StringBuilder url = new StringBuilder("jdbc:");
+url.append(driver.prefix());
+url.append("[");
+url.append("maxRetries=5,initialDelay=200");
+url.append("]:");
+url.append("jdbc:postgresql://localhost/mydb");
+
+// Result: jdbc:retry[maxRetries=5,initialDelay=200]:jdbc:postgresql://localhost/mydb
+```
+
+### Capability Tags
+
+Drivers are tagged with capabilities for easy discovery:
+
+| Tag | Description | Drivers |
+|-----|-------------|---------|
+| `caching` | Query result caching | cache, rediscache, memcache, hazelcast |
+| `pooling` | Connection pooling | pool, hikaricp |
+| `logging` | SQL statement logging | log |
+| `tracing` | Distributed tracing | trace |
+| `metrics` | Performance metrics | metrics |
+| `resilience` | Fault tolerance | retry, chaos |
+| `security` | Access control | readonly, mapuser, mask |
+| `testing` | Test utilities | mock, sink, chaos |
+| `transformation` | SQL modification | filter |
+| `masking` | Data masking | mask |
+
 ## Creating Custom Drivers
 
 Extend `AbstractProxyDriver` to create custom proxy drivers:
