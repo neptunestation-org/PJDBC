@@ -53,7 +53,7 @@ public class DriverCompositionTest {
 			 MockDriver.getLog("jdbc:mock:bar"));}
 	catch (Exception e) {fail(e.getMessage());}}
 
-    @Test @Ignore
+    @Test
     public void URLsCanHaveWhitespace () {
 	try {
 	    int i = 0;
@@ -61,5 +61,5 @@ public class DriverCompositionTest {
 	    try{DriverManager.getConnection("jdbc: cat:jdbc:\nsink:jdbc:mock:foo");} catch (Exception e) {i++;}
 	    try{DriverManager.getConnection("jdbc: log:jdbc:\nfilter:jdbc:cat:jdbc:sink:jdbc:mock:foo");} catch (Exception e) {i++;}
 	    try{DriverManager.getConnection("jdbc: log:jdbc:\nfilter:jdbc\n:cat :  jdbc:\ntee:jdbc:sink :jdbc:mock:foo ;\njdbc:mock:bar");} catch (Exception e) {i++;}
-	    assert(i==4);}
+	    assertEquals(4, i);}
 	catch (Exception e) {fail(e.getMessage());}}}

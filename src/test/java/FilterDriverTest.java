@@ -62,7 +62,7 @@ public class FilterDriverTest {
     public void compliance () {
 	assertFalse(new FilterDriver().jdbcCompliant());}
 
-    @Test @Ignore
+    @Test
     public void upcaseFilter () {
 	try {
 	    ((FilterDriver)DriverManager.getDriver("jdbc:filter:jdbc:mock:foo")).setFilter(new FilterDriver.Filter() {
