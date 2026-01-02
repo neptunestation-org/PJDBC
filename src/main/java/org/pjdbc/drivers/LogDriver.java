@@ -14,7 +14,11 @@ public class LogDriver extends AbstractProxyDriver {
 	return stmt.getConnection().unwrap(Connection.class).getMetaData().getURL();}
 
     protected Statement proxyStatement (Statement delegate, Connection conn) throws SQLException {
+	final AbstractProxyDriver driver = this;
 	return new AbstractStatement(delegate, conn) {
+	    @Override
+	    protected ResultSet wrap (ResultSet r) throws SQLException {
+		return driver.proxyResultSet(this, r);}
 	    private void log (String sql) throws SQLException {
 		Logger.getLogger(getLogName(this)).info(sql);}
 	    public void addBatch (String sql) throws SQLException {

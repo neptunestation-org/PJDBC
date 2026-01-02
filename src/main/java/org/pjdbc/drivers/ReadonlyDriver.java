@@ -260,6 +260,12 @@ public class ReadonlyDriver extends AbstractProxyDriver {
         }
 
         @Override
+        protected ResultSet wrap(ResultSet r) throws SQLException {
+            Driver driver = ((AbstractConnection)getConnection()).getDriver();
+            return ((AbstractProxyDriver)driver).proxyResultSet(this, r);
+        }
+
+        @Override
         public boolean execute(String sql) throws SQLException {
             config.checkStatement(sql);
             return super.execute(sql);

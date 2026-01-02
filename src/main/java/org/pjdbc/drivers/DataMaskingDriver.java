@@ -98,7 +98,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
     }
 
     @Override
-    protected ResultSet proxyResultSet(Statement stmt, ResultSet delegate) throws SQLException {
+    public ResultSet proxyResultSet(Statement stmt, ResultSet delegate) throws SQLException {
         Connection conn = stmt.getConnection();
         if (conn instanceof MaskingConnection maskConn) {
             return new MaskingResultSet(stmt, delegate, maskConn.getConfig());

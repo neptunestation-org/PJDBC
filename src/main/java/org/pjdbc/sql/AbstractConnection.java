@@ -18,7 +18,7 @@ public abstract class AbstractConnection extends AbstractWrapper implements Conn
 	for (Connection c : delegates) return c;
 	return null;}
 
-    protected Driver getDriver () {
+    public Driver getDriver () {
 	return driver;}
 
     protected Statement wrap (Statement stmt) throws SQLException {

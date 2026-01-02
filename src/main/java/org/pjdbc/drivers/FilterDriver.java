@@ -44,8 +44,12 @@ public class FilterDriver extends AbstractProxyDriver {
         return "filter".equals(subprotocol);}
 
     protected Statement proxyStatement (Statement delegate, Connection conn) throws SQLException {
+	final AbstractProxyDriver driver = this;
         final JdbcTransformer xformer = transformer;
         return new AbstractStatement(delegate, conn) {
+	    @Override
+	    protected ResultSet wrap (ResultSet r) throws SQLException {
+		return driver.proxyResultSet(this, r);}
             public void addBatch (String sql) throws SQLException {
                 super.addBatch(xformer.transformSql(sql));}
             public boolean execute (String sql) throws SQLException {

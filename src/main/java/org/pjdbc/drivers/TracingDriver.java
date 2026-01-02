@@ -380,6 +380,11 @@ public class TracingDriver extends AbstractProxyDriver {
             this.driver = driver;
         }
 
+        @Override
+        protected ResultSet wrap(ResultSet r) throws SQLException {
+            return driver.proxyResultSet(this, r);
+        }
+
         private Span startSpan(String operation, String sql) {
             Span span = config.getTracer().startSpan(config.getSpanPrefix() + operation);
             span.setAttribute("db.system", "jdbc");

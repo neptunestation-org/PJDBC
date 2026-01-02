@@ -77,7 +77,8 @@ public abstract class AbstractProxyDriver extends AbstractDriver {
 		return driver.proxyResultSet(this, r);}};}
 
 
-    protected ResultSet proxyResultSet (Statement stmt, ResultSet delegate) throws SQLException {
+    public ResultSet proxyResultSet (Statement stmt, ResultSet delegate) throws SQLException {
+	if (delegate == null) return null;
 	return new AbstractResultSet(stmt, delegate) {};}
 
     @Override
