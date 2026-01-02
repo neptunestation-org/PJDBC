@@ -89,42 +89,4 @@ public abstract class DriverConformanceTest {
             }
         }
     }
-
-    /**
-     * Asserts that a condition is true, throwing AssertionError if not.
-     */
-    protected void assertTrue(String message, boolean condition) {
-        if (!condition) {
-            throw new AssertionError(message);
-        }
-    }
-
-    /**
-     * Asserts that two objects are equal.
-     */
-    protected void assertEquals(String message, Object expected, Object actual) {
-        if (expected == null && actual == null) return;
-        if (expected != null && expected.equals(actual)) return;
-        throw new AssertionError(message + ": expected <" + expected + "> but was <" + actual + ">");
-    }
-
-    /**
-     * Asserts that an exception is thrown.
-     */
-    protected <T extends Throwable> T assertThrows(Class<T> expectedType, ThrowingRunnable runnable) {
-        try {
-            runnable.run();
-            throw new AssertionError("Expected " + expectedType.getName() + " but no exception was thrown");
-        } catch (Throwable t) {
-            if (expectedType.isInstance(t)) {
-                return expectedType.cast(t);
-            }
-            throw new AssertionError("Expected " + expectedType.getName() + " but got " + t.getClass().getName(), t);
-        }
-    }
-
-    @FunctionalInterface
-    protected interface ThrowingRunnable {
-        void run() throws Throwable;
-    }
 }

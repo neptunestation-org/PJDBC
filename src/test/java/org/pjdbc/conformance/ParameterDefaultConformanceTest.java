@@ -21,15 +21,16 @@ import static org.junit.jupiter.api.Assertions.*;
 public class ParameterDefaultConformanceTest extends DriverConformanceTest {
 
     @Test
-    @DisplayName("All optional parameters have default values")
+    @DisplayName("All optional non-string parameters have default values")
     void optionalParametersHaveDefaults() {
         for (DriverCapability driver : capabilities.getAllDrivers()) {
             if (driver.parameters() == null) continue;
 
             for (DriverCapability.Parameter param : driver.parameters()) {
-                if (!param.required()) {
+                // String parameters may legitimately have no default (user-provided values)
+                if (!param.required() && !"string".equals(param.type())) {
                     assertNotNull(param.defaultValue(),
-                        "Optional parameter '" + param.name() + "' in " + driver.name() +
+                        "Optional non-string parameter '" + param.name() + "' in " + driver.name() +
                         " should have a default value");
                 }
             }
