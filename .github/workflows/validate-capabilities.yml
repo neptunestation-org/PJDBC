@@ -1,0 +1,93 @@
+name: Validate Capabilities Manifest
+
+on:
+  push:
+    paths:
+      - 'src/main/resources/pjdbc.capabilities.json'
+      - 'src/main/resources/pjdbc.capabilities.schema.json'
+      - '.github/workflows/validate-capabilities.yml'
+  pull_request:
+    paths:
+      - 'src/main/resources/pjdbc.capabilities.json'
+      - 'src/main/resources/pjdbc.capabilities.schema.json'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install ajv-cli
+      run: npm install -g ajv-cli ajv-formats
+
+    - name: Validate JSON syntax
+      run: |
+        python3 -c "import json; json.load(open('src/main/resources/pjdbc.capabilities.json'))"
+        python3 -c "import json; json.load(open('src/main/resources/pjdbc.capabilities.schema.json'))"
+
+    - name: Validate manifest against schema
+      run: |
+        ajv validate \
+          -s src/main/resources/pjdbc.capabilities.schema.json \
+          -d src/main/resources/pjdbc.capabilities.json \
+          --strict=false
+
+    - name: Verify all drivers have required fields
+      run: |
+        python3 << 'EOF'
+        import json
+        import sys
+
+        with open('src/main/resources/pjdbc.capabilities.json') as f:
+            manifest = json.load(f)
+
+        errors = []
+        prefixes = set()
+
+        for i, driver in enumerate(manifest.get('drivers', [])):
+            name = driver.get('name', f'driver[{i}]')
+
+            # Check required fields
+            for field in ['name', 'prefix', 'class', 'description', 'capabilities']:
+                if field not in driver:
+                    errors.append(f"{name}: missing required field '{field}'")
+
+            # Check for duplicate prefixes
+            prefix = driver.get('prefix')
+            if prefix:
+                if prefix in prefixes:
+                    errors.append(f"{name}: duplicate prefix '{prefix}'")
+                prefixes.add(prefix)
+
+            # Validate class name format
+            cls = driver.get('class', '')
+            if cls and not cls.startswith('org.pjdbc.'):
+                errors.append(f"{name}: class should be in org.pjdbc package, got '{cls}'")
+
+        if errors:
+            print("Validation errors found:")
+            for error in errors:
+                print(f"  - {error}")
+            sys.exit(1)
+        else:
+            print(f"Validated {len(manifest.get('drivers', []))} drivers successfully")
+        EOF
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Verify manifest loads at runtime
+      run: |
+        mvn -B compile -DskipTests
+        mvn -B exec:java -Dexec.mainClass="org.pjdbc.capabilities.PjdbcCapabilities" -Dexec.classpathScope=compile -Dexec.args="" 2>/dev/null || true

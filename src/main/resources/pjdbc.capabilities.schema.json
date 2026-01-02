@@ -1,0 +1,183 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://pjdbc.org/schemas/capabilities.schema.json",
+  "title": "PJDBC Driver Capabilities Manifest",
+  "description": "Schema for describing PJDBC driver capabilities, parameters, and metadata",
+  "type": "object",
+  "required": ["version", "drivers"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version",
+      "pattern": "^\\d+\\.\\d+$"
+    },
+    "drivers": {
+      "type": "array",
+      "description": "List of available PJDBC drivers",
+      "items": {
+        "$ref": "#/definitions/driver"
+      }
+    }
+  },
+  "definitions": {
+    "driver": {
+      "type": "object",
+      "required": ["name", "prefix", "class", "description", "capabilities"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable driver name"
+        },
+        "prefix": {
+          "type": "string",
+          "description": "JDBC URL prefix (e.g., 'pool', 'log', 'cache')",
+          "pattern": "^[a-z][a-z0-9]*$"
+        },
+        "class": {
+          "type": "string",
+          "description": "Fully qualified Java class name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of driver purpose"
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "List of capability tags",
+          "items": {
+            "type": "string",
+            "enum": [
+              "passthrough",
+              "logging",
+              "caching",
+              "pooling",
+              "transformation",
+              "filtering",
+              "replication",
+              "metrics",
+              "tracing",
+              "resilience",
+              "security",
+              "testing",
+              "masking"
+            ]
+          }
+        },
+        "parameters": {
+          "type": "array",
+          "description": "Configurable URL parameters",
+          "items": {
+            "$ref": "#/definitions/parameter"
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "description": "Optional external dependencies",
+          "items": {
+            "$ref": "#/definitions/dependency"
+          }
+        },
+        "sideEffects": {
+          "type": "object",
+          "description": "Side effects this driver may produce",
+          "properties": {
+            "logging": {
+              "type": "boolean",
+              "description": "Writes to logging system"
+            },
+            "metrics": {
+              "type": "boolean",
+              "description": "Collects metrics"
+            },
+            "network": {
+              "type": "boolean",
+              "description": "Makes network calls beyond delegate"
+            },
+            "filesystem": {
+              "type": "boolean",
+              "description": "Reads/writes filesystem"
+            },
+            "stateful": {
+              "type": "boolean",
+              "description": "Maintains state across calls"
+            }
+          }
+        },
+        "composable": {
+          "type": "boolean",
+          "description": "Whether driver can be chained with others",
+          "default": true
+        },
+        "terminal": {
+          "type": "boolean",
+          "description": "Whether driver terminates the chain (no delegate)",
+          "default": false
+        }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "required": ["name", "type", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Parameter name as used in URL"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["string", "integer", "boolean", "float", "duration"],
+          "description": "Parameter value type"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable parameter description"
+        },
+        "default": {
+          "description": "Default value if not specified"
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum value for numeric types"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum value for numeric types"
+        },
+        "enum": {
+          "type": "array",
+          "description": "Allowed values for string types",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "required": ["groupId", "artifactId"],
+      "properties": {
+        "groupId": {
+          "type": "string",
+          "description": "Maven group ID"
+        },
+        "artifactId": {
+          "type": "string",
+          "description": "Maven artifact ID"
+        },
+        "version": {
+          "type": "string",
+          "description": "Recommended version"
+        },
+        "optional": {
+          "type": "boolean",
+          "description": "Whether dependency is optional",
+          "default": true
+        }
+      }
+    }
+  }
+}
