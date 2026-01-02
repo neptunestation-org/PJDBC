@@ -48,7 +48,6 @@ public class UrlParsingConformanceTest extends DriverConformanceTest {
         Class.forName("org.pjdbc.drivers.TracingDriver");
         Class.forName("org.pjdbc.drivers.MetricsDriver");
         Class.forName("org.pjdbc.drivers.DataMaskingDriver");
-        Class.forName("org.pjdbc.drivers.SerialDriver");
     }
 
     @Test

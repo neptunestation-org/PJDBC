@@ -689,19 +689,6 @@
       "sideEffects": {},
       "composable": true,
       "terminal": false
-    },
-    {
-      "name": "SerialDriver",
-      "prefix": "serial",
-      "class": "org.pjdbc.drivers.SerialDriver",
-      "description": "Serializes concurrent database access",
-      "capabilities": ["security"],
-      "parameters": [],
-      "sideEffects": {
-        "stateful": true
-      },
-      "composable": true,
-      "terminal": false
     }
   ]
 }
