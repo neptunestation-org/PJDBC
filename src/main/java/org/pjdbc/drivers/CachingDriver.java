@@ -744,45 +744,62 @@ public class CachingDriver extends AbstractProxyDriver {
 
         @Override
         public ResultSet executeQuery() throws SQLException {
-            if (!isSelect()) {
-                return super.executeQuery();
-            }
+            try {
+                if (!isSelect()) {
+                    return super.executeQuery();
+                }
 
-            String cacheKey = getCacheKey();
-            CachedResultSet cached = cache.get(cacheKey);
-            if (cached != null) {
-                return new CachedResultSetWrapper(this, cached);
-            }
+                String cacheKey = getCacheKey();
+                CachedResultSet cached = cache.get(cacheKey);
+                if (cached != null) {
+                    return new CachedResultSetWrapper(this, cached);
+                }
 
-            ResultSet rs = super.executeQuery();
-            CachedResultSet cachedResult = new CachedResultSet(rs);
-            rs.close();
-            cache.put(cacheKey, cachedResult);
-            return new CachedResultSetWrapper(this, cachedResult);
+                ResultSet rs = super.executeQuery();
+                CachedResultSet cachedResult = new CachedResultSet(rs);
+                rs.close();
+                cache.put(cacheKey, cachedResult);
+                return new CachedResultSetWrapper(this, cachedResult);
+            } finally {
+                // Clear parameters to prevent stale values leaking into subsequent executions
+                parameters.clear();
+            }
         }
 
         @Override
         public int executeUpdate() throws SQLException {
-            if (cache.getConfig().isInvalidateOnWrite() && isWrite()) {
-                cache.clear();
+            try {
+                if (cache.getConfig().isInvalidateOnWrite() && isWrite()) {
+                    cache.clear();
+                }
+                return super.executeUpdate();
+            } finally {
+                parameters.clear();
             }
-            return super.executeUpdate();
         }
 
         @Override
         public boolean execute() throws SQLException {
-            if (cache.getConfig().isInvalidateOnWrite() && isWrite()) {
-                cache.clear();
+            try {
+                if (cache.getConfig().isInvalidateOnWrite() && isWrite()) {
+                    cache.clear();
+                }
+                return super.execute();
+            } finally {
+                parameters.clear();
             }
-            return super.execute();
         }
 
         @Override
         public int[] executeBatch() throws SQLException {
-            if (cache.getConfig().isInvalidateOnWrite()) {
-                cache.clear();
+            try {
+                if (cache.getConfig().isInvalidateOnWrite()) {
+                    cache.clear();
+                }
+                return super.executeBatch();
+            } finally {
+                parameters.clear();
             }
-            return super.executeBatch();
         }
     }
 
