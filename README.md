@@ -26,7 +26,7 @@ Add to your `pom.xml`:
 <dependency>
   <groupId>org.pjdbc</groupId>
   <artifactId>PJDBC</artifactId>
-  <version>1.2</version>
+  <version>1.3.0</version>
 </dependency>
 ```
 
@@ -623,6 +623,34 @@ public interface JdbcTransformer {
 ```bash
 mvn clean install
 ```
+
+## Development
+
+### Running Tests
+
+```bash
+mvn test
+```
+
+### CI Configuration
+
+The project uses GitHub Actions for CI with the following workflows:
+
+- **CI**: Builds and tests the project
+- **SpotBugs**: Static analysis for bug detection
+- **OWASP Dependency Check**: Scans dependencies for known vulnerabilities
+
+#### NVD API Key Setup
+
+The OWASP Dependency Check workflow uses the National Vulnerability Database (NVD) API. Without an API key, vulnerability database updates are rate-limited and can take 20+ minutes. With an API key, updates complete in ~4 minutes.
+
+To configure:
+
+1. Request a free API key at https://nvd.nist.gov/developers/request-an-api-key
+2. Add the key as a repository secret named `NVD_API_KEY`:
+   - Go to Settings → Secrets and variables → Actions → New repository secret
+   - Name: `NVD_API_KEY`
+   - Value: your API key
 
 ## Requirements
 
