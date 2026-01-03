@@ -193,7 +193,7 @@ public class RedisCachingDriver extends AbstractProxyDriver {
         public RedisCacheConfig getConfig() { return config; }
 
         private String makeKey(String sql) {
-            return config.getKeyPrefix() + Integer.toHexString(sql.hashCode());
+            return CacheKeyBuilder.buildKey(config.getKeyPrefix(), sql);
         }
 
         public SafeResultSetSerializer.CachedData get(String sql) {

@@ -279,7 +279,7 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
         public HazelcastCacheConfig getConfig() { return config; }
 
         private String makeKey(String sql) {
-            return "q:" + Integer.toHexString(sql.hashCode());
+            return CacheKeyBuilder.buildKey("q:", sql);
         }
 
         public SerializableCachedResultSet get(String sql) {

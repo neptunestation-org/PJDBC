@@ -178,11 +178,8 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
 
         private String makeKey(String sql) {
             // Memcached keys can't have spaces or control chars, max 250 bytes
-            String key = config.getKeyPrefix() + Integer.toHexString(sql.hashCode());
-            if (key.length() > 250) {
-                key = key.substring(0, 250);
-            }
-            return key;
+            // SHA-256 produces 64 hex chars, well under limit with typical prefixes
+            return CacheKeyBuilder.buildKey(config.getKeyPrefix(), sql);
         }
 
         public SafeResultSetSerializer.CachedData get(String sql) {
