@@ -33,6 +33,40 @@ public class TeeDriverTest {
 	catch (Exception e) {fail(e.getMessage());}}
 
     @Test
+    public void executeUpdateReplicatesToAllConnections () {
+	try {
+	    MockDriver.clearLogs();
+	    Connection c = (new TeeDriver().connect("jdbc:tee:jdbc:mock:update1;jdbc:mock:update2", null));
+	    Statement stmt = c.createStatement();
+	    stmt.executeUpdate("INSERT INTO person VALUES (1, 'Alice')");
+	    stmt.executeUpdate("UPDATE person SET name = 'Bob' WHERE id = 1");
+	    stmt.executeUpdate("DELETE FROM person WHERE id = 1");
+
+	    String expectedLog = "executeUpdate[INSERT INTO person VALUES (1, 'Alice')]\n"+
+				 "executeUpdate[UPDATE person SET name = 'Bob' WHERE id = 1]\n"+
+				 "executeUpdate[DELETE FROM person WHERE id = 1]";
+
+	    assertEquals(expectedLog, MockDriver.getLog("jdbc:mock:update1"));
+	    assertEquals(expectedLog, MockDriver.getLog("jdbc:mock:update2"));}
+	catch (Exception e) {fail(e.getMessage());}}
+
+    @Test
+    public void executeReplicatesToAllConnections () {
+	try {
+	    MockDriver.clearLogs();
+	    Connection c = (new TeeDriver().connect("jdbc:tee:jdbc:mock:exec1;jdbc:mock:exec2", null));
+	    Statement stmt = c.createStatement();
+	    stmt.execute("CREATE TABLE test (id INT)");
+	    stmt.execute("DROP TABLE test");
+
+	    String expectedLog = "execute[CREATE TABLE test (id INT)]\n"+
+				 "execute[DROP TABLE test]";
+
+	    assertEquals(expectedLog, MockDriver.getLog("jdbc:mock:exec1"));
+	    assertEquals(expectedLog, MockDriver.getLog("jdbc:mock:exec2"));}
+	catch (Exception e) {fail(e.getMessage());}}
+
+    @Test
     public void connectDirectly () {
 	try {
 	    assertFalse(new TeeDriver().acceptsURL("foo"));
