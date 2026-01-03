@@ -1,11 +1,38 @@
 import java.io.*;
 import java.sql.*;
+import java.util.*;
 import java.util.logging.*;
 import org.junit.*;
 import org.pjdbc.drivers.*;
 import static org.junit.Assert.*;
 
 public class LogDriverTest {
+    // Custom handler that collects log messages
+    private static class TestHandler extends Handler {
+        private final List<String> messages = new ArrayList<>();
+
+        @Override
+        public void publish(LogRecord record) {
+            if (record != null && record.getMessage() != null) {
+                messages.add(record.getMessage());
+            }
+        }
+
+        @Override
+        public void flush() {}
+
+        @Override
+        public void close() throws SecurityException {}
+
+        public List<String> getMessages() {
+            return new ArrayList<>(messages);
+        }
+
+        public void clear() {
+            messages.clear();
+        }
+    }
+
     @Test
     public void acceptsURL () {
 	assertFalse(new LogDriver().acceptsURL("jdbc:log"));
@@ -15,24 +42,42 @@ public class LogDriverTest {
 
     @Test
     public void testConnectDirectlyAndInvokeMethods () {
+	Logger logger = Logger.getLogger("jdbc:mock:foo");
+	TestHandler testHandler = new TestHandler();
+	Handler[] originalHandlers = logger.getHandlers();
+	Level originalLevel = logger.getLevel();
+	boolean originalUseParent = logger.getUseParentHandlers();
+
 	try {
-	    ByteArrayOutputStream out = new ByteArrayOutputStream();
-	    Logger.getLogger("jdbc:mock:foo").setLevel(Level.INFO);
-	    Logger.getLogger("jdbc:mock:foo").setUseParentHandlers(false);
-	    Logger.getLogger("jdbc:mock:foo").addHandler(new StreamHandler(out, new SimpleFormatter()));
+	    // Configure logger to capture messages
+	    logger.setLevel(Level.INFO);
+	    logger.setUseParentHandlers(false);
+	    for (Handler h : originalHandlers) logger.removeHandler(h);
+	    logger.addHandler(testHandler);
+
 	    Connection c = (new LogDriver().connect("jdbc:log:jdbc:mock:foo", null));
 	    Statement stmt = c.createStatement();
 	    stmt.executeQuery("select * from person;");
 	    stmt.executeQuery("insert into person (last_name, first_name, age) values ('David', 'Ventimiglia', 42);");
-	    for (Handler h : Logger.getLogger("jdbc:mock:foo").getHandlers()) h.flush();
+
 	    assertNotNull(MockDriver.getLog("jdbc:mock:foo"));
 	    assertEquals("executeQuery[select * from person;]\n" +
 			 "executeQuery[insert into person (last_name, first_name, age) values ('David', 'Ventimiglia', 42);]",
 			 MockDriver.getLog("jdbc:mock:foo"));
-	    assertEquals("select * from person;\n" +
-			 "insert into person (last_name, first_name, age) values ('David', 'Ventimiglia', 42);",
-			 out.toString().trim());}
-	catch (Exception e) {fail(e.getMessage());}}
+
+	    List<String> logged = testHandler.getMessages();
+	    assertEquals(2, logged.size());
+	    assertEquals("select * from person;", logged.get(0));
+	    assertEquals("insert into person (last_name, first_name, age) values ('David', 'Ventimiglia', 42);", logged.get(1));
+	}
+	catch (Exception e) {fail(e.getMessage());}
+	finally {
+	    // Restore logger state
+	    logger.removeHandler(testHandler);
+	    for (Handler h : originalHandlers) logger.addHandler(h);
+	    logger.setLevel(originalLevel);
+	    logger.setUseParentHandlers(originalUseParent);
+	}}
 
     @Test
     public void testConnectDirectly () {
