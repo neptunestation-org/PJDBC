@@ -129,6 +129,7 @@ public class RedisCachingDriver extends AbstractProxyDriver {
         private final int ttlSeconds;
         private final int maxPoolSize;
         private final int maxCacheRows;
+        private final boolean includeContext;
         private final boolean invalidateOnWrite;
         private final boolean enabled;
 
@@ -142,6 +143,8 @@ public class RedisCachingDriver extends AbstractProxyDriver {
             this.ttlSeconds = parseInt(parser.getParameter("ttl", "60"));
             this.maxPoolSize = parseInt(parser.getParameter("maxPoolSize", "8"));
             this.maxCacheRows = parseIntDefault(parser.getParameter("maxCacheRows", "10000"), 10000);
+            // Default to true for distributed caches to prevent cross-user data leakage
+            this.includeContext = parseBoolean(parser.getParameter("includeContext", "true"));
             this.invalidateOnWrite = parseBoolean(parser.getParameter("invalidateOnWrite", "true"));
             this.enabled = parseBoolean(parser.getParameter("enabled", "true"));
         }
@@ -167,6 +170,8 @@ public class RedisCachingDriver extends AbstractProxyDriver {
         public int getMaxPoolSize() { return maxPoolSize; }
         /** Maximum rows to cache per query. 0 = unlimited. Default: 10000 */
         public int getMaxCacheRows() { return maxCacheRows; }
+        /** Include catalog/schema/user in cache key. Default: true for distributed cache */
+        public boolean isIncludeContext() { return includeContext; }
         public boolean isInvalidateOnWrite() { return invalidateOnWrite; }
         public boolean isEnabled() { return enabled; }
     }
@@ -200,14 +205,14 @@ public class RedisCachingDriver extends AbstractProxyDriver {
 
         public RedisCacheConfig getConfig() { return config; }
 
-        private String makeKey(String sql) {
-            return CacheKeyBuilder.buildKey(config.getKeyPrefix(), sql);
+        private String makeKey(String sql, CacheKeyBuilder.ConnectionContext context) {
+            return CacheKeyBuilder.buildKey(config.getKeyPrefix(), sql, context);
         }
 
-        public SafeResultSetSerializer.CachedData get(String sql) {
+        public SafeResultSetSerializer.CachedData get(String sql, CacheKeyBuilder.ConnectionContext context) {
             if (!config.isEnabled()) return null;
 
-            String key = makeKey(sql);
+            String key = makeKey(sql, context);
             try (Jedis jedis = pool.getResource()) {
                 byte[] data = jedis.get(key.getBytes());
                 if (data == null) {
@@ -222,13 +227,47 @@ public class RedisCachingDriver extends AbstractProxyDriver {
             }
         }
 
-        public void put(String sql, SafeResultSetSerializer.CachedData result) {
+        public void put(String sql, CacheKeyBuilder.ConnectionContext context, SafeResultSetSerializer.CachedData result) {
             if (!config.isEnabled()) return;
 
-            String key = makeKey(sql);
+            String key = makeKey(sql, context);
             try (Jedis jedis = pool.getResource()) {
                 byte[] data = SafeResultSetSerializer.serialize(result);
                 jedis.setex(key.getBytes(), config.getTtlSeconds(), data);
+            } catch (Exception e) {
+                // Silently ignore cache write failures
+            }
+        }
+
+        /**
+         * Get cached data using a pre-built cache key (for PreparedStatements).
+         */
+        public SafeResultSetSerializer.CachedData getByKey(String cacheKey) {
+            if (!config.isEnabled()) return null;
+
+            try (Jedis jedis = pool.getResource()) {
+                byte[] data = jedis.get(cacheKey.getBytes());
+                if (data == null) {
+                    misses.incrementAndGet();
+                    return null;
+                }
+                hits.incrementAndGet();
+                return SafeResultSetSerializer.deserialize(data);
+            } catch (Exception e) {
+                misses.incrementAndGet();
+                return null;
+            }
+        }
+
+        /**
+         * Put cached data using a pre-built cache key (for PreparedStatements).
+         */
+        public void putByKey(String cacheKey, SafeResultSetSerializer.CachedData result) {
+            if (!config.isEnabled()) return;
+
+            try (Jedis jedis = pool.getResource()) {
+                byte[] data = SafeResultSetSerializer.serialize(result);
+                jedis.setex(cacheKey.getBytes(), config.getTtlSeconds(), data);
             } catch (Exception e) {
                 // Silently ignore cache write failures
             }
@@ -582,11 +621,15 @@ public class RedisCachingDriver extends AbstractProxyDriver {
     private class RedisCachingStatement extends AbstractStatement {
         private final RedisQueryCache cache;
         private final RedisCachingDriver driver;
+        private final CacheKeyBuilder.ConnectionContext context;
 
         public RedisCachingStatement(Statement delegate, Connection conn, RedisQueryCache cache, RedisCachingDriver driver) throws SQLException {
             super(delegate, conn);
             this.cache = cache;
             this.driver = driver;
+            this.context = cache.getConfig().isIncludeContext()
+                ? CacheKeyBuilder.ConnectionContext.fromConnection(conn)
+                : null;
         }
 
         private boolean isSelect(String sql) {
@@ -609,8 +652,8 @@ public class RedisCachingDriver extends AbstractProxyDriver {
                 return super.executeQuery(sql);
             }
 
-            // Check cache
-            SafeResultSetSerializer.CachedData cached = cache.get(sql);
+            // Check cache with connection context for isolation
+            SafeResultSetSerializer.CachedData cached = cache.get(sql, context);
             if (cached != null) {
                 return new CachedResultSetWrapper(this, cached);
             }
@@ -620,7 +663,7 @@ public class RedisCachingDriver extends AbstractProxyDriver {
             SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs, cache.getConfig().getMaxCacheRows());
             rs.close();
             if (!cachedResult.isTooLargeToCache()) {
-                cache.put(sql, cachedResult);
+                cache.put(sql, context, cachedResult);
             }
             return new CachedResultSetWrapper(this, cachedResult);
         }
@@ -690,6 +733,7 @@ public class RedisCachingDriver extends AbstractProxyDriver {
         private final RedisQueryCache cache;
         private final String sql;
         private final RedisCachingDriver driver;
+        private final CacheKeyBuilder.ConnectionContext context;
         private final Map<Integer, Object> parameters = new ConcurrentHashMap<>();
 
         public RedisCachingPreparedStatement(PreparedStatement delegate, Connection conn, RedisQueryCache cache, String sql, RedisCachingDriver driver) throws SQLException {
@@ -697,6 +741,9 @@ public class RedisCachingDriver extends AbstractProxyDriver {
             this.cache = cache;
             this.sql = sql;
             this.driver = driver;
+            this.context = cache.getConfig().isIncludeContext()
+                ? CacheKeyBuilder.ConnectionContext.fromConnection(conn)
+                : null;
         }
 
         private boolean isSelect() {
@@ -708,14 +755,16 @@ public class RedisCachingDriver extends AbstractProxyDriver {
         }
 
         private String getCacheKey() {
-            StringBuilder sb = new StringBuilder(sql);
+            // Build ordered parameter array for consistent hashing
+            Object[] params = null;
             if (!parameters.isEmpty()) {
-                sb.append("::params::");
-                for (Map.Entry<Integer, Object> e : parameters.entrySet()) {
-                    sb.append(e.getKey()).append("=").append(e.getValue()).append(";");
+                int maxIndex = parameters.keySet().stream().mapToInt(Integer::intValue).max().orElse(0);
+                params = new Object[maxIndex];
+                for (int i = 1; i <= maxIndex; i++) {
+                    params[i - 1] = parameters.get(i);
                 }
             }
-            return sb.toString();
+            return CacheKeyBuilder.buildKeyWithContext(cache.getConfig().getKeyPrefix(), sql, context, params);
         }
 
         @Override
@@ -762,7 +811,7 @@ public class RedisCachingDriver extends AbstractProxyDriver {
                 }
 
                 String cacheKey = getCacheKey();
-                SafeResultSetSerializer.CachedData cached = cache.get(cacheKey);
+                SafeResultSetSerializer.CachedData cached = cache.getByKey(cacheKey);
                 if (cached != null) {
                     return new CachedResultSetWrapper(this, cached);
                 }
@@ -771,7 +820,7 @@ public class RedisCachingDriver extends AbstractProxyDriver {
                 SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs, cache.getConfig().getMaxCacheRows());
                 rs.close();
                 if (!cachedResult.isTooLargeToCache()) {
-                    cache.put(cacheKey, cachedResult);
+                    cache.putByKey(cacheKey, cachedResult);
                 }
                 return new CachedResultSetWrapper(this, cachedResult);
             } finally {

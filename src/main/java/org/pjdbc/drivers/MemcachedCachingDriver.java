@@ -120,6 +120,7 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
         private final String keyPrefix;
         private final int ttlSeconds;
         private final int maxCacheRows;
+        private final boolean includeContext;
         private final boolean invalidateOnWrite;
         private final boolean enabled;
 
@@ -129,6 +130,8 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
             this.keyPrefix = parser.getParameter("keyPrefix", "pjdbc:");
             this.ttlSeconds = parseInt(parser.getParameter("ttl", "60"));
             this.maxCacheRows = parseInt(parser.getParameter("maxCacheRows", "10000"));
+            // Default to true for distributed caches to prevent cross-user data leakage
+            this.includeContext = parseBoolean(parser.getParameter("includeContext", "true"));
             this.invalidateOnWrite = parseBoolean(parser.getParameter("invalidateOnWrite", "true"));
             this.enabled = parseBoolean(parser.getParameter("enabled", "true"));
         }
@@ -146,6 +149,8 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
         public int getTtlSeconds() { return ttlSeconds; }
         /** Maximum rows to cache per query. 0 = unlimited. Default: 10000 */
         public int getMaxCacheRows() { return maxCacheRows; }
+        /** Include catalog/schema/user in cache key. Default: true for distributed cache */
+        public boolean isIncludeContext() { return includeContext; }
         public boolean isInvalidateOnWrite() { return invalidateOnWrite; }
         public boolean isEnabled() { return enabled; }
 
@@ -180,16 +185,16 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
 
         public MemcachedCacheConfig getConfig() { return config; }
 
-        private String makeKey(String sql) {
+        private String makeKey(String sql, CacheKeyBuilder.ConnectionContext context) {
             // Memcached keys can't have spaces or control chars, max 250 bytes
             // SHA-256 produces 64 hex chars, well under limit with typical prefixes
-            return CacheKeyBuilder.buildKey(config.getKeyPrefix(), sql);
+            return CacheKeyBuilder.buildKey(config.getKeyPrefix(), sql, context);
         }
 
-        public SafeResultSetSerializer.CachedData get(String sql) {
+        public SafeResultSetSerializer.CachedData get(String sql, CacheKeyBuilder.ConnectionContext context) {
             if (!config.isEnabled()) return null;
 
-            String key = makeKey(sql);
+            String key = makeKey(sql, context);
             try {
                 Object data = client.get(key);
                 if (data == null) {
@@ -207,15 +212,55 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
             }
         }
 
-        public void put(String sql, SafeResultSetSerializer.CachedData result) {
+        public void put(String sql, CacheKeyBuilder.ConnectionContext context, SafeResultSetSerializer.CachedData result) {
             if (!config.isEnabled()) return;
 
-            String key = makeKey(sql);
+            String key = makeKey(sql, context);
             try {
                 byte[] data = SafeResultSetSerializer.serialize(result);
                 client.set(key, config.getTtlSeconds(), data);
                 synchronized (trackedKeys) {
                     trackedKeys.add(key);
+                }
+            } catch (Exception e) {
+                // Silently ignore cache write failures
+            }
+        }
+
+        /**
+         * Get cached data using a pre-built cache key (for PreparedStatements).
+         */
+        public SafeResultSetSerializer.CachedData getByKey(String cacheKey) {
+            if (!config.isEnabled()) return null;
+
+            try {
+                Object data = client.get(cacheKey);
+                if (data == null) {
+                    misses.incrementAndGet();
+                    return null;
+                }
+                hits.incrementAndGet();
+                if (data instanceof byte[] bytes) {
+                    return SafeResultSetSerializer.deserialize(bytes);
+                }
+                return null;
+            } catch (Exception e) {
+                misses.incrementAndGet();
+                return null;
+            }
+        }
+
+        /**
+         * Put cached data using a pre-built cache key (for PreparedStatements).
+         */
+        public void putByKey(String cacheKey, SafeResultSetSerializer.CachedData result) {
+            if (!config.isEnabled()) return;
+
+            try {
+                byte[] data = SafeResultSetSerializer.serialize(result);
+                client.set(cacheKey, config.getTtlSeconds(), data);
+                synchronized (trackedKeys) {
+                    trackedKeys.add(cacheKey);
                 }
             } catch (Exception e) {
                 // Silently ignore cache write failures
@@ -570,11 +615,15 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
     private class MemcachedCachingStatement extends AbstractStatement {
         private final MemcachedQueryCache cache;
         private final MemcachedCachingDriver driver;
+        private final CacheKeyBuilder.ConnectionContext context;
 
         public MemcachedCachingStatement(Statement delegate, Connection conn, MemcachedQueryCache cache, MemcachedCachingDriver driver) throws SQLException {
             super(delegate, conn);
             this.cache = cache;
             this.driver = driver;
+            this.context = cache.getConfig().isIncludeContext()
+                ? CacheKeyBuilder.ConnectionContext.fromConnection(conn)
+                : null;
         }
 
         private boolean isSelect(String sql) {
@@ -597,8 +646,8 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
                 return super.executeQuery(sql);
             }
 
-            // Check cache
-            SafeResultSetSerializer.CachedData cached = cache.get(sql);
+            // Check cache with connection context for isolation
+            SafeResultSetSerializer.CachedData cached = cache.get(sql, context);
             if (cached != null) {
                 return new CachedResultSetWrapper(this, cached);
             }
@@ -608,7 +657,7 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
             SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs, cache.getConfig().getMaxCacheRows());
             rs.close();
             if (!cachedResult.isTooLargeToCache()) {
-                cache.put(sql, cachedResult);
+                cache.put(sql, context, cachedResult);
             }
             return new CachedResultSetWrapper(this, cachedResult);
         }
@@ -678,6 +727,7 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
         private final MemcachedQueryCache cache;
         private final String sql;
         private final MemcachedCachingDriver driver;
+        private final CacheKeyBuilder.ConnectionContext context;
         private final Map<Integer, Object> parameters = new ConcurrentHashMap<>();
 
         public MemcachedCachingPreparedStatement(PreparedStatement delegate, Connection conn, MemcachedQueryCache cache, String sql, MemcachedCachingDriver driver) throws SQLException {
@@ -685,6 +735,9 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
             this.cache = cache;
             this.sql = sql;
             this.driver = driver;
+            this.context = cache.getConfig().isIncludeContext()
+                ? CacheKeyBuilder.ConnectionContext.fromConnection(conn)
+                : null;
         }
 
         private boolean isSelect() {
@@ -696,14 +749,16 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
         }
 
         private String getCacheKey() {
-            StringBuilder sb = new StringBuilder(sql);
+            // Build ordered parameter array for consistent hashing
+            Object[] params = null;
             if (!parameters.isEmpty()) {
-                sb.append("::params::");
-                for (Map.Entry<Integer, Object> e : parameters.entrySet()) {
-                    sb.append(e.getKey()).append("=").append(e.getValue()).append(";");
+                int maxIndex = parameters.keySet().stream().mapToInt(Integer::intValue).max().orElse(0);
+                params = new Object[maxIndex];
+                for (int i = 1; i <= maxIndex; i++) {
+                    params[i - 1] = parameters.get(i);
                 }
             }
-            return sb.toString();
+            return CacheKeyBuilder.buildKeyWithContext(cache.getConfig().getKeyPrefix(), sql, context, params);
         }
 
         @Override
@@ -750,7 +805,7 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
                 }
 
                 String cacheKey = getCacheKey();
-                SafeResultSetSerializer.CachedData cached = cache.get(cacheKey);
+                SafeResultSetSerializer.CachedData cached = cache.getByKey(cacheKey);
                 if (cached != null) {
                     return new CachedResultSetWrapper(this, cached);
                 }
@@ -759,7 +814,7 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
                 SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs, cache.getConfig().getMaxCacheRows());
                 rs.close();
                 if (!cachedResult.isTooLargeToCache()) {
-                    cache.put(cacheKey, cachedResult);
+                    cache.putByKey(cacheKey, cachedResult);
                 }
                 return new CachedResultSetWrapper(this, cachedResult);
             } finally {

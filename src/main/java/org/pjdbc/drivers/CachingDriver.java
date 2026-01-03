@@ -115,6 +115,7 @@ public class CachingDriver extends AbstractProxyDriver {
         private final long ttlMs;
         private final int maxSize;
         private final int maxCacheRows;
+        private final boolean includeContext;
         private final boolean invalidateOnWrite;
         private final boolean enabled;
 
@@ -123,6 +124,7 @@ public class CachingDriver extends AbstractProxyDriver {
             this.ttlMs = parseLong(parser.getParameter("ttl", "60")) * 1000;
             this.maxSize = parseInt(parser.getParameter("maxSize", "1000"));
             this.maxCacheRows = parseInt(parser.getParameter("maxCacheRows", "10000"));
+            this.includeContext = parseBoolean(parser.getParameter("includeContext", "false"));
             this.invalidateOnWrite = parseBoolean(parser.getParameter("invalidateOnWrite", "true"));
             this.enabled = parseBoolean(parser.getParameter("enabled", "true"));
         }
@@ -143,6 +145,8 @@ public class CachingDriver extends AbstractProxyDriver {
         public int getMaxSize() { return maxSize; }
         /** Maximum rows to cache per query. 0 = unlimited. Default: 10000 */
         public int getMaxCacheRows() { return maxCacheRows; }
+        /** Include catalog/schema/user in cache key. Default: false for in-memory cache */
+        public boolean isIncludeContext() { return includeContext; }
         public boolean isInvalidateOnWrite() { return invalidateOnWrite; }
         public boolean isEnabled() { return enabled; }
     }
@@ -587,13 +591,22 @@ public class CachingDriver extends AbstractProxyDriver {
      * Statement wrapper with caching support.
      */
     private class CachingStatement extends AbstractStatement {
+        private static final String CACHE_KEY_PREFIX = "pjdbc:cache:";
         private final QueryCache cache;
         private final CachingDriver driver;
+        private final CacheKeyBuilder.ConnectionContext context;
 
         public CachingStatement(Statement delegate, Connection conn, QueryCache cache, CachingDriver driver) throws SQLException {
             super(delegate, conn);
             this.cache = cache;
             this.driver = driver;
+            this.context = cache.getConfig().isIncludeContext()
+                ? CacheKeyBuilder.ConnectionContext.fromConnection(conn)
+                : null;
+        }
+
+        private String buildCacheKey(String sql) {
+            return CacheKeyBuilder.buildKey(CACHE_KEY_PREFIX, sql, context);
         }
 
         private boolean isSelect(String sql) {
@@ -616,8 +629,9 @@ public class CachingDriver extends AbstractProxyDriver {
                 return super.executeQuery(sql);
             }
 
-            // Check cache
-            CachedResultSet cached = cache.get(sql);
+            // Check cache using secure key with optional connection context
+            String cacheKey = buildCacheKey(sql);
+            CachedResultSet cached = cache.get(cacheKey);
             if (cached != null) {
                 return new CachedResultSetWrapper(this, cached);
             }
@@ -628,7 +642,7 @@ public class CachingDriver extends AbstractProxyDriver {
             rs.close();
             // Only cache if result set didn't exceed the row limit
             if (!cachedResult.isTooLargeToCache()) {
-                cache.put(sql, cachedResult);
+                cache.put(cacheKey, cachedResult);
             }
             return new CachedResultSetWrapper(this, cachedResult);
         }
@@ -695,9 +709,11 @@ public class CachingDriver extends AbstractProxyDriver {
      * PreparedStatement wrapper with caching support.
      */
     private class CachingPreparedStatement extends AbstractPreparedStatement {
+        private static final String CACHE_KEY_PREFIX = "pjdbc:cache:";
         private final QueryCache cache;
         private final String sql;
         private final CachingDriver driver;
+        private final CacheKeyBuilder.ConnectionContext context;
         private final Map<Integer, Object> parameters = new ConcurrentHashMap<>();
 
         public CachingPreparedStatement(PreparedStatement delegate, Connection conn, QueryCache cache, String sql, CachingDriver driver) throws SQLException {
@@ -705,6 +721,9 @@ public class CachingDriver extends AbstractProxyDriver {
             this.cache = cache;
             this.sql = sql;
             this.driver = driver;
+            this.context = cache.getConfig().isIncludeContext()
+                ? CacheKeyBuilder.ConnectionContext.fromConnection(conn)
+                : null;
         }
 
         private boolean isSelect() {
@@ -716,14 +735,16 @@ public class CachingDriver extends AbstractProxyDriver {
         }
 
         private String getCacheKey() {
-            StringBuilder sb = new StringBuilder(sql);
+            // Build ordered parameter array for consistent hashing
+            Object[] params = null;
             if (!parameters.isEmpty()) {
-                sb.append("::params::");
-                for (Map.Entry<Integer, Object> e : parameters.entrySet()) {
-                    sb.append(e.getKey()).append("=").append(e.getValue()).append(";");
+                int maxIndex = parameters.keySet().stream().mapToInt(Integer::intValue).max().orElse(0);
+                params = new Object[maxIndex];
+                for (int i = 1; i <= maxIndex; i++) {
+                    params[i - 1] = parameters.get(i);
                 }
             }
-            return sb.toString();
+            return CacheKeyBuilder.buildKeyWithContext(CACHE_KEY_PREFIX, sql, context, params);
         }
 
         @Override

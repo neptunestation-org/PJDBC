@@ -129,6 +129,7 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
      * Configuration for Hazelcast cache.
      */
     public static class HazelcastCacheConfig {
+        private static final String KEY_PREFIX = "q:";
         private final String mode;
         private final String clusterName;
         private final String members;
@@ -136,6 +137,7 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
         private final int ttlSeconds;
         private final int maxIdleSeconds;
         private final int maxCacheRows;
+        private final boolean includeContext;
         private final boolean invalidateOnWrite;
         private final boolean enabled;
 
@@ -148,6 +150,8 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
             this.ttlSeconds = parseInt(parser.getParameter("ttl", "60"));
             this.maxIdleSeconds = parseInt(parser.getParameter("maxIdle", "0"));
             this.maxCacheRows = parseIntDefault(parser.getParameter("maxCacheRows", "10000"), 10000);
+            // Default to true for distributed caches to prevent cross-user data leakage
+            this.includeContext = parseBoolean(parser.getParameter("includeContext", "true"));
             this.invalidateOnWrite = parseBoolean(parser.getParameter("invalidateOnWrite", "true"));
             this.enabled = parseBoolean(parser.getParameter("enabled", "true"));
         }
@@ -172,8 +176,11 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
         public int getMaxIdleSeconds() { return maxIdleSeconds; }
         /** Maximum rows to cache per query. 0 = unlimited. Default: 10000 */
         public int getMaxCacheRows() { return maxCacheRows; }
+        /** Include catalog/schema/user in cache key. Default: true for distributed cache */
+        public boolean isIncludeContext() { return includeContext; }
         public boolean isInvalidateOnWrite() { return invalidateOnWrite; }
         public boolean isEnabled() { return enabled; }
+        public String getKeyPrefix() { return KEY_PREFIX; }
 
         public boolean isEmbedded() {
             return "embedded".equalsIgnoreCase(mode);
@@ -299,14 +306,14 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
 
         public HazelcastCacheConfig getConfig() { return config; }
 
-        private String makeKey(String sql) {
-            return CacheKeyBuilder.buildKey("q:", sql);
+        private String makeKey(String sql, CacheKeyBuilder.ConnectionContext context) {
+            return CacheKeyBuilder.buildKey(config.getKeyPrefix(), sql, context);
         }
 
-        public SerializableCachedResultSet get(String sql) {
+        public SerializableCachedResultSet get(String sql, CacheKeyBuilder.ConnectionContext context) {
             if (!config.isEnabled()) return null;
 
-            String key = makeKey(sql);
+            String key = makeKey(sql, context);
             try {
                 SerializableCachedResultSet result = cache.get(key);
                 if (result == null) {
@@ -321,15 +328,52 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
             }
         }
 
-        public void put(String sql, SerializableCachedResultSet result) {
+        public void put(String sql, CacheKeyBuilder.ConnectionContext context, SerializableCachedResultSet result) {
             if (!config.isEnabled()) return;
 
-            String key = makeKey(sql);
+            String key = makeKey(sql, context);
             try {
                 if (config.getTtlSeconds() > 0) {
                     cache.put(key, result, config.getTtlSeconds(), TimeUnit.SECONDS);
                 } else {
                     cache.put(key, result);
+                }
+            } catch (Exception e) {
+                // Silently ignore cache write failures
+            }
+        }
+
+        /**
+         * Get cached data using a pre-built cache key (for PreparedStatements).
+         */
+        public SerializableCachedResultSet getByKey(String cacheKey) {
+            if (!config.isEnabled()) return null;
+
+            try {
+                SerializableCachedResultSet result = cache.get(cacheKey);
+                if (result == null) {
+                    misses.incrementAndGet();
+                    return null;
+                }
+                hits.incrementAndGet();
+                return result;
+            } catch (Exception e) {
+                misses.incrementAndGet();
+                return null;
+            }
+        }
+
+        /**
+         * Put cached data using a pre-built cache key (for PreparedStatements).
+         */
+        public void putByKey(String cacheKey, SerializableCachedResultSet result) {
+            if (!config.isEnabled()) return;
+
+            try {
+                if (config.getTtlSeconds() > 0) {
+                    cache.put(cacheKey, result, config.getTtlSeconds(), TimeUnit.SECONDS);
+                } else {
+                    cache.put(cacheKey, result);
                 }
             } catch (Exception e) {
                 // Silently ignore cache write failures
@@ -709,11 +753,15 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
     private class HazelcastCachingStatement extends AbstractStatement {
         private final HazelcastQueryCache cache;
         private final HazelcastCachingDriver driver;
+        private final CacheKeyBuilder.ConnectionContext context;
 
         public HazelcastCachingStatement(Statement delegate, Connection conn, HazelcastQueryCache cache, HazelcastCachingDriver driver) throws SQLException {
             super(delegate, conn);
             this.cache = cache;
             this.driver = driver;
+            this.context = cache.getConfig().isIncludeContext()
+                ? CacheKeyBuilder.ConnectionContext.fromConnection(conn)
+                : null;
         }
 
         private boolean isSelect(String sql) {
@@ -736,8 +784,8 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
                 return super.executeQuery(sql);
             }
 
-            // Check cache
-            SerializableCachedResultSet cached = cache.get(sql);
+            // Check cache with connection context for isolation
+            SerializableCachedResultSet cached = cache.get(sql, context);
             if (cached != null) {
                 return new CachedResultSetWrapper(this, cached);
             }
@@ -747,7 +795,7 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
             SerializableCachedResultSet cachedResult = new SerializableCachedResultSet(rs, cache.getConfig().getMaxCacheRows());
             rs.close();
             if (!cachedResult.isTooLargeToCache()) {
-                cache.put(sql, cachedResult);
+                cache.put(sql, context, cachedResult);
             }
             return new CachedResultSetWrapper(this, cachedResult);
         }
@@ -817,6 +865,7 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
         private final HazelcastQueryCache cache;
         private final String sql;
         private final HazelcastCachingDriver driver;
+        private final CacheKeyBuilder.ConnectionContext context;
         private final Map<Integer, Object> parameters = new ConcurrentHashMap<>();
 
         public HazelcastCachingPreparedStatement(PreparedStatement delegate, Connection conn, HazelcastQueryCache cache, String sql, HazelcastCachingDriver driver) throws SQLException {
@@ -824,6 +873,9 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
             this.cache = cache;
             this.sql = sql;
             this.driver = driver;
+            this.context = cache.getConfig().isIncludeContext()
+                ? CacheKeyBuilder.ConnectionContext.fromConnection(conn)
+                : null;
         }
 
         private boolean isSelect() {
@@ -835,14 +887,16 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
         }
 
         private String getCacheKey() {
-            StringBuilder sb = new StringBuilder(sql);
+            // Build ordered parameter array for consistent hashing
+            Object[] params = null;
             if (!parameters.isEmpty()) {
-                sb.append("::params::");
-                for (Map.Entry<Integer, Object> e : parameters.entrySet()) {
-                    sb.append(e.getKey()).append("=").append(e.getValue()).append(";");
+                int maxIndex = parameters.keySet().stream().mapToInt(Integer::intValue).max().orElse(0);
+                params = new Object[maxIndex];
+                for (int i = 1; i <= maxIndex; i++) {
+                    params[i - 1] = parameters.get(i);
                 }
             }
-            return sb.toString();
+            return CacheKeyBuilder.buildKeyWithContext(cache.getConfig().getKeyPrefix(), sql, context, params);
         }
 
         @Override
@@ -889,7 +943,7 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
                 }
 
                 String cacheKey = getCacheKey();
-                SerializableCachedResultSet cached = cache.get(cacheKey);
+                SerializableCachedResultSet cached = cache.getByKey(cacheKey);
                 if (cached != null) {
                     return new CachedResultSetWrapper(this, cached);
                 }
@@ -898,7 +952,7 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
                 SerializableCachedResultSet cachedResult = new SerializableCachedResultSet(rs, cache.getConfig().getMaxCacheRows());
                 rs.close();
                 if (!cachedResult.isTooLargeToCache()) {
-                    cache.put(cacheKey, cachedResult);
+                    cache.putByKey(cacheKey, cachedResult);
                 }
                 return new CachedResultSetWrapper(this, cachedResult);
             } finally {
