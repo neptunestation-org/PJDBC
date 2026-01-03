@@ -39,17 +39,17 @@ jobs:
         echo "sbom_xml=target/bom.xml" >> $GITHUB_OUTPUT
 
     - name: Attest JAR
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: ${{ steps.artifacts.outputs.jar }}
 
     - name: Attest SBOM (JSON)
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: ${{ steps.artifacts.outputs.sbom_json }}
 
     - name: Attest SBOM (XML)
-      uses: actions/attest-build-provenance@v2
+      uses: actions/attest-build-provenance@v3
       with:
         subject-path: ${{ steps.artifacts.outputs.sbom_xml }}
 
