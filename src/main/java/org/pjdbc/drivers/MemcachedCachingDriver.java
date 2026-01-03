@@ -119,6 +119,7 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
         private final String servers;
         private final String keyPrefix;
         private final int ttlSeconds;
+        private final int maxCacheRows;
         private final boolean invalidateOnWrite;
         private final boolean enabled;
 
@@ -127,6 +128,7 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
             this.servers = parser.getParameter("servers", "localhost:11211");
             this.keyPrefix = parser.getParameter("keyPrefix", "pjdbc:");
             this.ttlSeconds = parseInt(parser.getParameter("ttl", "60"));
+            this.maxCacheRows = parseInt(parser.getParameter("maxCacheRows", "10000"));
             this.invalidateOnWrite = parseBoolean(parser.getParameter("invalidateOnWrite", "true"));
             this.enabled = parseBoolean(parser.getParameter("enabled", "true"));
         }
@@ -142,6 +144,8 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
         public String getServers() { return servers; }
         public String getKeyPrefix() { return keyPrefix; }
         public int getTtlSeconds() { return ttlSeconds; }
+        /** Maximum rows to cache per query. 0 = unlimited. Default: 10000 */
+        public int getMaxCacheRows() { return maxCacheRows; }
         public boolean isInvalidateOnWrite() { return invalidateOnWrite; }
         public boolean isEnabled() { return enabled; }
 
@@ -599,11 +603,13 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
                 return new CachedResultSetWrapper(this, cached);
             }
 
-            // Execute and cache
+            // Execute and cache (respecting maxCacheRows limit)
             ResultSet rs = super.executeQuery(sql);
-            SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs);
+            SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs, cache.getConfig().getMaxCacheRows());
             rs.close();
-            cache.put(sql, cachedResult);
+            if (!cachedResult.isTooLargeToCache()) {
+                cache.put(sql, cachedResult);
+            }
             return new CachedResultSetWrapper(this, cachedResult);
         }
 
@@ -750,9 +756,11 @@ public class MemcachedCachingDriver extends AbstractProxyDriver {
                 }
 
                 ResultSet rs = super.executeQuery();
-                SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs);
+                SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs, cache.getConfig().getMaxCacheRows());
                 rs.close();
-                cache.put(cacheKey, cachedResult);
+                if (!cachedResult.isTooLargeToCache()) {
+                    cache.put(cacheKey, cachedResult);
+                }
                 return new CachedResultSetWrapper(this, cachedResult);
             } finally {
                 // Clear parameters to prevent stale values leaking into subsequent executions

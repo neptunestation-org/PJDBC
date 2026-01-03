@@ -114,6 +114,7 @@ public class CachingDriver extends AbstractProxyDriver {
     public static class CacheConfig {
         private final long ttlMs;
         private final int maxSize;
+        private final int maxCacheRows;
         private final boolean invalidateOnWrite;
         private final boolean enabled;
 
@@ -121,6 +122,7 @@ public class CachingDriver extends AbstractProxyDriver {
             JdbcUrlParser parser = JdbcUrlParser.parse(url);
             this.ttlMs = parseLong(parser.getParameter("ttl", "60")) * 1000;
             this.maxSize = parseInt(parser.getParameter("maxSize", "1000"));
+            this.maxCacheRows = parseInt(parser.getParameter("maxCacheRows", "10000"));
             this.invalidateOnWrite = parseBoolean(parser.getParameter("invalidateOnWrite", "true"));
             this.enabled = parseBoolean(parser.getParameter("enabled", "true"));
         }
@@ -139,6 +141,8 @@ public class CachingDriver extends AbstractProxyDriver {
 
         public long getTtlMs() { return ttlMs; }
         public int getMaxSize() { return maxSize; }
+        /** Maximum rows to cache per query. 0 = unlimited. Default: 10000 */
+        public int getMaxCacheRows() { return maxCacheRows; }
         public boolean isInvalidateOnWrite() { return invalidateOnWrite; }
         public boolean isEnabled() { return enabled; }
     }
@@ -244,8 +248,13 @@ public class CachingDriver extends AbstractProxyDriver {
         private final String[] columnNames;
         private final int[] columnTypes;
         private final List<Object[]> rows;
+        private final boolean tooLargeToCache;
 
         public CachedResultSet(ResultSet rs) throws SQLException {
+            this(rs, 0);
+        }
+
+        public CachedResultSet(ResultSet rs, int maxRows) throws SQLException {
             ResultSetMetaData meta = rs.getMetaData();
             int columnCount = meta.getColumnCount();
 
@@ -257,19 +266,27 @@ public class CachingDriver extends AbstractProxyDriver {
             }
 
             this.rows = new ArrayList<>();
+            boolean exceeded = false;
             while (rs.next()) {
+                if (maxRows > 0 && rows.size() >= maxRows) {
+                    exceeded = true;
+                    break;
+                }
                 Object[] row = new Object[columnCount];
                 for (int i = 0; i < columnCount; i++) {
                     row[i] = rs.getObject(i + 1);
                 }
                 rows.add(row);
             }
+            this.tooLargeToCache = exceeded;
         }
 
         public String[] getColumnNames() { return columnNames; }
         public int[] getColumnTypes() { return columnTypes; }
         public List<Object[]> getRows() { return rows; }
         public int getRowCount() { return rows.size(); }
+        /** Returns true if the result set exceeded maxRows and should not be cached */
+        public boolean isTooLargeToCache() { return tooLargeToCache; }
     }
 
     /**
@@ -605,11 +622,14 @@ public class CachingDriver extends AbstractProxyDriver {
                 return new CachedResultSetWrapper(this, cached);
             }
 
-            // Execute and cache
+            // Execute and cache (respecting maxCacheRows limit)
             ResultSet rs = super.executeQuery(sql);
-            CachedResultSet cachedResult = new CachedResultSet(rs);
+            CachedResultSet cachedResult = new CachedResultSet(rs, cache.getConfig().getMaxCacheRows());
             rs.close();
-            cache.put(sql, cachedResult);
+            // Only cache if result set didn't exceed the row limit
+            if (!cachedResult.isTooLargeToCache()) {
+                cache.put(sql, cachedResult);
+            }
             return new CachedResultSetWrapper(this, cachedResult);
         }
 
@@ -756,9 +776,11 @@ public class CachingDriver extends AbstractProxyDriver {
                 }
 
                 ResultSet rs = super.executeQuery();
-                CachedResultSet cachedResult = new CachedResultSet(rs);
+                CachedResultSet cachedResult = new CachedResultSet(rs, cache.getConfig().getMaxCacheRows());
                 rs.close();
-                cache.put(cacheKey, cachedResult);
+                if (!cachedResult.isTooLargeToCache()) {
+                    cache.put(cacheKey, cachedResult);
+                }
                 return new CachedResultSetWrapper(this, cachedResult);
             } finally {
                 // Clear parameters to prevent stale values leaking into subsequent executions

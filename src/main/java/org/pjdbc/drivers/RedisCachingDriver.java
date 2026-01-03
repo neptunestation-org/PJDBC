@@ -128,6 +128,7 @@ public class RedisCachingDriver extends AbstractProxyDriver {
         private final String keyPrefix;
         private final int ttlSeconds;
         private final int maxPoolSize;
+        private final int maxCacheRows;
         private final boolean invalidateOnWrite;
         private final boolean enabled;
 
@@ -140,12 +141,17 @@ public class RedisCachingDriver extends AbstractProxyDriver {
             this.keyPrefix = parser.getParameter("keyPrefix", "pjdbc:");
             this.ttlSeconds = parseInt(parser.getParameter("ttl", "60"));
             this.maxPoolSize = parseInt(parser.getParameter("maxPoolSize", "8"));
+            this.maxCacheRows = parseIntDefault(parser.getParameter("maxCacheRows", "10000"), 10000);
             this.invalidateOnWrite = parseBoolean(parser.getParameter("invalidateOnWrite", "true"));
             this.enabled = parseBoolean(parser.getParameter("enabled", "true"));
         }
 
         private static int parseInt(String s) {
             try { return Integer.parseInt(s); } catch (NumberFormatException e) { return 0; }
+        }
+
+        private static int parseIntDefault(String s, int defaultVal) {
+            try { return Integer.parseInt(s); } catch (NumberFormatException e) { return defaultVal; }
         }
 
         private static boolean parseBoolean(String s) {
@@ -159,6 +165,8 @@ public class RedisCachingDriver extends AbstractProxyDriver {
         public String getKeyPrefix() { return keyPrefix; }
         public int getTtlSeconds() { return ttlSeconds; }
         public int getMaxPoolSize() { return maxPoolSize; }
+        /** Maximum rows to cache per query. 0 = unlimited. Default: 10000 */
+        public int getMaxCacheRows() { return maxCacheRows; }
         public boolean isInvalidateOnWrite() { return invalidateOnWrite; }
         public boolean isEnabled() { return enabled; }
     }
@@ -607,11 +615,13 @@ public class RedisCachingDriver extends AbstractProxyDriver {
                 return new CachedResultSetWrapper(this, cached);
             }
 
-            // Execute and cache
+            // Execute and cache (respecting maxCacheRows limit)
             ResultSet rs = super.executeQuery(sql);
-            SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs);
+            SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs, cache.getConfig().getMaxCacheRows());
             rs.close();
-            cache.put(sql, cachedResult);
+            if (!cachedResult.isTooLargeToCache()) {
+                cache.put(sql, cachedResult);
+            }
             return new CachedResultSetWrapper(this, cachedResult);
         }
 
@@ -758,9 +768,11 @@ public class RedisCachingDriver extends AbstractProxyDriver {
                 }
 
                 ResultSet rs = super.executeQuery();
-                SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs);
+                SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs, cache.getConfig().getMaxCacheRows());
                 rs.close();
-                cache.put(cacheKey, cachedResult);
+                if (!cachedResult.isTooLargeToCache()) {
+                    cache.put(cacheKey, cachedResult);
+                }
                 return new CachedResultSetWrapper(this, cachedResult);
             } finally {
                 // Clear parameters to prevent stale values leaking into subsequent executions

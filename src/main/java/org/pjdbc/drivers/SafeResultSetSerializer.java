@@ -63,23 +63,41 @@ public final class SafeResultSetSerializer {
         private final String[] columnNames;
         private final int[] columnTypes;
         private final List<Object[]> rows;
+        private final boolean tooLargeToCache;
 
         public CachedData(String[] columnNames, int[] columnTypes, List<Object[]> rows) {
+            this(columnNames, columnTypes, rows, false);
+        }
+
+        public CachedData(String[] columnNames, int[] columnTypes, List<Object[]> rows, boolean tooLargeToCache) {
             this.columnNames = columnNames;
             this.columnTypes = columnTypes;
             this.rows = rows;
+            this.tooLargeToCache = tooLargeToCache;
         }
 
         public String[] getColumnNames() { return columnNames; }
         public int[] getColumnTypes() { return columnTypes; }
         public List<Object[]> getRows() { return rows; }
         public int getRowCount() { return rows.size(); }
+        /** Returns true if the result set exceeded maxRows and should not be cached */
+        public boolean isTooLargeToCache() { return tooLargeToCache; }
     }
 
     /**
      * Extract data from a ResultSet into a cacheable structure.
      */
     public static CachedData fromResultSet(ResultSet rs) throws SQLException {
+        return fromResultSet(rs, 0);
+    }
+
+    /**
+     * Extract data from a ResultSet into a cacheable structure with row limit.
+     * @param rs the ResultSet to read
+     * @param maxRows maximum rows to read (0 = unlimited)
+     * @return CachedData with tooLargeToCache flag set if limit was exceeded
+     */
+    public static CachedData fromResultSet(ResultSet rs, int maxRows) throws SQLException {
         ResultSetMetaData meta = rs.getMetaData();
         int columnCount = meta.getColumnCount();
 
@@ -91,7 +109,12 @@ public final class SafeResultSetSerializer {
         }
 
         List<Object[]> rows = new ArrayList<>();
+        boolean exceeded = false;
         while (rs.next()) {
+            if (maxRows > 0 && rows.size() >= maxRows) {
+                exceeded = true;
+                break;
+            }
             Object[] row = new Object[columnCount];
             for (int i = 0; i < columnCount; i++) {
                 Object val = rs.getObject(i + 1);
@@ -100,7 +123,7 @@ public final class SafeResultSetSerializer {
             rows.add(row);
         }
 
-        return new CachedData(columnNames, columnTypes, rows);
+        return new CachedData(columnNames, columnTypes, rows, exceeded);
     }
 
     /**
