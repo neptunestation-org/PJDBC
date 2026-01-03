@@ -30,11 +30,13 @@ jobs:
     - name: Run OWASP Dependency-Check
       env:
         NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        JAVA_TOOL_OPTIONS: "--add-modules jdk.incubator.vector"
       run: |
         mvn -B org.owasp:dependency-check-maven:check \
           -DfailBuildOnCVSS=7 \
           -Dformats=HTML,SARIF \
           -DenableExperimental=true \
+          -DossIndexAnalyzerEnabled=false \
           ${NVD_API_KEY:+-DnvdApiKey=$NVD_API_KEY}
 
     - name: Upload Dependency-Check report
