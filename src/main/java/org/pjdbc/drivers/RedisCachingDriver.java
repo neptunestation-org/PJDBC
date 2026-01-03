@@ -1,21 +1,14 @@
 package org.pjdbc.drivers;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -170,62 +163,6 @@ public class RedisCachingDriver extends AbstractProxyDriver {
         public boolean isEnabled() { return enabled; }
     }
 
-    /**
-     * Serializable cached result set data for Redis storage.
-     */
-    public static class SerializableCachedResultSet implements Serializable {
-        private static final long serialVersionUID = 1L;
-
-        private final String[] columnNames;
-        private final int[] columnTypes;
-        private final List<Object[]> rows;
-
-        public SerializableCachedResultSet(ResultSet rs) throws SQLException {
-            ResultSetMetaData meta = rs.getMetaData();
-            int columnCount = meta.getColumnCount();
-
-            this.columnNames = new String[columnCount];
-            this.columnTypes = new int[columnCount];
-            for (int i = 0; i < columnCount; i++) {
-                columnNames[i] = meta.getColumnLabel(i + 1);
-                columnTypes[i] = meta.getColumnType(i + 1);
-            }
-
-            this.rows = new ArrayList<>();
-            while (rs.next()) {
-                Object[] row = new Object[columnCount];
-                for (int i = 0; i < columnCount; i++) {
-                    Object val = rs.getObject(i + 1);
-                    // Ensure value is serializable
-                    if (val != null && !(val instanceof Serializable)) {
-                        val = val.toString();
-                    }
-                    row[i] = val;
-                }
-                rows.add(row);
-            }
-        }
-
-        public String[] getColumnNames() { return columnNames; }
-        public int[] getColumnTypes() { return columnTypes; }
-        public List<Object[]> getRows() { return rows; }
-        public int getRowCount() { return rows.size(); }
-
-        public byte[] serialize() throws IOException {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
-                oos.writeObject(this);
-            }
-            return baos.toByteArray();
-        }
-
-        public static SerializableCachedResultSet deserialize(byte[] data) throws IOException, ClassNotFoundException {
-            ByteArrayInputStream bais = new ByteArrayInputStream(data);
-            try (ObjectInputStream ois = new ObjectInputStream(bais)) {
-                return (SerializableCachedResultSet) ois.readObject();
-            }
-        }
-    }
 
     /**
      * Redis-backed query cache.
@@ -259,7 +196,7 @@ public class RedisCachingDriver extends AbstractProxyDriver {
             return config.getKeyPrefix() + Integer.toHexString(sql.hashCode());
         }
 
-        public SerializableCachedResultSet get(String sql) {
+        public SafeResultSetSerializer.CachedData get(String sql) {
             if (!config.isEnabled()) return null;
 
             String key = makeKey(sql);
@@ -270,19 +207,19 @@ public class RedisCachingDriver extends AbstractProxyDriver {
                     return null;
                 }
                 hits.incrementAndGet();
-                return SerializableCachedResultSet.deserialize(data);
+                return SafeResultSetSerializer.deserialize(data);
             } catch (Exception e) {
                 misses.incrementAndGet();
                 return null;
             }
         }
 
-        public void put(String sql, SerializableCachedResultSet result) {
+        public void put(String sql, SafeResultSetSerializer.CachedData result) {
             if (!config.isEnabled()) return;
 
             String key = makeKey(sql);
             try (Jedis jedis = pool.getResource()) {
-                byte[] data = result.serialize();
+                byte[] data = SafeResultSetSerializer.serialize(result);
                 jedis.setex(key.getBytes(), config.getTtlSeconds(), data);
             } catch (Exception e) {
                 // Silently ignore cache write failures
@@ -332,11 +269,11 @@ public class RedisCachingDriver extends AbstractProxyDriver {
      * ResultSet implementation that reads from cached data.
      */
     public static class CachedResultSetWrapper extends AbstractResultSet {
-        private final SerializableCachedResultSet cached;
+        private final SafeResultSetSerializer.CachedData cached;
         private int currentRow = -1;
         private boolean wasNull = false;
 
-        public CachedResultSetWrapper(Statement stmt, SerializableCachedResultSet cached) throws SQLException {
+        public CachedResultSetWrapper(Statement stmt, SafeResultSetSerializer.CachedData cached) throws SQLException {
             super(stmt, null);
             this.cached = cached;
         }
@@ -665,14 +602,14 @@ public class RedisCachingDriver extends AbstractProxyDriver {
             }
 
             // Check cache
-            SerializableCachedResultSet cached = cache.get(sql);
+            SafeResultSetSerializer.CachedData cached = cache.get(sql);
             if (cached != null) {
                 return new CachedResultSetWrapper(this, cached);
             }
 
             // Execute and cache
             ResultSet rs = super.executeQuery(sql);
-            SerializableCachedResultSet cachedResult = new SerializableCachedResultSet(rs);
+            SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs);
             rs.close();
             cache.put(sql, cachedResult);
             return new CachedResultSetWrapper(this, cachedResult);
@@ -814,13 +751,13 @@ public class RedisCachingDriver extends AbstractProxyDriver {
             }
 
             String cacheKey = getCacheKey();
-            SerializableCachedResultSet cached = cache.get(cacheKey);
+            SafeResultSetSerializer.CachedData cached = cache.get(cacheKey);
             if (cached != null) {
                 return new CachedResultSetWrapper(this, cached);
             }
 
             ResultSet rs = super.executeQuery();
-            SerializableCachedResultSet cachedResult = new SerializableCachedResultSet(rs);
+            SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs);
             rs.close();
             cache.put(cacheKey, cachedResult);
             return new CachedResultSetWrapper(this, cachedResult);

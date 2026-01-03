@@ -98,22 +98,22 @@ public class RedisCachingDriverTest {
     }
 
     @Test
-    public void testSerializableCachedResultSetSerialization() throws SQLException, IOException, ClassNotFoundException {
+    public void testSafeResultSetSerializerSerialization() throws SQLException, IOException {
         setupTestTable("redis_test_serialize");
         try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:redis_test_serialize;DB_CLOSE_DELAY=-1")) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT * FROM users ORDER BY id")) {
-                    RedisCachingDriver.SerializableCachedResultSet cached =
-                        new RedisCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     // Serialize
-                    byte[] data = cached.serialize();
+                    byte[] data = SafeResultSetSerializer.serialize(cached);
                     assertNotNull(data);
                     assertTrue(data.length > 0);
 
                     // Deserialize
-                    RedisCachingDriver.SerializableCachedResultSet restored =
-                        RedisCachingDriver.SerializableCachedResultSet.deserialize(data);
+                    SafeResultSetSerializer.CachedData restored =
+                        SafeResultSetSerializer.deserialize(data);
                     assertNotNull(restored);
                     assertEquals(2, restored.getRowCount());
                     assertEquals(2, restored.getColumnNames().length);
@@ -130,8 +130,8 @@ public class RedisCachingDriverTest {
         try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:redis_test_wrapper;DB_CLOSE_DELAY=-1")) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT * FROM users ORDER BY id")) {
-                    RedisCachingDriver.SerializableCachedResultSet cached =
-                        new RedisCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     // Create wrapper
                     try (RedisCachingDriver.CachedResultSetWrapper wrapper =
@@ -159,8 +159,8 @@ public class RedisCachingDriverTest {
         try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:redis_test_nav;DB_CLOSE_DELAY=-1")) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT * FROM users ORDER BY id")) {
-                    RedisCachingDriver.SerializableCachedResultSet cached =
-                        new RedisCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     try (RedisCachingDriver.CachedResultSetWrapper wrapper =
                             new RedisCachingDriver.CachedResultSetWrapper(stmt, cached)) {
@@ -197,8 +197,8 @@ public class RedisCachingDriverTest {
                 stmt.execute("INSERT INTO types_test VALUES (42, 3.14, true, 'hello')");
 
                 try (ResultSet rs = stmt.executeQuery("SELECT * FROM types_test")) {
-                    RedisCachingDriver.SerializableCachedResultSet cached =
-                        new RedisCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     try (RedisCachingDriver.CachedResultSetWrapper wrapper =
                             new RedisCachingDriver.CachedResultSetWrapper(stmt, cached)) {
@@ -227,8 +227,8 @@ public class RedisCachingDriverTest {
                 stmt.execute("INSERT INTO null_test VALUES (1, NULL)");
 
                 try (ResultSet rs = stmt.executeQuery("SELECT * FROM null_test")) {
-                    RedisCachingDriver.SerializableCachedResultSet cached =
-                        new RedisCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     try (RedisCachingDriver.CachedResultSetWrapper wrapper =
                             new RedisCachingDriver.CachedResultSetWrapper(stmt, cached)) {
@@ -250,8 +250,8 @@ public class RedisCachingDriverTest {
         try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:redis_test_findcol;DB_CLOSE_DELAY=-1")) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT id, name FROM users")) {
-                    RedisCachingDriver.SerializableCachedResultSet cached =
-                        new RedisCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     try (RedisCachingDriver.CachedResultSetWrapper wrapper =
                             new RedisCachingDriver.CachedResultSetWrapper(stmt, cached)) {
@@ -271,8 +271,8 @@ public class RedisCachingDriverTest {
         try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:redis_test_invalid;DB_CLOSE_DELAY=-1")) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT id FROM users")) {
-                    RedisCachingDriver.SerializableCachedResultSet cached =
-                        new RedisCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     try (RedisCachingDriver.CachedResultSetWrapper wrapper =
                             new RedisCachingDriver.CachedResultSetWrapper(stmt, cached)) {
@@ -289,8 +289,8 @@ public class RedisCachingDriverTest {
         try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:redis_test_cursor;DB_CLOSE_DELAY=-1")) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT id FROM users")) {
-                    RedisCachingDriver.SerializableCachedResultSet cached =
-                        new RedisCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     try (RedisCachingDriver.CachedResultSetWrapper wrapper =
                             new RedisCachingDriver.CachedResultSetWrapper(stmt, cached)) {

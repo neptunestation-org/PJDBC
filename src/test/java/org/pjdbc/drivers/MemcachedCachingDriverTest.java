@@ -122,22 +122,22 @@ public class MemcachedCachingDriverTest {
     }
 
     @Test
-    public void testSerializableCachedResultSetSerialization() throws SQLException, IOException, ClassNotFoundException {
+    public void testSafeResultSetSerializerSerialization() throws SQLException, IOException {
         setupTestTable("memcache_test_serialize");
         try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:memcache_test_serialize;DB_CLOSE_DELAY=-1")) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT * FROM users ORDER BY id")) {
-                    MemcachedCachingDriver.SerializableCachedResultSet cached =
-                        new MemcachedCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     // Serialize
-                    byte[] data = cached.serialize();
+                    byte[] data = SafeResultSetSerializer.serialize(cached);
                     assertNotNull(data);
                     assertTrue(data.length > 0);
 
                     // Deserialize
-                    MemcachedCachingDriver.SerializableCachedResultSet restored =
-                        MemcachedCachingDriver.SerializableCachedResultSet.deserialize(data);
+                    SafeResultSetSerializer.CachedData restored =
+                        SafeResultSetSerializer.deserialize(data);
                     assertNotNull(restored);
                     assertEquals(2, restored.getRowCount());
                     assertEquals(2, restored.getColumnNames().length);
@@ -154,8 +154,8 @@ public class MemcachedCachingDriverTest {
         try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:memcache_test_wrapper;DB_CLOSE_DELAY=-1")) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT * FROM users ORDER BY id")) {
-                    MemcachedCachingDriver.SerializableCachedResultSet cached =
-                        new MemcachedCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     // Create wrapper
                     try (MemcachedCachingDriver.CachedResultSetWrapper wrapper =
@@ -183,8 +183,8 @@ public class MemcachedCachingDriverTest {
         try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:memcache_test_nav;DB_CLOSE_DELAY=-1")) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT * FROM users ORDER BY id")) {
-                    MemcachedCachingDriver.SerializableCachedResultSet cached =
-                        new MemcachedCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     try (MemcachedCachingDriver.CachedResultSetWrapper wrapper =
                             new MemcachedCachingDriver.CachedResultSetWrapper(stmt, cached)) {
@@ -221,8 +221,8 @@ public class MemcachedCachingDriverTest {
                 stmt.execute("INSERT INTO types_test VALUES (42, 3.14, true, 'hello')");
 
                 try (ResultSet rs = stmt.executeQuery("SELECT * FROM types_test")) {
-                    MemcachedCachingDriver.SerializableCachedResultSet cached =
-                        new MemcachedCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     try (MemcachedCachingDriver.CachedResultSetWrapper wrapper =
                             new MemcachedCachingDriver.CachedResultSetWrapper(stmt, cached)) {
@@ -251,8 +251,8 @@ public class MemcachedCachingDriverTest {
                 stmt.execute("INSERT INTO null_test VALUES (1, NULL)");
 
                 try (ResultSet rs = stmt.executeQuery("SELECT * FROM null_test")) {
-                    MemcachedCachingDriver.SerializableCachedResultSet cached =
-                        new MemcachedCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     try (MemcachedCachingDriver.CachedResultSetWrapper wrapper =
                             new MemcachedCachingDriver.CachedResultSetWrapper(stmt, cached)) {
@@ -274,8 +274,8 @@ public class MemcachedCachingDriverTest {
         try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:memcache_test_findcol;DB_CLOSE_DELAY=-1")) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT id, name FROM users")) {
-                    MemcachedCachingDriver.SerializableCachedResultSet cached =
-                        new MemcachedCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     try (MemcachedCachingDriver.CachedResultSetWrapper wrapper =
                             new MemcachedCachingDriver.CachedResultSetWrapper(stmt, cached)) {
@@ -295,8 +295,8 @@ public class MemcachedCachingDriverTest {
         try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:memcache_test_invalid;DB_CLOSE_DELAY=-1")) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT id FROM users")) {
-                    MemcachedCachingDriver.SerializableCachedResultSet cached =
-                        new MemcachedCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     try (MemcachedCachingDriver.CachedResultSetWrapper wrapper =
                             new MemcachedCachingDriver.CachedResultSetWrapper(stmt, cached)) {
@@ -313,8 +313,8 @@ public class MemcachedCachingDriverTest {
         try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:memcache_test_cursor;DB_CLOSE_DELAY=-1")) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT id FROM users")) {
-                    MemcachedCachingDriver.SerializableCachedResultSet cached =
-                        new MemcachedCachingDriver.SerializableCachedResultSet(rs);
+                    SafeResultSetSerializer.CachedData cached =
+                        SafeResultSetSerializer.fromResultSet(rs);
 
                     try (MemcachedCachingDriver.CachedResultSetWrapper wrapper =
                             new MemcachedCachingDriver.CachedResultSetWrapper(stmt, cached)) {
