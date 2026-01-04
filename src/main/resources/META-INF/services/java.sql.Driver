@@ -17,3 +17,4 @@ org.pjdbc.drivers.RedisCachingDriver
 org.pjdbc.drivers.MemcachedCachingDriver
 org.pjdbc.drivers.HazelcastCachingDriver
 org.pjdbc.drivers.MetricsDriver
+org.pjdbc.drivers.FederatingDriver
