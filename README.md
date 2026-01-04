@@ -26,7 +26,7 @@ Add to your `pom.xml`:
 <dependency>
   <groupId>org.pjdbc</groupId>
   <artifactId>PJDBC</artifactId>
-  <version>1.3.0</version>
+  <version>1.5.0</version>
 </dependency>
 ```
 
