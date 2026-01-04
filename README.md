@@ -629,8 +629,22 @@ mvn clean install
 ### Running Tests
 
 ```bash
+# Run all tests (~1m 42s)
 mvn test
+
+# Run fast tests only (~28s) - excludes container-based integration tests
+mvn test -Pfast
 ```
+
+### Speeding Up Tests
+
+**Testcontainer Reuse**: Enable container reuse to avoid restarting Docker containers between test runs. Add to `~/.testcontainers.properties`:
+
+```properties
+testcontainers.reuse.enable=true
+```
+
+This significantly reduces test time when running integration tests repeatedly during development.
 
 ### CI Configuration
 
