@@ -93,4 +93,98 @@ public class TeeDriverTest {
     @Test
     public void versionInfo () {
 	assertEquals(1, new TeeDriver().getMajorVersion());
-	assertEquals(0, new TeeDriver().getMinorVersion());}}
+	assertEquals(0, new TeeDriver().getMinorVersion());}
+
+    @Test
+    public void preparedStatementExecuteUpdateReplicatesToAllConnections () {
+	try {
+	    MockDriver.clearLogs();
+	    Connection c = (new TeeDriver().connect("jdbc:tee:jdbc:mock:pstmt1;jdbc:mock:pstmt2", null));
+	    PreparedStatement pstmt = c.prepareStatement("INSERT INTO person VALUES (?, ?)");
+	    pstmt.setInt(1, 1);
+	    pstmt.setString(2, "Alice");
+	    pstmt.executeUpdate();
+
+	    String log1 = MockDriver.getLog("jdbc:mock:pstmt1");
+	    String log2 = MockDriver.getLog("jdbc:mock:pstmt2");
+
+	    // MockDriver logs operations on PreparedStatement, not Connection.prepareStatement()
+	    assertTrue("Target 1 should have setInt", log1.contains("setInt[1, 1]"));
+	    assertTrue("Target 2 should have setInt", log2.contains("setInt[1, 1]"));
+	    assertTrue("Target 1 should have setString", log1.contains("setString[2, Alice]"));
+	    assertTrue("Target 2 should have setString", log2.contains("setString[2, Alice]"));
+	    assertTrue("Target 1 should have executeUpdate", log1.contains("executeUpdate[]"));
+	    assertTrue("Target 2 should have executeUpdate", log2.contains("executeUpdate[]"));}
+	catch (Exception e) {fail(e.getMessage());}}
+
+    @Test
+    public void preparedStatementExecuteReplicatesToAllConnections () {
+	try {
+	    MockDriver.clearLogs();
+	    Connection c = (new TeeDriver().connect("jdbc:tee:jdbc:mock:pexec1;jdbc:mock:pexec2", null));
+	    PreparedStatement pstmt = c.prepareStatement("CREATE TABLE test (id INT)");
+	    pstmt.execute();
+
+	    String log1 = MockDriver.getLog("jdbc:mock:pexec1");
+	    String log2 = MockDriver.getLog("jdbc:mock:pexec2");
+
+	    assertTrue("Target 1 should have execute", log1.contains("execute[]"));
+	    assertTrue("Target 2 should have execute", log2.contains("execute[]"));}
+	catch (Exception e) {fail(e.getMessage());}}
+
+    @Test
+    public void preparedStatementExecuteQueryReplicatesToAllConnections () {
+	try {
+	    MockDriver.clearLogs();
+	    Connection c = (new TeeDriver().connect("jdbc:tee:jdbc:mock:pquery1;jdbc:mock:pquery2", null));
+	    PreparedStatement pstmt = c.prepareStatement("SELECT * FROM person WHERE id = ?");
+	    pstmt.setInt(1, 42);
+	    pstmt.executeQuery();
+
+	    String log1 = MockDriver.getLog("jdbc:mock:pquery1");
+	    String log2 = MockDriver.getLog("jdbc:mock:pquery2");
+
+	    assertTrue("Target 1 should have setInt", log1.contains("setInt[1, 42]"));
+	    assertTrue("Target 2 should have setInt", log2.contains("setInt[1, 42]"));
+	    assertTrue("Target 1 should have executeQuery", log1.contains("executeQuery[]"));
+	    assertTrue("Target 2 should have executeQuery", log2.contains("executeQuery[]"));}
+	catch (Exception e) {fail(e.getMessage());}}
+
+    @Test
+    public void preparedStatementWithH2Databases () {
+	try {
+	    String h2Url1 = "jdbc:h2:mem:tee_pstmt_h2_1_" + System.nanoTime();
+	    String h2Url2 = "jdbc:h2:mem:tee_pstmt_h2_2_" + System.nanoTime();
+	    String teeUrl = "jdbc:tee:" + h2Url1 + ";" + h2Url2;
+
+	    try (Connection conn = DriverManager.getConnection(teeUrl)) {
+		// Create table in both databases
+		try (Statement stmt = conn.createStatement()) {
+		    stmt.execute("CREATE TABLE test (id INT, name VARCHAR(100))");
+		}
+
+		// Insert using PreparedStatement - should go to both
+		try (PreparedStatement pstmt = conn.prepareStatement("INSERT INTO test VALUES (?, ?)")) {
+		    pstmt.setInt(1, 1);
+		    pstmt.setString(2, "Alice");
+		    int count = pstmt.executeUpdate();
+		    assertEquals(1, count);
+		}
+
+		// Verify data exists in first H2 database
+		try (Connection c1 = DriverManager.getConnection(h2Url1);
+		     Statement s1 = c1.createStatement();
+		     ResultSet rs1 = s1.executeQuery("SELECT name FROM test WHERE id = 1")) {
+		    assertTrue("First DB should have the row", rs1.next());
+		    assertEquals("Alice", rs1.getString(1));
+		}
+
+		// Verify data exists in second H2 database
+		try (Connection c2 = DriverManager.getConnection(h2Url2);
+		     Statement s2 = c2.createStatement();
+		     ResultSet rs2 = s2.executeQuery("SELECT name FROM test WHERE id = 1")) {
+		    assertTrue("Second DB should have the row", rs2.next());
+		    assertEquals("Alice", rs2.getString(1));
+		}
+	    }}
+	catch (Exception e) {fail(e.getMessage());}}}
