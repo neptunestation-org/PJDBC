@@ -3,10 +3,14 @@ package org.pjdbc.annotations.processor;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -44,9 +48,16 @@ public class CapabilityProcessor extends AbstractProcessor {
     private static final String MANIFEST_PATH = "pjdbc.capabilities.json";
     private static final String MANIFEST_VERSION = "1.0";
 
+    /** Valid prefix pattern: lowercase letters and numbers, starting with letter */
+    private static final Pattern PREFIX_PATTERN = Pattern.compile("^[a-z][a-z0-9]*$");
+
+    /** Valid capability tag pattern: lowercase with optional hyphens */
+    private static final Pattern CAPABILITY_PATTERN = Pattern.compile("^[a-z]+(-[a-z]+)*$");
+
     private Filer filer;
     private Messager messager;
     private boolean processed = false;
+    private boolean hasErrors = false;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -68,41 +79,69 @@ public class CapabilityProcessor extends AbstractProcessor {
         }
 
         List<Map<String, Object>> drivers = new ArrayList<>();
+        Map<String, TypeElement> prefixToElement = new HashMap<>();
 
         for (Element element : elements) {
             if (!(element instanceof TypeElement)) {
-                messager.printMessage(Diagnostic.Kind.WARNING,
-                    "@DriverCapability can only be applied to classes", element);
+                error("@DriverCapability can only be applied to classes", element);
                 continue;
             }
 
             TypeElement typeElement = (TypeElement) element;
-            Map<String, Object> driverInfo = processDriver(typeElement);
+
+            // Validate and process driver
+            Map<String, Object> driverInfo = processDriver(typeElement, prefixToElement);
             if (driverInfo != null) {
                 drivers.add(driverInfo);
             }
         }
 
-        if (!drivers.isEmpty()) {
+        // Only generate manifest if no errors occurred
+        if (!drivers.isEmpty() && !hasErrors) {
             generateManifest(drivers);
             processed = true;
+        } else if (hasErrors) {
+            messager.printMessage(Diagnostic.Kind.ERROR,
+                "Capability manifest generation aborted due to validation errors");
         }
 
         return false; // Don't claim the annotations
     }
 
-    private Map<String, Object> processDriver(TypeElement element) {
+    // ========== Error/Warning Helpers ==========
+
+    private void error(String message, Element element) {
+        hasErrors = true;
+        messager.printMessage(Diagnostic.Kind.ERROR, message, element);
+    }
+
+    private void warning(String message, Element element) {
+        messager.printMessage(Diagnostic.Kind.WARNING, message, element);
+    }
+
+    private void note(String message) {
+        messager.printMessage(Diagnostic.Kind.NOTE, message);
+    }
+
+    // ========== Driver Processing ==========
+
+    private Map<String, Object> processDriver(TypeElement element, Map<String, TypeElement> prefixToElement) {
         DriverCapability capability = element.getAnnotation(DriverCapability.class);
         if (capability == null) {
             return null;
         }
 
+        String className = element.getSimpleName().toString();
+
+        // Validate @DriverCapability
+        if (!validateDriverCapability(capability, element, prefixToElement)) {
+            return null; // Validation errors prevent processing
+        }
+
         Map<String, Object> driver = new LinkedHashMap<>();
 
         // Basic info
-        String name = capability.name().isEmpty()
-            ? element.getSimpleName().toString()
-            : capability.name();
+        String name = capability.name().isEmpty() ? className : capability.name();
         driver.put("name", name);
         driver.put("prefix", capability.prefix());
         driver.put("class", element.getQualifiedName().toString());
@@ -115,11 +154,11 @@ public class CapabilityProcessor extends AbstractProcessor {
         }
         driver.put("capabilities", capabilities);
 
-        // Parameters
+        // Parameters (with validation)
         List<Map<String, Object>> parameters = processParameters(element);
         driver.put("parameters", parameters);
 
-        // Dependencies
+        // Dependencies (with validation)
         List<Map<String, Object>> dependencies = processDependencies(element);
         if (!dependencies.isEmpty()) {
             driver.put("dependencies", dependencies);
@@ -129,18 +168,78 @@ public class CapabilityProcessor extends AbstractProcessor {
         Map<String, Object> sideEffects = processSideEffects(element);
         driver.put("sideEffects", sideEffects);
 
-        // Composability
+        // Composability validation
+        if (capability.terminal() && capability.composable()) {
+            warning("Driver is marked as both terminal and composable; terminal drivers typically are not composable", element);
+        }
+
         driver.put("composable", capability.composable());
         driver.put("terminal", capability.terminal());
 
         return driver;
     }
 
+    // ========== Validation Methods ==========
+
+    private boolean validateDriverCapability(DriverCapability capability, TypeElement element,
+            Map<String, TypeElement> prefixToElement) {
+        boolean valid = true;
+        String prefix = capability.prefix();
+
+        // Prefix must not be empty
+        if (prefix == null || prefix.trim().isEmpty()) {
+            error("@DriverCapability prefix must not be empty", element);
+            valid = false;
+        } else {
+            // Prefix must match pattern
+            if (!PREFIX_PATTERN.matcher(prefix).matches()) {
+                error("@DriverCapability prefix '" + prefix +
+                    "' is invalid; must be lowercase alphanumeric starting with a letter", element);
+                valid = false;
+            }
+
+            // Check for duplicate prefix
+            TypeElement existing = prefixToElement.get(prefix);
+            if (existing != null) {
+                error("Duplicate driver prefix '" + prefix + "'; already used by " +
+                    existing.getQualifiedName(), element);
+                valid = false;
+            } else {
+                prefixToElement.put(prefix, element);
+            }
+        }
+
+        // Description should not be empty (warning only)
+        if (capability.description() == null || capability.description().trim().isEmpty()) {
+            warning("@DriverCapability description should not be empty", element);
+        }
+
+        // Validate capability tags
+        for (String cap : capability.capabilities()) {
+            if (cap == null || cap.trim().isEmpty()) {
+                error("Capability tag must not be empty", element);
+                valid = false;
+            } else if (!CAPABILITY_PATTERN.matcher(cap).matches()) {
+                error("Capability tag '" + cap +
+                    "' is invalid; must be lowercase with optional hyphens (e.g., 'caching', 'load-balancing')", element);
+                valid = false;
+            }
+        }
+
+        return valid;
+    }
+
     private List<Map<String, Object>> processParameters(TypeElement element) {
         List<Map<String, Object>> parameters = new ArrayList<>();
+        Set<String> seenNames = new HashSet<>();
 
         DriverParameter[] params = element.getAnnotationsByType(DriverParameter.class);
         for (DriverParameter param : params) {
+            // Validate parameter
+            if (!validateParameter(param, element, seenNames)) {
+                continue; // Skip invalid parameters but continue processing
+            }
+
             Map<String, Object> paramInfo = new LinkedHashMap<>();
             paramInfo.put("name", param.name());
             paramInfo.put("type", param.type().name().toLowerCase());
@@ -151,7 +250,7 @@ public class CapabilityProcessor extends AbstractProcessor {
 
             if (!param.defaultValue().isEmpty()) {
                 // Convert to appropriate type
-                Object defaultVal = convertDefault(param.defaultValue(), param.type());
+                Object defaultVal = convertDefault(param.defaultValue(), param.type(), param, element);
                 paramInfo.put("default", defaultVal);
             }
 
@@ -181,7 +280,97 @@ public class CapabilityProcessor extends AbstractProcessor {
         return parameters;
     }
 
-    private Object convertDefault(String value, DriverParameter.ParameterType type) {
+    private boolean validateParameter(DriverParameter param, TypeElement element, Set<String> seenNames) {
+        boolean valid = true;
+        String name = param.name();
+
+        // Name must not be empty
+        if (name == null || name.trim().isEmpty()) {
+            error("@DriverParameter name must not be empty", element);
+            return false;
+        }
+
+        // Check for duplicate parameter names
+        if (!seenNames.add(name)) {
+            error("Duplicate parameter name '" + name + "'", element);
+            valid = false;
+        }
+
+        // Validate min/max constraints
+        if (param.min() != Long.MIN_VALUE && param.max() != Long.MAX_VALUE) {
+            if (param.min() > param.max()) {
+                error("Parameter '" + name + "' has min (" + param.min() +
+                    ") greater than max (" + param.max() + ")", element);
+                valid = false;
+            }
+        }
+
+        // Validate default value against constraints
+        if (!param.defaultValue().isEmpty()) {
+            validateDefaultValue(param, element);
+        }
+
+        // Warning for missing description
+        if (param.description().isEmpty()) {
+            warning("Parameter '" + name + "' has no description", element);
+        }
+
+        return valid;
+    }
+
+    private void validateDefaultValue(DriverParameter param, TypeElement element) {
+        String defaultValue = param.defaultValue();
+        String name = param.name();
+
+        switch (param.type()) {
+            case INTEGER:
+                try {
+                    long value = Long.parseLong(defaultValue);
+                    // Check min constraint
+                    if (param.min() != Long.MIN_VALUE && value < param.min()) {
+                        error("Parameter '" + name + "' default value " + value +
+                            " is less than min " + param.min(), element);
+                    }
+                    // Check max constraint
+                    if (param.max() != Long.MAX_VALUE && value > param.max()) {
+                        error("Parameter '" + name + "' default value " + value +
+                            " is greater than max " + param.max(), element);
+                    }
+                } catch (NumberFormatException e) {
+                    error("Parameter '" + name + "' has invalid integer default value: " + defaultValue, element);
+                }
+                break;
+
+            case FLOAT:
+                try {
+                    Double.parseDouble(defaultValue);
+                } catch (NumberFormatException e) {
+                    error("Parameter '" + name + "' has invalid float default value: " + defaultValue, element);
+                }
+                break;
+
+            case BOOLEAN:
+                if (!defaultValue.equalsIgnoreCase("true") && !defaultValue.equalsIgnoreCase("false")) {
+                    warning("Parameter '" + name + "' has non-standard boolean default value: " + defaultValue +
+                        " (will be parsed as false)", element);
+                }
+                break;
+
+            case STRING:
+                // Check enum constraint
+                if (param.enumValues().length > 0) {
+                    List<String> enumList = Arrays.asList(param.enumValues());
+                    if (!enumList.contains(defaultValue)) {
+                        error("Parameter '" + name + "' default value '" + defaultValue +
+                            "' is not in enum values: " + enumList, element);
+                    }
+                }
+                break;
+        }
+    }
+
+    private Object convertDefault(String value, DriverParameter.ParameterType type,
+            DriverParameter param, TypeElement element) {
         try {
             switch (type) {
                 case INTEGER:
@@ -194,6 +383,7 @@ public class CapabilityProcessor extends AbstractProcessor {
                     return value;
             }
         } catch (NumberFormatException e) {
+            // Already reported in validateDefaultValue, just return string
             return value;
         }
     }
@@ -203,6 +393,11 @@ public class CapabilityProcessor extends AbstractProcessor {
 
         DriverDependency[] deps = element.getAnnotationsByType(DriverDependency.class);
         for (DriverDependency dep : deps) {
+            // Validate dependency
+            if (!validateDependency(dep, element)) {
+                continue;
+            }
+
             Map<String, Object> depInfo = new LinkedHashMap<>();
             depInfo.put("groupId", dep.groupId());
             depInfo.put("artifactId", dep.artifactId());
@@ -221,6 +416,28 @@ public class CapabilityProcessor extends AbstractProcessor {
         }
 
         return dependencies;
+    }
+
+    private boolean validateDependency(DriverDependency dep, TypeElement element) {
+        boolean valid = true;
+
+        if (dep.groupId() == null || dep.groupId().trim().isEmpty()) {
+            error("@DriverDependency groupId must not be empty", element);
+            valid = false;
+        }
+
+        if (dep.artifactId() == null || dep.artifactId().trim().isEmpty()) {
+            error("@DriverDependency artifactId must not be empty", element);
+            valid = false;
+        }
+
+        // Warning for missing version
+        if (dep.version().isEmpty()) {
+            warning("@DriverDependency for " + dep.groupId() + ":" + dep.artifactId() +
+                " has no version specified", element);
+        }
+
+        return valid;
     }
 
     private Map<String, Object> processSideEffects(TypeElement element) {
