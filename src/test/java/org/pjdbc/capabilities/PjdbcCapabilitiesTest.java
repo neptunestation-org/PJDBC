@@ -445,4 +445,159 @@ public class PjdbcCapabilitiesTest {
         assertEquals("Parsed Driver", driver.get().name());
         assertTrue(driver.get().hasCapability("parsing"));
     }
+
+    // ========== Source enum tests ==========
+
+    @Test
+    public void testLoadFromManifestReturnsManifestSource() {
+        PjdbcCapabilities caps = PjdbcCapabilities.loadFromManifest();
+        assertEquals("Should have MANIFEST source",
+            PjdbcCapabilities.Source.MANIFEST, caps.getSource());
+    }
+
+    @Test
+    public void testLoadFromReflectionReturnsReflectionSource() {
+        PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
+        assertEquals("Should have REFLECTION source",
+            PjdbcCapabilities.Source.REFLECTION, caps.getSource());
+    }
+
+    @Test
+    public void testGetSourceIsNonNull() {
+        PjdbcCapabilities caps = PjdbcCapabilities.load();
+        assertNotNull("getSource() should not return null", caps.getSource());
+    }
+
+    @Test
+    public void testToStringContainsSource() {
+        PjdbcCapabilities caps = PjdbcCapabilities.load();
+        String str = caps.toString();
+        assertTrue("toString should contain source", str.contains("source="));
+    }
+
+    // ========== Reflection loading tests ==========
+
+    @Test
+    public void testLoadFromReflectionReturnsNonNull() {
+        PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
+        assertNotNull("loadFromReflection() should return non-null", caps);
+    }
+
+    @Test
+    public void testLoadFromReflectionHasDrivers() {
+        PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
+        assertTrue("Reflection should find at least one driver",
+            caps.getDriverCount() > 0);
+    }
+
+    @Test
+    public void testLoadFromReflectionHasVersion() {
+        PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
+        assertNotNull("Reflection version should not be null", caps.getVersion());
+        assertTrue("Reflection version should contain 'reflection'",
+            caps.getVersion().contains("reflection"));
+    }
+
+    @Test
+    public void testLoadFromReflectionFindsLogDriver() {
+        PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
+        Optional<DriverCapability> log = caps.findByPrefix("log");
+        assertTrue("Reflection should find 'log' driver", log.isPresent());
+        assertEquals("org.pjdbc.drivers.LogDriver", log.get().driverClass());
+    }
+
+    @Test
+    public void testLoadFromReflectionFindsRetryDriverWithParameters() {
+        PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
+        Optional<DriverCapability> retry = caps.findByPrefix("retry");
+        assertTrue("Reflection should find 'retry' driver", retry.isPresent());
+
+        // RetryDriver should have parameters like maxRetries
+        assertNotNull("RetryDriver should have parameters", retry.get().parameters());
+        assertFalse("RetryDriver should have at least one parameter",
+            retry.get().parameters().isEmpty());
+
+        boolean hasMaxRetries = retry.get().parameters().stream()
+            .anyMatch(p -> "maxRetries".equals(p.name()));
+        assertTrue("RetryDriver should have maxRetries parameter", hasMaxRetries);
+    }
+
+    @Test
+    public void testLoadFromReflectionFindsCachingDriverWithCapabilities() {
+        PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
+        Optional<DriverCapability> cache = caps.findByPrefix("cache");
+        assertTrue("Reflection should find 'cache' driver", cache.isPresent());
+        assertTrue("CachingDriver should have 'caching' capability",
+            cache.get().hasCapability("caching"));
+    }
+
+    @Test
+    public void testLoadFromReflectionFindsRedisCachingDriverWithDependencies() {
+        PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
+        Optional<DriverCapability> redis = caps.findByPrefix("rediscache");
+        assertTrue("Reflection should find 'rediscache' driver", redis.isPresent());
+
+        // RedisCachingDriver should have Jedis dependency
+        assertNotNull("RedisCachingDriver should have dependencies",
+            redis.get().dependencies());
+        assertFalse("RedisCachingDriver should have at least one dependency",
+            redis.get().dependencies().isEmpty());
+
+        boolean hasJedis = redis.get().dependencies().stream()
+            .anyMatch(d -> "jedis".equals(d.artifactId()));
+        assertTrue("RedisCachingDriver should have Jedis dependency", hasJedis);
+    }
+
+    @Test
+    public void testLoadFromReflectionFindsDriverWithSideEffects() {
+        PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
+        Optional<DriverCapability> log = caps.findByPrefix("log");
+        assertTrue("Reflection should find 'log' driver", log.isPresent());
+
+        // LogDriver should have logging side effect
+        assertNotNull("LogDriver should have side effects", log.get().sideEffects());
+        assertTrue("LogDriver should have logging side effect",
+            log.get().sideEffects().logging());
+    }
+
+    @Test
+    public void testLoadFromReflectionDriversAreSortedByPrefix() {
+        PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
+        List<DriverCapability> drivers = caps.getAllDrivers();
+        for (int i = 1; i < drivers.size(); i++) {
+            String prev = drivers.get(i - 1).prefix();
+            String curr = drivers.get(i).prefix();
+            assertTrue("Drivers should be sorted by prefix: " + prev + " <= " + curr,
+                prev.compareTo(curr) <= 0);
+        }
+    }
+
+    @Test
+    public void testReflectionAndManifestFindSameDrivers() {
+        PjdbcCapabilities manifest = PjdbcCapabilities.loadFromManifest();
+        PjdbcCapabilities reflection = PjdbcCapabilities.loadFromReflection();
+
+        // Both should find the same set of drivers (by prefix)
+        for (DriverCapability driver : manifest.getAllDrivers()) {
+            assertTrue("Reflection should find driver: " + driver.prefix(),
+                reflection.hasDriver(driver.prefix()));
+        }
+    }
+
+    @Test
+    public void testBuilderWithSource() {
+        PjdbcCapabilities caps = PjdbcCapabilities.builder()
+            .version("1.0")
+            .source(PjdbcCapabilities.Source.REFLECTION)
+            .build();
+        assertEquals("Source should be REFLECTION",
+            PjdbcCapabilities.Source.REFLECTION, caps.getSource());
+    }
+
+    @Test
+    public void testBuilderDefaultSource() {
+        PjdbcCapabilities caps = PjdbcCapabilities.builder().build();
+        assertEquals("Default source should be MANIFEST",
+            PjdbcCapabilities.Source.MANIFEST, caps.getSource());
+    }
 }

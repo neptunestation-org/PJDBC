@@ -6,10 +6,15 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import org.pjdbc.annotations.DriverDependency;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverSideEffects;
 
 /**
  * Runtime introspection API for PJDBC driver capabilities.
@@ -40,25 +45,41 @@ public final class PjdbcCapabilities {
     private static final String MANIFEST_PATH = "pjdbc.capabilities.json";
     private static volatile PjdbcCapabilities instance;
 
+    /**
+     * Source from which capabilities were loaded.
+     */
+    public enum Source {
+        /** Loaded from pjdbc.capabilities.json manifest file */
+        MANIFEST,
+        /** Loaded via runtime reflection on annotated classes */
+        REFLECTION
+    }
+
     private final String version;
     private final List<DriverCapability> drivers;
+    private final Source source;
 
-    private PjdbcCapabilities(String version, List<DriverCapability> drivers) {
+    private PjdbcCapabilities(String version, List<DriverCapability> drivers, Source source) {
         this.version = version;
         this.drivers = Collections.unmodifiableList(new ArrayList<>(drivers));
+        this.source = source;
     }
 
     /**
-     * Loads the capabilities manifest from the classpath.
+     * Loads capabilities, trying manifest first then falling back to reflection.
+     *
+     * <p>This method first attempts to load from the pjdbc.capabilities.json
+     * manifest. If the manifest is not found, it falls back to discovering
+     * drivers via runtime reflection on annotated classes.</p>
      *
      * @return The loaded capabilities
-     * @throws PjdbcCapabilitiesException if the manifest cannot be loaded or parsed
+     * @throws PjdbcCapabilitiesException if capabilities cannot be loaded from either source
      */
     public static PjdbcCapabilities load() {
         if (instance == null) {
             synchronized (PjdbcCapabilities.class) {
                 if (instance == null) {
-                    instance = loadFromClasspath();
+                    instance = loadWithFallback();
                 }
             }
         }
@@ -66,16 +87,54 @@ public final class PjdbcCapabilities {
     }
 
     /**
-     * Forces a reload of the capabilities manifest.
+     * Forces loading from the manifest only.
+     *
+     * @return The loaded capabilities
+     * @throws PjdbcCapabilitiesException if the manifest cannot be loaded or parsed
+     */
+    public static PjdbcCapabilities loadFromManifest() {
+        synchronized (PjdbcCapabilities.class) {
+            instance = loadFromClasspath();
+        }
+        return instance;
+    }
+
+    /**
+     * Forces loading via runtime reflection on annotated driver classes.
+     *
+     * <p>This method scans known driver classes for @DriverCapability annotations
+     * and builds the capabilities model from those annotations. Useful during
+     * development when the manifest may not be up to date.</p>
+     *
+     * @return The loaded capabilities
+     */
+    public static PjdbcCapabilities loadFromReflection() {
+        synchronized (PjdbcCapabilities.class) {
+            instance = buildFromReflection();
+        }
+        return instance;
+    }
+
+    /**
+     * Forces a reload of capabilities, trying manifest first then reflection.
      * Useful for testing or when the manifest may have changed.
      *
      * @return The reloaded capabilities
      */
     public static PjdbcCapabilities reload() {
         synchronized (PjdbcCapabilities.class) {
-            instance = loadFromClasspath();
+            instance = loadWithFallback();
         }
         return instance;
+    }
+
+    private static PjdbcCapabilities loadWithFallback() {
+        try {
+            return loadFromClasspath();
+        } catch (PjdbcCapabilitiesException e) {
+            // Manifest not found or invalid, fall back to reflection
+            return buildFromReflection();
+        }
     }
 
     private static PjdbcCapabilities loadFromClasspath() {
@@ -94,13 +153,133 @@ public final class PjdbcCapabilities {
         }
     }
 
+    private static PjdbcCapabilities buildFromReflection() {
+        List<DriverCapability> drivers = new ArrayList<>();
+
+        // Known driver classes - scan all drivers in org.pjdbc.drivers package
+        String[] driverNames = {
+            "AuditDriver", "CachingDriver", "CatDriver", "ChaosDriver", "CircuitBreakerDriver",
+            "DataMaskingDriver", "FederatingDriver", "FilterDriver", "HazelcastCachingDriver",
+            "HikariPoolDriver", "LoadBalancingDriver", "LogDriver", "MemcachedCachingDriver",
+            "MetricsDriver", "MockDriver", "NullDriver", "PoolDriver", "RateLimitDriver",
+            "ReadonlyDriver", "RedisCachingDriver", "RetryDriver", "SchemaValidationDriver",
+            "SinkDriver", "TeeDriver", "TimeoutDriver", "TracingDriver", "UserMapDriver", "VoidDriver"
+        };
+
+        for (String name : driverNames) {
+            try {
+                Class<?> clazz = Class.forName("org.pjdbc.drivers." + name);
+                DriverCapability cap = buildDriverCapability(clazz);
+                if (cap != null) {
+                    drivers.add(cap);
+                }
+            } catch (ClassNotFoundException e) {
+                // Skip if not found
+            }
+        }
+
+        // Sort by prefix
+        drivers.sort((a, b) -> a.prefix().compareTo(b.prefix()));
+
+        return new PjdbcCapabilities("1.0-reflection", drivers, Source.REFLECTION);
+    }
+
+    private static DriverCapability buildDriverCapability(Class<?> clazz) {
+        org.pjdbc.annotations.DriverCapability cap =
+            clazz.getAnnotation(org.pjdbc.annotations.DriverCapability.class);
+
+        if (cap == null) {
+            return null;
+        }
+
+        String name = cap.name().isEmpty() ? clazz.getSimpleName() : cap.name();
+        String prefix = cap.prefix();
+        String driverClass = clazz.getName();
+        String description = cap.description();
+        List<String> capabilities = Arrays.asList(cap.capabilities());
+        boolean composable = cap.composable();
+        boolean terminal = cap.terminal();
+
+        // Extract parameters
+        List<DriverCapability.Parameter> parameters = new ArrayList<>();
+        DriverParameter[] paramAnnotations = clazz.getAnnotationsByType(DriverParameter.class);
+        for (DriverParameter param : paramAnnotations) {
+            Object defaultValue = param.defaultValue().isEmpty() ? null : parseDefaultValue(param);
+            Number min = param.min() == Long.MIN_VALUE ? null : param.min();
+            Number max = param.max() == Long.MAX_VALUE ? null : param.max();
+            List<String> enumValues = param.enumValues().length == 0 ? null :
+                Arrays.asList(param.enumValues());
+
+            parameters.add(new DriverCapability.Parameter(
+                param.name(),
+                param.type().name().toLowerCase(),
+                param.description(),
+                defaultValue,
+                param.required(),
+                min,
+                max,
+                enumValues
+            ));
+        }
+
+        // Extract dependencies
+        List<DriverCapability.Dependency> dependencies = new ArrayList<>();
+        DriverDependency[] depAnnotations = clazz.getAnnotationsByType(DriverDependency.class);
+        for (DriverDependency dep : depAnnotations) {
+            dependencies.add(new DriverCapability.Dependency(
+                dep.groupId(),
+                dep.artifactId(),
+                dep.version().isEmpty() ? null : dep.version(),
+                dep.optional()
+            ));
+        }
+
+        // Extract side effects
+        DriverCapability.SideEffects sideEffects = null;
+        DriverSideEffects seAnnotation = clazz.getAnnotation(DriverSideEffects.class);
+        if (seAnnotation != null) {
+            sideEffects = new DriverCapability.SideEffects(
+                seAnnotation.logging(),
+                seAnnotation.metrics(),
+                seAnnotation.network(),
+                seAnnotation.filesystem(),
+                seAnnotation.stateful()
+            );
+        }
+
+        return new DriverCapability(
+            name,
+            prefix,
+            driverClass,
+            description,
+            capabilities.isEmpty() ? null : capabilities,
+            parameters.isEmpty() ? null : parameters,
+            dependencies.isEmpty() ? null : dependencies,
+            sideEffects,
+            composable,
+            terminal
+        );
+    }
+
+    private static Object parseDefaultValue(DriverParameter param) {
+        String value = param.defaultValue();
+        return switch (param.type()) {
+            case INTEGER -> Long.parseLong(value);
+            case FLOAT -> Double.parseDouble(value);
+            case BOOLEAN -> Boolean.parseBoolean(value);
+            case STRING -> value;
+        };
+    }
+
     /**
      * Parses capabilities from a JSON string.
      * Uses a simple parser to avoid external dependencies.
      */
     static PjdbcCapabilities parse(String json) {
         SimpleJsonParser parser = new SimpleJsonParser(json);
-        return parser.parseCapabilities();
+        PjdbcCapabilities parsed = parser.parseCapabilities();
+        // Re-wrap with MANIFEST source
+        return new PjdbcCapabilities(parsed.version, parsed.drivers, Source.MANIFEST);
     }
 
     /**
@@ -108,6 +287,13 @@ public final class PjdbcCapabilities {
      */
     public String getVersion() {
         return version;
+    }
+
+    /**
+     * Returns the source from which capabilities were loaded.
+     */
+    public Source getSource() {
+        return source;
     }
 
     /**
@@ -230,7 +416,8 @@ public final class PjdbcCapabilities {
 
     @Override
     public String toString() {
-        return "PjdbcCapabilities{version='" + version + "', drivers=" + drivers.size() + "}";
+        return "PjdbcCapabilities{version='" + version + "', source=" + source +
+            ", drivers=" + drivers.size() + "}";
     }
 
     /**
@@ -243,10 +430,16 @@ public final class PjdbcCapabilities {
 
     public static class Builder {
         private String version = "1.0";
+        private Source source = Source.MANIFEST;
         private final List<DriverCapability> drivers = new ArrayList<>();
 
         public Builder version(String version) {
             this.version = version;
+            return this;
+        }
+
+        public Builder source(Source source) {
+            this.source = source;
             return this;
         }
 
@@ -256,7 +449,7 @@ public final class PjdbcCapabilities {
         }
 
         public PjdbcCapabilities build() {
-            return new PjdbcCapabilities(version, drivers);
+            return new PjdbcCapabilities(version, drivers, source);
         }
     }
 }

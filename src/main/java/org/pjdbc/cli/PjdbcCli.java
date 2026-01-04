@@ -423,12 +423,12 @@ public class PjdbcCli {
 
         // Known driver classes - we scan the drivers package
         String[] driverNames = {
-            "AuditDriver", "CachingDriver", "ChaosDriver", "CircuitBreakerDriver",
+            "AuditDriver", "CachingDriver", "CatDriver", "ChaosDriver", "CircuitBreakerDriver",
             "DataMaskingDriver", "FederatingDriver", "FilterDriver", "HazelcastCachingDriver",
             "HikariPoolDriver", "LoadBalancingDriver", "LogDriver", "MemcachedCachingDriver",
-            "MetricsDriver", "NullDriver", "PoolDriver", "RateLimitDriver", "ReadonlyDriver",
-            "RedisCachingDriver", "RetryDriver", "SchemaValidationDriver", "SinkDriver",
-            "TeeDriver", "TimeoutDriver", "TracingDriver", "UserMapDriver", "VoidDriver"
+            "MetricsDriver", "MockDriver", "NullDriver", "PoolDriver", "RateLimitDriver",
+            "ReadonlyDriver", "RedisCachingDriver", "RetryDriver", "SchemaValidationDriver",
+            "SinkDriver", "TeeDriver", "TimeoutDriver", "TracingDriver", "UserMapDriver", "VoidDriver"
         };
 
         for (String name : driverNames) {
