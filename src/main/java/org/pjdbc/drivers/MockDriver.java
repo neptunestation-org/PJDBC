@@ -43,6 +43,11 @@ public class MockDriver extends AbstractDriver {
 	    return null;}}
 
     private static Map<String, MyPrintWriter> logs = new ConcurrentHashMap<String, MyPrintWriter>();
+    private static Map<String, Properties> infos = new ConcurrentHashMap<String, Properties>();
+
+    public static Properties getLastConnectionInfo (String url) {
+        return infos.get(url);
+    }
 
     public static String getLog (String url) {
 	if (logs.containsKey(url)) {
@@ -65,6 +70,7 @@ public class MockDriver extends AbstractDriver {
     public Connection connect (final String url, Properties info) throws SQLException {
 	if (!acceptsURL(url)) return null;
 	logs.put(url, new MyPrintWriter(new ByteArrayOutputStream()));
+    infos.put(url, info);
 	final PrintWriter l = logs.get(url);
 	return (Connection)Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{Connection.class}, new InvocationHandler() {
 		public Object invoke (Object proxy, Method method, Object[] args) throws SQLException {
