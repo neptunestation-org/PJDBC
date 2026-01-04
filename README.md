@@ -191,6 +191,51 @@ Parameters:
 
 Default retryable SQL states: 08001, 08003, 08004, 08006, 08007 (connection errors), 40001, 40P01 (deadlock), 57P01 (admin shutdown), HYT00, HYT01 (timeouts).
 
+### CircuitBreakerDriver (`jdbc:circuitbreaker:...`)
+
+Implements the circuit breaker pattern for fault tolerance. Prevents cascading failures by failing fast when a backend is unavailable.
+
+The circuit breaker has three states:
+- **CLOSED**: Normal operation, requests pass through
+- **OPEN**: Circuit tripped, requests fail immediately without hitting the database
+- **HALF_OPEN**: Testing state, allows limited requests to check if backend recovered
+
+```java
+// Basic circuit breaker (5 failures to open, 30s reset timeout)
+Connection conn = DriverManager.getConnection(
+    "jdbc:circuitbreaker:jdbc:postgresql://localhost/mydb"
+);
+
+// Custom thresholds
+Connection conn = DriverManager.getConnection(
+    "jdbc:circuitbreaker[failureThreshold=3,resetTimeout=60000]:jdbc:postgresql://localhost/mydb"
+);
+
+// Named circuit breaker for monitoring
+Connection conn = DriverManager.getConnection(
+    "jdbc:circuitbreaker[name=primary-db,failureThreshold=10]:jdbc:postgresql://localhost/mydb"
+);
+
+// Access circuit breaker state
+CircuitBreakerDriver.CircuitBreaker cb = CircuitBreakerDriver.getCircuitBreaker(conn);
+System.out.println("State: " + cb.getState());  // CLOSED, OPEN, or HALF_OPEN
+System.out.println("Failures: " + cb.getFailureCount() + "/" + cb.getFailureThreshold());
+System.out.println("Total requests: " + cb.getTotalRequests());
+System.out.println("Total rejections: " + cb.getTotalRejections());
+```
+
+Parameters:
+- `name`: Circuit breaker name for monitoring (default: "default")
+- `failureThreshold`: Consecutive failures before opening circuit (default: 5)
+- `successThreshold`: Consecutive successes in half-open to close circuit (default: 1)
+- `resetTimeout`: Time in ms before open -> half-open transition (default: 30000)
+
+State transitions:
+- CLOSED → OPEN: After `failureThreshold` consecutive failures
+- OPEN → HALF_OPEN: After `resetTimeout` milliseconds
+- HALF_OPEN → CLOSED: After `successThreshold` consecutive successes
+- HALF_OPEN → OPEN: On any failure
+
 ### ChaosDriver (`jdbc:chaos:...`)
 
 Injects configurable failures and latency for resilience testing. Use this driver to test how your application handles database errors, slow queries, and connection drops.
@@ -560,7 +605,7 @@ Drivers are tagged with capabilities for easy discovery:
 | `logging`        | SQL statement logging | log                                    |
 | `tracing`        | Distributed tracing   | trace                                  |
 | `metrics`        | Performance metrics   | metrics                                |
-| `resilience`     | Fault tolerance       | retry, chaos                           |
+| `resilience`     | Fault tolerance       | retry, circuitbreaker, chaos           |
 | `security`       | Access control        | readonly, mapuser, mask                |
 | `testing`        | Test utilities        | mock, sink, chaos                      |
 | `transformation` | SQL modification      | filter                                 |

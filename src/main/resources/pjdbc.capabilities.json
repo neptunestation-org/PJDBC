@@ -265,6 +265,47 @@
       "terminal": false
     },
     {
+      "name": "CircuitBreakerDriver",
+      "prefix": "circuitbreaker",
+      "class": "org.pjdbc.drivers.CircuitBreakerDriver",
+      "description": "Implements circuit breaker pattern for fault tolerance with CLOSED/OPEN/HALF_OPEN states",
+      "capabilities": ["resilience"],
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Circuit breaker name for monitoring",
+          "default": "default"
+        },
+        {
+          "name": "failureThreshold",
+          "type": "integer",
+          "description": "Failures before opening circuit",
+          "default": 5,
+          "min": 1
+        },
+        {
+          "name": "successThreshold",
+          "type": "integer",
+          "description": "Successes in half-open to close circuit",
+          "default": 1,
+          "min": 1
+        },
+        {
+          "name": "resetTimeout",
+          "type": "integer",
+          "description": "Time in ms before open -> half-open",
+          "default": 30000,
+          "min": 1
+        }
+      ],
+      "sideEffects": {
+        "stateful": true
+      },
+      "composable": true,
+      "terminal": false
+    },
+    {
       "name": "ChaosDriver",
       "prefix": "chaos",
       "class": "org.pjdbc.drivers.ChaosDriver",
