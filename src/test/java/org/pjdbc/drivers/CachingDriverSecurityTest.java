@@ -425,4 +425,126 @@ public class CachingDriverSecurityTest {
             assertEquals(1, cache.getHits());
         }
     }
+
+    // ========== Thread Safety Tests ==========
+
+    @Test
+    public void testSha256ThreadSafety() throws InterruptedException {
+        // Test that SHA-256 hashing is thread-safe with ThreadLocal MessageDigest
+        final int threadCount = 10;
+        final int iterationsPerThread = 100;
+        final String[] results = new String[threadCount * iterationsPerThread];
+        final Thread[] threads = new Thread[threadCount];
+
+        for (int t = 0; t < threadCount; t++) {
+            final int threadIndex = t;
+            threads[t] = new Thread(() -> {
+                for (int i = 0; i < iterationsPerThread; i++) {
+                    String input = "SELECT * FROM users WHERE id = " + (threadIndex * iterationsPerThread + i);
+                    results[threadIndex * iterationsPerThread + i] = CacheKeyBuilder.sha256(input);
+                }
+            });
+        }
+
+        // Start all threads
+        for (Thread thread : threads) {
+            thread.start();
+        }
+
+        // Wait for all threads to complete
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        // Verify all results are valid SHA-256 hashes (64 hex chars)
+        for (int i = 0; i < results.length; i++) {
+            assertNotNull("Result " + i + " should not be null", results[i]);
+            assertEquals("Result " + i + " should be 64 chars", 64, results[i].length());
+            assertTrue("Result " + i + " should be hex", results[i].matches("[0-9a-f]{64}"));
+        }
+
+        // Verify determinism: same input produces same hash
+        for (int i = 0; i < results.length; i++) {
+            String input = "SELECT * FROM users WHERE id = " + i;
+            String expectedHash = CacheKeyBuilder.sha256(input);
+            assertEquals("Hash for input " + i + " should be deterministic", expectedHash, results[i]);
+        }
+    }
+
+    @Test
+    public void testConcurrentCacheKeyGeneration() throws InterruptedException {
+        // Test that cache key generation is thread-safe
+        final int threadCount = 5;
+        final String sql = "SELECT * FROM users WHERE id = ?";
+        final String[][] keys = new String[threadCount][3];
+        final Thread[] threads = new Thread[threadCount];
+
+        for (int t = 0; t < threadCount; t++) {
+            final int threadIndex = t;
+            threads[t] = new Thread(() -> {
+                // Each thread generates keys with different parameters
+                for (int i = 0; i < 3; i++) {
+                    keys[threadIndex][i] = CacheKeyBuilder.buildKey("prefix:", sql, threadIndex * 10 + i);
+                }
+            });
+        }
+
+        for (Thread thread : threads) {
+            thread.start();
+        }
+
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        // Verify all keys are valid
+        for (int t = 0; t < threadCount; t++) {
+            for (int i = 0; i < 3; i++) {
+                assertNotNull("Key [" + t + "][" + i + "] should not be null", keys[t][i]);
+                assertTrue("Key should start with prefix", keys[t][i].startsWith("prefix:"));
+            }
+        }
+
+        // Verify determinism
+        for (int t = 0; t < threadCount; t++) {
+            for (int i = 0; i < 3; i++) {
+                String expectedKey = CacheKeyBuilder.buildKey("prefix:", sql, t * 10 + i);
+                assertEquals("Key should be deterministic", expectedKey, keys[t][i]);
+            }
+        }
+    }
+
+    @Test
+    public void testConcurrentContextKeyGeneration() throws InterruptedException {
+        // Test that context-aware key generation is thread-safe
+        final int threadCount = 5;
+        final String sql = "SELECT * FROM data";
+        final String[] keys = new String[threadCount];
+        final Thread[] threads = new Thread[threadCount];
+
+        for (int t = 0; t < threadCount; t++) {
+            final int threadIndex = t;
+            threads[t] = new Thread(() -> {
+                CacheKeyBuilder.ConnectionContext ctx =
+                    new CacheKeyBuilder.ConnectionContext("db" + threadIndex, "schema" + threadIndex, "user" + threadIndex);
+                keys[threadIndex] = CacheKeyBuilder.buildKey("prefix:", sql, ctx);
+            });
+        }
+
+        for (Thread thread : threads) {
+            thread.start();
+        }
+
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        // Verify all keys are valid and unique (different contexts)
+        for (int i = 0; i < threadCount; i++) {
+            assertNotNull("Key " + i + " should not be null", keys[i]);
+            for (int j = i + 1; j < threadCount; j++) {
+                assertNotEquals("Keys for different contexts should differ", keys[i], keys[j]);
+            }
+        }
+    }
 }

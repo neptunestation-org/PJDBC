@@ -21,6 +21,20 @@ public final class CacheKeyBuilder {
 
     private static final char[] HEX_CHARS = "0123456789abcdef".toCharArray();
 
+    /**
+     * Thread-local MessageDigest instances for efficient SHA-256 computation.
+     * MessageDigest is not thread-safe, so we use ThreadLocal to provide
+     * one instance per thread, avoiding synchronization and repeated instantiation.
+     */
+    private static final ThreadLocal<MessageDigest> DIGEST_CACHE = ThreadLocal.withInitial(() -> {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 is guaranteed to be available in all Java implementations
+            throw new RuntimeException("SHA-256 not available", e);
+        }
+    });
+
     private CacheKeyBuilder() {
         // Utility class - prevent instantiation
     }
@@ -77,6 +91,7 @@ public final class CacheKeyBuilder {
 
     /**
      * Generate a SHA-256 hash of the input string, returned as hex.
+     * Uses ThreadLocal MessageDigest for thread-safety and efficiency.
      *
      * @param input the string to hash
      * @return 64-character hex string (256 bits)
@@ -85,14 +100,10 @@ public final class CacheKeyBuilder {
         if (input == null) {
             input = "";
         }
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return bytesToHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            // SHA-256 is guaranteed to be available in all Java implementations
-            throw new RuntimeException("SHA-256 not available", e);
-        }
+        MessageDigest digest = DIGEST_CACHE.get();
+        digest.reset(); // Reset before use (important for reuse)
+        byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+        return bytesToHex(hash);
     }
 
     /**

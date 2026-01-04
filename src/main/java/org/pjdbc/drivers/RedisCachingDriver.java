@@ -768,13 +768,23 @@ public class RedisCachingDriver extends AbstractProxyDriver {
         }
 
         private String getCacheKey() {
-            // Build ordered parameter array for consistent hashing
+            // Take atomic snapshot of parameters for thread-safe key generation
+            // ConcurrentHashMap's toArray provides a consistent snapshot
+            Map.Entry<Integer, Object>[] snapshot = parameters.entrySet().toArray(new Map.Entry[0]);
+
             Object[] params = null;
-            if (!parameters.isEmpty()) {
-                int maxIndex = parameters.keySet().stream().mapToInt(Integer::intValue).max().orElse(0);
+            if (snapshot.length > 0) {
+                // Find max index from snapshot
+                int maxIndex = 0;
+                for (Map.Entry<Integer, Object> entry : snapshot) {
+                    if (entry.getKey() > maxIndex) {
+                        maxIndex = entry.getKey();
+                    }
+                }
+                // Build ordered parameter array
                 params = new Object[maxIndex];
-                for (int i = 1; i <= maxIndex; i++) {
-                    params[i - 1] = parameters.get(i);
+                for (Map.Entry<Integer, Object> entry : snapshot) {
+                    params[entry.getKey() - 1] = entry.getValue();
                 }
             }
             return CacheKeyBuilder.buildKeyWithContext(cache.getConfig().getKeyPrefix(), sql, context, params);
