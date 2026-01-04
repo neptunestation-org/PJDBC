@@ -85,6 +85,17 @@
               </annotationProcessors>
             </configuration>
           </execution>
+          <!-- Disable annotation processing for test compilation -->
+          <execution>
+            <id>default-testCompile</id>
+            <phase>test-compile</phase>
+            <goals>
+              <goal>testCompile</goal>
+            </goals>
+            <configuration>
+              <proc>none</proc>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
       <plugin>
