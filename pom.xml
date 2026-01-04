@@ -177,6 +177,32 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>fast</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>3.5.4</version>
+            <configuration>
+              <includes>
+                <include>**/*Test.java</include>
+                <include>**/*Properties.java</include>
+              </includes>
+              <excludes>
+                <exclude>**/*IntegrationTest.java</exclude>
+                <exclude>**/Redis*Test.java</exclude>
+                <exclude>**/Memcached*Test.java</exclude>
+                <exclude>**/Hazelcast*Test.java</exclude>
+              </excludes>
+              <parallel>classes</parallel>
+              <threadCount>4</threadCount>
+              <perCoreThreadCount>true</perCoreThreadCount>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 
   <dependencies>
