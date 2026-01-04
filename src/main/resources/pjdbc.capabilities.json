@@ -306,6 +306,31 @@
       "terminal": false
     },
     {
+      "name": "TimeoutDriver",
+      "prefix": "timeout",
+      "class": "org.pjdbc.drivers.TimeoutDriver",
+      "description": "Enforces query timeout limits on all statements",
+      "capabilities": ["resilience"],
+      "parameters": [
+        {
+          "name": "queryTimeout",
+          "type": "integer",
+          "description": "Query timeout in seconds (0 = no timeout)",
+          "default": 30,
+          "min": 0
+        },
+        {
+          "name": "cancelOnTimeout",
+          "type": "boolean",
+          "description": "Whether to attempt cancellation on timeout",
+          "default": true
+        }
+      ],
+      "sideEffects": {},
+      "composable": true,
+      "terminal": false
+    },
+    {
       "name": "ChaosDriver",
       "prefix": "chaos",
       "class": "org.pjdbc.drivers.ChaosDriver",

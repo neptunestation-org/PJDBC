@@ -236,6 +236,46 @@ State transitions:
 - HALF_OPEN → CLOSED: After `successThreshold` consecutive successes
 - HALF_OPEN → OPEN: On any failure
 
+### TimeoutDriver (`jdbc:timeout:...`)
+
+Enforces query timeout limits on all statements. Uses JDBC's `Statement.setQueryTimeout()` to limit query execution time.
+
+```java
+// Basic timeout (30 second default)
+Connection conn = DriverManager.getConnection(
+    "jdbc:timeout:jdbc:postgresql://localhost/mydb"
+);
+
+// Custom timeout (60 seconds)
+Connection conn = DriverManager.getConnection(
+    "jdbc:timeout[queryTimeout=60]:jdbc:postgresql://localhost/mydb"
+);
+
+// No timeout (0 = unlimited)
+Connection conn = DriverManager.getConnection(
+    "jdbc:timeout[queryTimeout=0]:jdbc:postgresql://localhost/mydb"
+);
+
+// Override timeout on specific statement
+try (Statement stmt = conn.createStatement()) {
+    stmt.setQueryTimeout(120);  // Override to 120 seconds for this statement
+    stmt.executeQuery("SELECT * FROM large_table");
+}
+
+// Access timeout configuration
+TimeoutDriver.TimeoutConfig config = TimeoutDriver.getTimeoutConfig(conn);
+System.out.println("Query timeout: " + config.getQueryTimeout() + "s");
+```
+
+Parameters:
+- `queryTimeout`: Query timeout in seconds (default: 30, 0 = no timeout)
+- `cancelOnTimeout`: Whether to attempt statement cancellation on timeout (default: true)
+
+Notes:
+- The timeout is applied to all statements created from the connection
+- Individual statements can override the timeout using `setQueryTimeout()`
+- Actual timeout behavior depends on the underlying JDBC driver and database
+
 ### ChaosDriver (`jdbc:chaos:...`)
 
 Injects configurable failures and latency for resilience testing. Use this driver to test how your application handles database errors, slow queries, and connection drops.
@@ -605,7 +645,7 @@ Drivers are tagged with capabilities for easy discovery:
 | `logging`        | SQL statement logging | log                                    |
 | `tracing`        | Distributed tracing   | trace                                  |
 | `metrics`        | Performance metrics   | metrics                                |
-| `resilience`     | Fault tolerance       | retry, circuitbreaker, chaos           |
+| `resilience`     | Fault tolerance       | retry, circuitbreaker, timeout, chaos  |
 | `security`       | Access control        | readonly, mapuser, mask                |
 | `testing`        | Test utilities        | mock, sink, chaos                      |
 | `transformation` | SQL modification      | filter                                 |
