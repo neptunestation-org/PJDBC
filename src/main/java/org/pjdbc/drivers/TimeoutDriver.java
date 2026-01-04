@@ -10,6 +10,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
 import org.pjdbc.sql.AbstractCallableStatement;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractPreparedStatement;
@@ -40,6 +43,15 @@ import org.pjdbc.sql.JdbcUrlParser;
  * - The actual timeout behavior depends on the underlying JDBC driver
  * - Some databases may not support query cancellation
  */
+@DriverCapability(
+    prefix = "timeout",
+    description = "Enforces query timeout limits on all statements",
+    capabilities = {"resilience"}
+)
+@DriverParameter(name = "queryTimeout", type = ParameterType.INTEGER,
+    description = "Query timeout in seconds (0 = no timeout)", defaultValue = "30", min = 0)
+@DriverParameter(name = "cancelOnTimeout", type = ParameterType.BOOLEAN,
+    description = "Whether to attempt cancellation on timeout", defaultValue = "true")
 public class TimeoutDriver extends AbstractProxyDriver {
 
     static {

@@ -6,6 +6,11 @@ import java.net.*;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.*;
+
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.*;
 
 /**
@@ -25,6 +30,19 @@ import org.pjdbc.sql.*;
  *   jdbc:federate:jdbc:h2:mem:db1;jdbc:h2:mem:db2
  *   jdbc:federate[mergeStrategy=first_non_empty]:jdbc:postgresql://db1/sales;jdbc:mysql://db2/inventory
  */
+@DriverCapability(
+    prefix = "federate",
+    description = "Queries multiple databases and merges results",
+    capabilities = {"federation", "multi-database"}
+)
+@DriverParameter(name = "mergeStrategy", type = ParameterType.STRING,
+    description = "Result merge strategy", defaultValue = "concat",
+    enumValues = {"concat", "union_all", "first_non_empty"})
+@DriverParameter(name = "parallelExecution", type = ParameterType.BOOLEAN,
+    description = "Execute queries in parallel", defaultValue = "false")
+@DriverParameter(name = "timeout", type = ParameterType.INTEGER,
+    description = "Timeout in milliseconds for parallel execution", defaultValue = "30000", min = 0)
+@DriverSideEffects(stateful = true)
 public class FederatingDriver extends AbstractDriver {
     static {try {DriverManager.registerDriver(new FederatingDriver());} catch (Exception e) {throw new RuntimeException(e);}}
 

@@ -19,6 +19,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverDependency;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractProxyDriver;
 import org.pjdbc.sql.AbstractStatement;
@@ -63,6 +68,30 @@ import com.hazelcast.map.IMap;
  *   jdbc:hazelcast[mode=client,members=hz1:5701;hz2:5701]:jdbc:postgresql://localhost/mydb
  *   jdbc:hazelcast[ttl=300,mapName=myapp-cache]:jdbc:mysql://localhost/db
  */
+@DriverCapability(
+    prefix = "hazelcast",
+    description = "Caches SELECT query results in Hazelcast",
+    capabilities = {"caching"}
+)
+@DriverParameter(name = "mode", type = ParameterType.STRING,
+    description = "Hazelcast mode", defaultValue = "embedded",
+    enumValues = {"embedded", "client"})
+@DriverParameter(name = "clusterName", type = ParameterType.STRING,
+    description = "Hazelcast cluster name", defaultValue = "pjdbc-cache")
+@DriverParameter(name = "members", type = ParameterType.STRING,
+    description = "Semicolon-separated member addresses", defaultValue = "127.0.0.1:5701")
+@DriverParameter(name = "mapName", type = ParameterType.STRING,
+    description = "IMap name for caching", defaultValue = "pjdbc_query_cache")
+@DriverParameter(name = "ttl", type = ParameterType.INTEGER,
+    description = "Time-to-live in seconds", defaultValue = "60", min = 1)
+@DriverParameter(name = "maxIdle", type = ParameterType.INTEGER,
+    description = "Maximum idle time in seconds (0 to disable)", defaultValue = "0", min = 0)
+@DriverParameter(name = "invalidateOnWrite", type = ParameterType.BOOLEAN,
+    description = "Clear cache on writes", defaultValue = "true")
+@DriverParameter(name = "enabled", type = ParameterType.BOOLEAN,
+    description = "Enable caching", defaultValue = "true")
+@DriverDependency(groupId = "com.hazelcast", artifactId = "hazelcast", version = "5.3.6", optional = true)
+@DriverSideEffects(network = true, stateful = true)
 public class HazelcastCachingDriver extends AbstractProxyDriver {
 
     private static final Pattern SELECT_PATTERN = Pattern.compile(

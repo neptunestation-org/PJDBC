@@ -16,6 +16,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverDependency;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractProxyDriver;
 import org.pjdbc.sql.AbstractStatement;
@@ -58,6 +63,31 @@ import redis.clients.jedis.JedisPoolConfig;
  *   jdbc:rediscache[password=secret,ttl=300]:jdbc:mysql://localhost/db
  *   jdbc:rediscache[keyPrefix=myapp:,database=1]:jdbc:postgresql://localhost/mydb
  */
+@DriverCapability(
+    prefix = "rediscache",
+    description = "Caches SELECT query results in Redis",
+    capabilities = {"caching"}
+)
+@DriverParameter(name = "host", type = ParameterType.STRING,
+    description = "Redis server hostname", defaultValue = "localhost")
+@DriverParameter(name = "port", type = ParameterType.INTEGER,
+    description = "Redis server port", defaultValue = "6379", min = 1)
+@DriverParameter(name = "password", type = ParameterType.STRING,
+    description = "Redis password")
+@DriverParameter(name = "database", type = ParameterType.INTEGER,
+    description = "Redis database number", defaultValue = "0", min = 0)
+@DriverParameter(name = "keyPrefix", type = ParameterType.STRING,
+    description = "Prefix for cache keys", defaultValue = "pjdbc:")
+@DriverParameter(name = "ttl", type = ParameterType.INTEGER,
+    description = "Time-to-live in seconds", defaultValue = "60", min = 1)
+@DriverParameter(name = "maxPoolSize", type = ParameterType.INTEGER,
+    description = "Maximum connections in pool", defaultValue = "8", min = 1)
+@DriverParameter(name = "invalidateOnWrite", type = ParameterType.BOOLEAN,
+    description = "Clear cache on writes", defaultValue = "true")
+@DriverParameter(name = "enabled", type = ParameterType.BOOLEAN,
+    description = "Enable caching", defaultValue = "true")
+@DriverDependency(groupId = "redis.clients", artifactId = "jedis", version = "5.1.0", optional = true)
+@DriverSideEffects(network = true, stateful = true)
 public class RedisCachingDriver extends AbstractProxyDriver {
 
     private static final Pattern SELECT_PATTERN = Pattern.compile(

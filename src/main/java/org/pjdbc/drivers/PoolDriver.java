@@ -4,8 +4,25 @@ import java.lang.reflect.*;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.*;
+
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.*;
 
+@DriverCapability(
+    prefix = "pool",
+    description = "Connection pooling driver with configurable parameters",
+    capabilities = {"pooling"}
+)
+@DriverParameter(name = "min", type = ParameterType.INTEGER,
+    description = "Minimum pool size", defaultValue = "0", min = 0)
+@DriverParameter(name = "max", type = ParameterType.INTEGER,
+    description = "Maximum pool size (0 = unlimited)", defaultValue = "0", min = 0)
+@DriverParameter(name = "timeout", type = ParameterType.INTEGER,
+    description = "Connection acquisition timeout in milliseconds", defaultValue = "1000", min = 0)
+@DriverSideEffects(stateful = true)
 public class PoolDriver extends AbstractProxyDriver {
     static {try {DriverManager.registerDriver(new PoolDriver());} catch (Exception e) {throw new RuntimeException(e);}}
 

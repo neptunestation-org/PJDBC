@@ -14,6 +14,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractProxyDriver;
 import org.pjdbc.sql.AbstractResultSet;
@@ -47,6 +50,22 @@ import org.pjdbc.sql.JdbcUrlParser;
  *   jdbc:mask[columns=password;secret,strategy=REDACT]:jdbc:postgresql://localhost/mydb
  *   jdbc:mask[columns=card_number,showLast=4,showFirst=0]:jdbc:mysql://localhost/db
  */
+@DriverCapability(
+    prefix = "mask",
+    description = "Masks sensitive data in query results",
+    capabilities = {"masking", "security"}
+)
+@DriverParameter(name = "columns", type = ParameterType.STRING,
+    description = "Semicolon-separated column name patterns (regex) to mask")
+@DriverParameter(name = "strategy", type = ParameterType.STRING,
+    description = "Masking strategy", defaultValue = "PARTIAL",
+    enumValues = {"FULL", "PARTIAL", "EMAIL", "REDACT", "HASH"})
+@DriverParameter(name = "mask", type = ParameterType.STRING,
+    description = "Mask character", defaultValue = "*")
+@DriverParameter(name = "showFirst", type = ParameterType.INTEGER,
+    description = "Characters to show at start for PARTIAL", defaultValue = "0", min = 0)
+@DriverParameter(name = "showLast", type = ParameterType.INTEGER,
+    description = "Characters to show at end for PARTIAL", defaultValue = "4", min = 0)
 public class DataMaskingDriver extends AbstractProxyDriver {
 
     static {

@@ -14,6 +14,9 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
 import org.pjdbc.sql.AbstractCallableStatement;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractPreparedStatement;
@@ -45,6 +48,23 @@ import org.pjdbc.sql.JdbcUrlParser;
  *   jdbc:retry[maxRetries=5,initialDelay=200]:jdbc:postgresql://localhost/mydb
  *   jdbc:retry[retryOnSqlStates=40001;08006]:jdbc:mysql://localhost/db
  */
+@DriverCapability(
+    prefix = "retry",
+    description = "Automatically retries failed queries on transient errors",
+    capabilities = {"resilience"}
+)
+@DriverParameter(name = "maxRetries", type = ParameterType.INTEGER,
+    description = "Maximum retry attempts", defaultValue = "3", min = 0)
+@DriverParameter(name = "initialDelay", type = ParameterType.INTEGER,
+    description = "Initial delay in ms before first retry", defaultValue = "100", min = 0)
+@DriverParameter(name = "maxDelay", type = ParameterType.INTEGER,
+    description = "Maximum delay cap in ms", defaultValue = "5000", min = 0)
+@DriverParameter(name = "backoffMultiplier", type = ParameterType.FLOAT,
+    description = "Multiplier for exponential backoff", defaultValue = "2.0")
+@DriverParameter(name = "jitter", type = ParameterType.BOOLEAN,
+    description = "Add random jitter to delays", defaultValue = "true")
+@DriverParameter(name = "retryOnSqlStates", type = ParameterType.STRING,
+    description = "Semicolon-separated SQL states to retry on")
 public class RetryDriver extends AbstractProxyDriver {
 
     /** Default SQL states that indicate transient/retryable errors */

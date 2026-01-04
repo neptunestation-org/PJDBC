@@ -2,8 +2,17 @@ package org.pjdbc.drivers;
 
 import java.sql.*;
 import java.util.*;
+
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.*;
 
+@DriverCapability(
+    prefix = "mapuser",
+    description = "Maps application usernames to database credentials",
+    capabilities = {"security", "transformation"}
+)
+@DriverSideEffects(filesystem = true)
 public class UserMapDriver extends AbstractProxyDriver {
     private static final Properties p = new Properties();
     static {

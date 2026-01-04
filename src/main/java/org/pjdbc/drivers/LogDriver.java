@@ -2,8 +2,17 @@ package org.pjdbc.drivers;
 
 import java.sql.*;
 import java.util.logging.*;
+
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.*;
 
+@DriverCapability(
+    prefix = "log",
+    description = "Logs all SQL statements using java.util.logging",
+    capabilities = {"logging", "passthrough"}
+)
+@DriverSideEffects(logging = true)
 public class LogDriver extends AbstractProxyDriver {
     static {try {DriverManager.registerDriver(new LogDriver());} catch (Exception e) {throw new RuntimeException(e);}}
 

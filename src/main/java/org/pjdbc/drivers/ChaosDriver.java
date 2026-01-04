@@ -11,6 +11,9 @@ import java.sql.Statement;
 import java.util.Properties;
 import java.util.Random;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
 import org.pjdbc.sql.AbstractCallableStatement;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractPreparedStatement;
@@ -37,6 +40,23 @@ import org.pjdbc.sql.JdbcUrlParser;
  *   jdbc:chaos[latency=100,latencyVariance=50]:jdbc:h2:mem:test
  *   jdbc:chaos[failureRate=0.05,connectionDropRate=0.01]:jdbc:mysql://localhost/db
  */
+@DriverCapability(
+    prefix = "chaos",
+    description = "Injects configurable failures and latency for resilience testing",
+    capabilities = {"testing", "resilience"}
+)
+@DriverParameter(name = "failureRate", type = ParameterType.FLOAT,
+    description = "Probability of throwing SQLException per query", defaultValue = "0.0")
+@DriverParameter(name = "latency", type = ParameterType.INTEGER,
+    description = "Fixed delay in milliseconds before each query", defaultValue = "0", min = 0)
+@DriverParameter(name = "latencyVariance", type = ParameterType.INTEGER,
+    description = "Random additional delay up to this value in ms", defaultValue = "0", min = 0)
+@DriverParameter(name = "connectionDropRate", type = ParameterType.FLOAT,
+    description = "Probability of closing connection unexpectedly", defaultValue = "0.0")
+@DriverParameter(name = "resultSetLatency", type = ParameterType.INTEGER,
+    description = "Delay in ms for each ResultSet.next() call", defaultValue = "0", min = 0)
+@DriverParameter(name = "exceptionMessage", type = ParameterType.STRING,
+    description = "Custom exception message", defaultValue = "ChaosDriver: Induced failure")
 public class ChaosDriver extends AbstractProxyDriver {
 
     static {

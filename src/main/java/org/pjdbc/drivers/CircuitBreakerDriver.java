@@ -13,6 +13,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.AbstractCallableStatement;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractPreparedStatement;
@@ -47,6 +51,20 @@ import org.pjdbc.sql.JdbcUrlParser;
  *   jdbc:circuitbreaker[failureThreshold=3,resetTimeout=60000]:jdbc:postgresql://localhost/mydb
  *   jdbc:circuitbreaker[name=primary-db,failureThreshold=10]:jdbc:mysql://localhost/db
  */
+@DriverCapability(
+    prefix = "circuitbreaker",
+    description = "Implements circuit breaker pattern for fault tolerance with CLOSED/OPEN/HALF_OPEN states",
+    capabilities = {"resilience"}
+)
+@DriverParameter(name = "name", type = ParameterType.STRING,
+    description = "Circuit breaker name for monitoring", defaultValue = "default")
+@DriverParameter(name = "failureThreshold", type = ParameterType.INTEGER,
+    description = "Failures before opening circuit", defaultValue = "5", min = 1)
+@DriverParameter(name = "successThreshold", type = ParameterType.INTEGER,
+    description = "Successes in half-open to close circuit", defaultValue = "1", min = 1)
+@DriverParameter(name = "resetTimeout", type = ParameterType.INTEGER,
+    description = "Time in ms before open -> half-open", defaultValue = "30000", min = 1)
+@DriverSideEffects(stateful = true)
 public class CircuitBreakerDriver extends AbstractProxyDriver {
 
     public enum State {

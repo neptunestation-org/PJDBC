@@ -11,6 +11,9 @@ import java.sql.Statement;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
 import org.pjdbc.sql.AbstractCallableStatement;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractPreparedStatement;
@@ -39,6 +42,17 @@ import org.pjdbc.sql.JdbcUrlParser;
  *   jdbc:readonly[allowDDL=true]:jdbc:postgresql://localhost/mydb
  *   jdbc:readonly[message=No writes allowed in reporting mode]:jdbc:mysql://localhost/db
  */
+@DriverCapability(
+    prefix = "readonly",
+    description = "Enforces read-only database access",
+    capabilities = {"security", "filtering"}
+)
+@DriverParameter(name = "allowDDL", type = ParameterType.BOOLEAN,
+    description = "Allow DDL statements (CREATE, ALTER, DROP)", defaultValue = "false")
+@DriverParameter(name = "allowDML", type = ParameterType.BOOLEAN,
+    description = "Allow DML statements (INSERT, UPDATE, DELETE)", defaultValue = "false")
+@DriverParameter(name = "message", type = ParameterType.STRING,
+    description = "Custom error message for blocked operations")
 public class ReadonlyDriver extends AbstractProxyDriver {
 
     // Pattern to detect DML write operations

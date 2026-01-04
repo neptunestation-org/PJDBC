@@ -2,8 +2,17 @@ package org.pjdbc.drivers;
 
 import java.sql.*;
 import java.util.*;
+
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.*;
 
+@DriverCapability(
+    prefix = "tee",
+    description = "Replicates operations across multiple database connections",
+    capabilities = {"replication"}
+)
+@DriverSideEffects(stateful = true)
 public class TeeDriver extends AbstractProxyDriver {
     static {try {DriverManager.registerDriver(new TeeDriver());} catch (Exception e) {throw new RuntimeException(e);}}
 

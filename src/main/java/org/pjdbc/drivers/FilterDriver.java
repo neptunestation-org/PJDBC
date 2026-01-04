@@ -1,8 +1,19 @@
 package org.pjdbc.drivers;
 
 import java.sql.*;
+
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
 import org.pjdbc.sql.*;
 
+@DriverCapability(
+    prefix = "filter",
+    description = "Transforms SQL statements using a configurable JdbcTransformer",
+    capabilities = {"transformation", "filtering"}
+)
+@DriverParameter(name = "class", type = ParameterType.STRING,
+    description = "Fully qualified class name of JdbcTransformer implementation")
 public class FilterDriver extends AbstractProxyDriver {
     static {try {DriverManager.registerDriver(new FilterDriver());} catch (Exception e) {throw new RuntimeException(e);}}
 

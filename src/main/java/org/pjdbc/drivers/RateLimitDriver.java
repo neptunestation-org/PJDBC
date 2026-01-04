@@ -11,6 +11,10 @@ import java.sql.Statement;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.AbstractCallableStatement;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractPreparedStatement;
@@ -41,6 +45,21 @@ import org.pjdbc.sql.JdbcUrlParser;
  * Note: Rate limiting is per-connection. For application-wide limiting,
  * use a shared RateLimiter instance.
  */
+@DriverCapability(
+    prefix = "ratelimit",
+    description = "Limits query rate using token bucket algorithm",
+    capabilities = {"resilience"}
+)
+@DriverParameter(name = "maxRequests", type = ParameterType.INTEGER,
+    description = "Maximum requests per window", defaultValue = "100", min = 1)
+@DriverParameter(name = "windowMs", type = ParameterType.INTEGER,
+    description = "Time window in milliseconds", defaultValue = "1000", min = 1)
+@DriverParameter(name = "mode", type = ParameterType.STRING,
+    description = "Behavior when limit exceeded: reject or wait", defaultValue = "reject",
+    enumValues = {"reject", "wait"})
+@DriverParameter(name = "burstSize", type = ParameterType.INTEGER,
+    description = "Maximum burst capacity", defaultValue = "100", min = 1)
+@DriverSideEffects(stateful = true)
 public class RateLimitDriver extends AbstractProxyDriver {
 
     public enum Mode {

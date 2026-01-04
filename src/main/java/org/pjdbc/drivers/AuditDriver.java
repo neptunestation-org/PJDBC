@@ -21,6 +21,10 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.AbstractCallableStatement;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractPreparedStatement;
@@ -58,6 +62,23 @@ import org.pjdbc.sql.JdbcUrlParser;
  * Custom audit handlers can be registered via:
  *   AuditDriver.setAuditHandler("myhandler", event -> { ... });
  */
+@DriverCapability(
+    prefix = "audit",
+    description = "Compliance audit logging for database operations",
+    capabilities = {"logging", "security"}
+)
+@DriverParameter(name = "name", type = ParameterType.STRING,
+    description = "Audit log name for identification", defaultValue = "audit")
+@DriverParameter(name = "logLevel", type = ParameterType.STRING,
+    description = "What to log: all, success, or failure", defaultValue = "all",
+    enumValues = {"all", "success", "failure"})
+@DriverParameter(name = "includeSql", type = ParameterType.BOOLEAN,
+    description = "Include SQL statements in audit log", defaultValue = "true")
+@DriverParameter(name = "includeTime", type = ParameterType.BOOLEAN,
+    description = "Include execution time in audit log", defaultValue = "true")
+@DriverParameter(name = "includeRows", type = ParameterType.BOOLEAN,
+    description = "Include row counts in audit log", defaultValue = "true")
+@DriverSideEffects(logging = true, stateful = true)
 public class AuditDriver extends AbstractProxyDriver {
 
     private static final Logger DEFAULT_LOGGER = Logger.getLogger("org.pjdbc.audit");

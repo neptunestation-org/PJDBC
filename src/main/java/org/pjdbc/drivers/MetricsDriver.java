@@ -14,6 +14,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractProxyDriver;
 import org.pjdbc.sql.AbstractStatement;
@@ -44,6 +48,18 @@ import org.pjdbc.sql.JdbcUrlParser;
  *   jdbc:metrics[slowThreshold=500]:jdbc:postgresql://localhost/mydb
  *   jdbc:metrics[trackByType=true]:jdbc:mysql://localhost/db
  */
+@DriverCapability(
+    prefix = "metrics",
+    description = "Collects performance metrics for JDBC operations",
+    capabilities = {"metrics"}
+)
+@DriverParameter(name = "enabled", type = ParameterType.BOOLEAN,
+    description = "Enable metrics collection", defaultValue = "true")
+@DriverParameter(name = "slowThreshold", type = ParameterType.INTEGER,
+    description = "Threshold in ms for slow query detection", defaultValue = "1000", min = 0)
+@DriverParameter(name = "trackByType", type = ParameterType.BOOLEAN,
+    description = "Track metrics by operation type", defaultValue = "true")
+@DriverSideEffects(metrics = true, stateful = true)
 public class MetricsDriver extends AbstractProxyDriver {
 
     private static final Pattern SELECT_PATTERN = Pattern.compile(

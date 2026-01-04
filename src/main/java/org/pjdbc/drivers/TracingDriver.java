@@ -16,6 +16,10 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractProxyDriver;
 import org.pjdbc.sql.AbstractStatement;
@@ -46,6 +50,22 @@ import org.pjdbc.sql.JdbcUrlParser;
  *   jdbc:trace[tracerName=myapp,includeSql=true]:jdbc:postgresql://localhost/mydb
  *   jdbc:trace[spanPrefix=sql.,includeParams=true]:jdbc:mysql://localhost/db
  */
+@DriverCapability(
+    prefix = "trace",
+    description = "Provides distributed tracing for JDBC operations",
+    capabilities = {"tracing"}
+)
+@DriverParameter(name = "tracerName", type = ParameterType.STRING,
+    description = "Registered tracer name", defaultValue = "jdbc")
+@DriverParameter(name = "spanPrefix", type = ParameterType.STRING,
+    description = "Prefix for span names", defaultValue = "db.")
+@DriverParameter(name = "includeSql", type = ParameterType.BOOLEAN,
+    description = "Include SQL in spans", defaultValue = "true")
+@DriverParameter(name = "includeParams", type = ParameterType.BOOLEAN,
+    description = "Include parameter values", defaultValue = "false")
+@DriverParameter(name = "includeRowCount", type = ParameterType.BOOLEAN,
+    description = "Include row counts", defaultValue = "true")
+@DriverSideEffects(stateful = true)
 public class TracingDriver extends AbstractProxyDriver {
 
     private static final Map<String, JdbcTracer> tracers = new ConcurrentHashMap<>();

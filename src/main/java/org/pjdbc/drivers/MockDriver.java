@@ -5,8 +5,19 @@ import java.lang.reflect.*;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.*;
+
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.*;
 
+@DriverCapability(
+    prefix = "mock",
+    description = "In-memory mock driver for testing",
+    capabilities = {"testing"},
+    composable = false,
+    terminal = true
+)
+@DriverSideEffects(stateful = true)
 public class MockDriver extends AbstractDriver {
     static {try {DriverManager.registerDriver(new MockDriver());} catch (Exception e) {throw new RuntimeException(e);}}
     static {System.setProperty("java.util.logging.SimpleFormatter.format", "%5$s\n");}

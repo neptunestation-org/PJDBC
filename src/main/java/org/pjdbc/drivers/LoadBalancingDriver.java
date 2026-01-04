@@ -4,6 +4,11 @@ import java.sql.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
+
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.*;
 
 /**
@@ -23,6 +28,19 @@ import org.pjdbc.sql.*;
  *   jdbc:loadbalance:jdbc:postgresql://primary:5432/db;jdbc:postgresql://replica1:5432/db
  *   jdbc:loadbalance[readStrategy=random]:jdbc:h2:mem:db1;jdbc:h2:mem:db2
  */
+@DriverCapability(
+    prefix = "loadbalance",
+    description = "Distributes read load across replicas while broadcasting writes to all",
+    capabilities = {"load-balancing", "resilience"}
+)
+@DriverParameter(name = "readStrategy", type = ParameterType.STRING,
+    description = "Strategy for selecting read connection", defaultValue = "round_robin",
+    enumValues = {"round_robin", "random", "least_connections", "primary_only", "replica_only"})
+@DriverParameter(name = "healthCheckInterval", type = ParameterType.INTEGER,
+    description = "Milliseconds between health checks", defaultValue = "30000", min = 0)
+@DriverParameter(name = "failoverEnabled", type = ParameterType.BOOLEAN,
+    description = "Automatically failover to healthy connections", defaultValue = "true")
+@DriverSideEffects(stateful = true)
 public class LoadBalancingDriver extends AbstractDriver {
     static {try {DriverManager.registerDriver(new LoadBalancingDriver());} catch (Exception e) {throw new RuntimeException(e);}}
 

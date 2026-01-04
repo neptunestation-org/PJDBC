@@ -18,6 +18,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverDependency;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractProxyDriver;
 import org.pjdbc.sql.AbstractStatement;
@@ -53,6 +58,23 @@ import net.spy.memcached.MemcachedClient;
  *   jdbc:memcache[servers=cache1:11211;cache2:11211]:jdbc:postgresql://localhost/mydb
  *   jdbc:memcache[ttl=300,keyPrefix=myapp:]:jdbc:mysql://localhost/db
  */
+@DriverCapability(
+    prefix = "memcache",
+    description = "Caches SELECT query results in Memcached",
+    capabilities = {"caching"}
+)
+@DriverParameter(name = "servers", type = ParameterType.STRING,
+    description = "Semicolon-separated list of host:port", defaultValue = "localhost:11211")
+@DriverParameter(name = "keyPrefix", type = ParameterType.STRING,
+    description = "Prefix for cache keys", defaultValue = "pjdbc:")
+@DriverParameter(name = "ttl", type = ParameterType.INTEGER,
+    description = "Time-to-live in seconds", defaultValue = "60", min = 1)
+@DriverParameter(name = "invalidateOnWrite", type = ParameterType.BOOLEAN,
+    description = "Clear cache on writes", defaultValue = "true")
+@DriverParameter(name = "enabled", type = ParameterType.BOOLEAN,
+    description = "Enable caching", defaultValue = "true")
+@DriverDependency(groupId = "net.spy", artifactId = "spymemcached", version = "2.12.3", optional = true)
+@DriverSideEffects(network = true, stateful = true)
 public class MemcachedCachingDriver extends AbstractProxyDriver {
 
     private static final Pattern SELECT_PATTERN = Pattern.compile(

@@ -18,6 +18,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
 import org.pjdbc.sql.AbstractCallableStatement;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractPreparedStatement;
@@ -53,6 +56,32 @@ import org.pjdbc.sql.JdbcUrlParser;
  *   jdbc:schema[mode=metadata,schemaPattern=public]:jdbc:postgresql://localhost/mydb
  *   jdbc:schema[blockedColumns=ssn;credit_card]:jdbc:postgresql://localhost/mydb
  */
+@DriverCapability(
+    prefix = "schema",
+    description = "Validates SQL statements against a defined schema (table/column whitelist or blacklist)",
+    capabilities = {"security", "validation"}
+)
+@DriverParameter(name = "allowedTables", type = ParameterType.STRING,
+    description = "Semicolon-separated list of allowed table names (whitelist mode)")
+@DriverParameter(name = "blockedTables", type = ParameterType.STRING,
+    description = "Semicolon-separated list of blocked table names (blacklist mode)")
+@DriverParameter(name = "allowedColumns", type = ParameterType.STRING,
+    description = "Semicolon-separated list of allowed column patterns")
+@DriverParameter(name = "blockedColumns", type = ParameterType.STRING,
+    description = "Semicolon-separated list of blocked column patterns")
+@DriverParameter(name = "mode", type = ParameterType.STRING,
+    description = "Validation mode", defaultValue = "whitelist",
+    enumValues = {"whitelist", "blacklist", "metadata"})
+@DriverParameter(name = "caseSensitive", type = ParameterType.BOOLEAN,
+    description = "Whether table/column names are case-sensitive", defaultValue = "false")
+@DriverParameter(name = "message", type = ParameterType.STRING,
+    description = "Custom error message prefix", defaultValue = "SchemaValidationDriver")
+@DriverParameter(name = "loadFromDb", type = ParameterType.BOOLEAN,
+    description = "Load allowed tables from database metadata", defaultValue = "false")
+@DriverParameter(name = "schemaPattern", type = ParameterType.STRING,
+    description = "Schema pattern for metadata loading")
+@DriverParameter(name = "tableTypes", type = ParameterType.STRING,
+    description = "Semicolon-separated table types for metadata", defaultValue = "TABLE;VIEW")
 public class SchemaValidationDriver extends AbstractProxyDriver {
 
     // Pattern to extract table names from SQL
