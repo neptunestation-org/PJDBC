@@ -59,6 +59,33 @@
 	  <target>21</target>
 	  <compilerArgument>-Xlint:unchecked</compilerArgument>
         </configuration>
+        <executions>
+          <!-- First pass: compile without annotation processing -->
+          <execution>
+            <id>default-compile</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <proc>none</proc>
+            </configuration>
+          </execution>
+          <!-- Second pass: run annotation processing only -->
+          <execution>
+            <id>process-annotations</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <proc>only</proc>
+              <annotationProcessors>
+                <annotationProcessor>org.pjdbc.annotations.processor.CapabilityProcessor</annotationProcessor>
+              </annotationProcessors>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

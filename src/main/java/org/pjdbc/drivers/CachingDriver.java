@@ -21,6 +21,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
+import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.annotations.DriverParameter;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
+import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractProxyDriver;
 import org.pjdbc.sql.AbstractStatement;
@@ -55,6 +59,22 @@ import org.pjdbc.sql.JdbcUrlParser;
  *   jdbc:cache[invalidateOnWrite=false]:jdbc:mysql://localhost/db
  *   jdbc:cache[tableAwareInvalidation=true]:jdbc:postgresql://localhost/mydb
  */
+@DriverCapability(
+    prefix = "cache",
+    description = "Caches SELECT query results in memory to reduce database load",
+    capabilities = {"caching", "performance"}
+)
+@DriverParameter(name = "ttl", type = ParameterType.INTEGER,
+    description = "Time-to-live in seconds for cache entries", defaultValue = "60", min = 0)
+@DriverParameter(name = "maxSize", type = ParameterType.INTEGER,
+    description = "Maximum number of cached queries", defaultValue = "1000", min = 1)
+@DriverParameter(name = "invalidateOnWrite", type = ParameterType.BOOLEAN,
+    description = "Clear cache on INSERT/UPDATE/DELETE", defaultValue = "true")
+@DriverParameter(name = "tableAwareInvalidation", type = ParameterType.BOOLEAN,
+    description = "Only invalidate queries for affected tables", defaultValue = "false")
+@DriverParameter(name = "enabled", type = ParameterType.BOOLEAN,
+    description = "Enable caching", defaultValue = "true")
+@DriverSideEffects(stateful = true)
 public class CachingDriver extends AbstractProxyDriver {
 
     private static final Pattern SELECT_PATTERN = Pattern.compile(
