@@ -373,6 +373,58 @@ Audit Events capture:
 - Rows affected (for updates)
 - Success/failure status with error details
 
+### SchemaValidationDriver (`jdbc:schema:...`)
+
+Validates SQL statements against a defined schema. Prevents access to unauthorized tables or columns using whitelist, blacklist, or database metadata validation.
+
+```java
+// Whitelist mode - only allow specific tables
+Connection conn = DriverManager.getConnection(
+    "jdbc:schema[allowedTables=users;orders;products]:jdbc:postgresql://localhost/mydb"
+);
+
+// Blacklist mode - block specific sensitive tables
+Connection conn = DriverManager.getConnection(
+    "jdbc:schema[blockedTables=audit_log;secrets,mode=blacklist]:jdbc:postgresql://localhost/mydb"
+);
+
+// Block access to sensitive columns
+Connection conn = DriverManager.getConnection(
+    "jdbc:schema[blockedColumns=ssn;credit_card;password]:jdbc:postgresql://localhost/mydb"
+);
+
+// Metadata mode - validate against actual database schema
+Connection conn = DriverManager.getConnection(
+    "jdbc:schema[mode=metadata,schemaPattern=public]:jdbc:postgresql://localhost/mydb"
+);
+
+// Access schema configuration programmatically
+SchemaValidationDriver.SchemaConfig config = SchemaValidationDriver.getSchemaConfig(conn);
+config.addBlockedTable("temp_data");  // Block dynamically
+config.addBlockedColumn("api_key");   // Block column dynamically
+```
+
+Parameters:
+- `allowedTables`: Semicolon-separated allowed table names (whitelist mode)
+- `blockedTables`: Semicolon-separated blocked table names (blacklist mode)
+- `allowedColumns`: Semicolon-separated allowed column patterns
+- `blockedColumns`: Semicolon-separated blocked column patterns
+- `mode`: Validation mode (default: "whitelist")
+  - `whitelist`: Only allow explicitly listed tables
+  - `blacklist`: Block explicitly listed tables, allow others
+  - `metadata`: Load allowed tables from database metadata
+- `caseSensitive`: Case-sensitive matching (default: false)
+- `message`: Custom error message prefix
+- `loadFromDb`: Load tables from metadata at connection time (default: false)
+- `schemaPattern`: Schema pattern for metadata loading
+- `tableTypes`: Table types for metadata (default: "TABLE;VIEW")
+
+Notes:
+- In whitelist mode with empty allowedTables, all tables are allowed
+- Column blocking works regardless of validation mode
+- Validates all tables in JOIN queries
+- PreparedStatement SQL is validated at prepare time
+
 ### ChaosDriver (`jdbc:chaos:...`)
 
 Injects configurable failures and latency for resilience testing. Use this driver to test how your application handles database errors, slow queries, and connection drops.
@@ -743,8 +795,9 @@ Drivers are tagged with capabilities for easy discovery:
 | `tracing`        | Distributed tracing   | trace                                  |
 | `metrics`        | Performance metrics   | metrics                                |
 | `audit`          | Compliance auditing   | audit                                  |
+| `validation`     | Schema validation     | schema                                 |
 | `resilience`     | Fault tolerance       | retry, circuitbreaker, timeout, ratelimit, chaos |
-| `security`       | Access control        | readonly, mapuser, mask                |
+| `security`       | Access control        | readonly, mapuser, mask, schema        |
 | `testing`        | Test utilities        | mock, sink, chaos                      |
 | `transformation` | SQL modification      | filter                                 |
 | `masking`        | Data masking          | mask                                   |

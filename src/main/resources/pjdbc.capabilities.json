@@ -843,6 +843,74 @@
       "sideEffects": {},
       "composable": true,
       "terminal": false
+    },
+    {
+      "name": "SchemaValidationDriver",
+      "prefix": "schema",
+      "class": "org.pjdbc.drivers.SchemaValidationDriver",
+      "description": "Validates SQL statements against a defined schema (table/column whitelist or blacklist)",
+      "capabilities": ["security", "validation"],
+      "parameters": [
+        {
+          "name": "allowedTables",
+          "type": "string",
+          "description": "Semicolon-separated list of allowed table names (whitelist mode)"
+        },
+        {
+          "name": "blockedTables",
+          "type": "string",
+          "description": "Semicolon-separated list of blocked table names (blacklist mode)"
+        },
+        {
+          "name": "allowedColumns",
+          "type": "string",
+          "description": "Semicolon-separated list of allowed column patterns"
+        },
+        {
+          "name": "blockedColumns",
+          "type": "string",
+          "description": "Semicolon-separated list of blocked column patterns"
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "description": "Validation mode",
+          "default": "whitelist",
+          "enum": ["whitelist", "blacklist", "metadata"]
+        },
+        {
+          "name": "caseSensitive",
+          "type": "boolean",
+          "description": "Whether table/column names are case-sensitive",
+          "default": false
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "description": "Custom error message prefix",
+          "default": "SchemaValidationDriver"
+        },
+        {
+          "name": "loadFromDb",
+          "type": "boolean",
+          "description": "Load allowed tables from database metadata",
+          "default": false
+        },
+        {
+          "name": "schemaPattern",
+          "type": "string",
+          "description": "Schema pattern for metadata loading"
+        },
+        {
+          "name": "tableTypes",
+          "type": "string",
+          "description": "Semicolon-separated table types for metadata",
+          "default": "TABLE;VIEW"
+        }
+      ],
+      "sideEffects": {},
+      "composable": true,
+      "terminal": false
     }
   ]
 }

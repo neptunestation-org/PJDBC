@@ -23,3 +23,4 @@ org.pjdbc.drivers.HazelcastCachingDriver
 org.pjdbc.drivers.MetricsDriver
 org.pjdbc.drivers.FederatingDriver
 org.pjdbc.drivers.LoadBalancingDriver
+org.pjdbc.drivers.SchemaValidationDriver
