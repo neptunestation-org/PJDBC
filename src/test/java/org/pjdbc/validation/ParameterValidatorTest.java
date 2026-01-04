@@ -9,7 +9,6 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverParameter;
 import org.pjdbc.annotations.DriverParameter.ParameterType;
 
@@ -17,30 +16,26 @@ import org.pjdbc.annotations.DriverParameter.ParameterType;
 class ParameterValidatorTest {
 
     // Test driver classes with various parameter configurations
+    // Note: These use @DriverParameter only (no @DriverCapability) to avoid
+    // being included in the generated manifest by the annotation processor.
 
-    @DriverCapability(prefix = "pvreq", description = "Test driver with required param")
     @DriverParameter(name = "required", type = ParameterType.STRING, required = true)
     @DriverParameter(name = "optional", type = ParameterType.STRING)
     static class RequiredParamDriver {}
 
-    @DriverCapability(prefix = "pvint", description = "Test driver with integer param")
     @DriverParameter(name = "count", type = ParameterType.INTEGER, min = 0, max = 100)
     @DriverParameter(name = "unbounded", type = ParameterType.INTEGER)
     static class IntegerParamDriver {}
 
-    @DriverCapability(prefix = "pvfloat", description = "Test driver with float param")
     @DriverParameter(name = "rate", type = ParameterType.FLOAT, min = 0, max = 1)
     static class FloatParamDriver {}
 
-    @DriverCapability(prefix = "pvbool", description = "Test driver with boolean param")
     @DriverParameter(name = "enabled", type = ParameterType.BOOLEAN)
     static class BooleanParamDriver {}
 
-    @DriverCapability(prefix = "pvenum", description = "Test driver with enum param")
     @DriverParameter(name = "mode", type = ParameterType.STRING, enumValues = {"fast", "slow", "auto"})
     static class EnumParamDriver {}
 
-    @DriverCapability(prefix = "pvnone", description = "Test driver with no params")
     static class NoParamDriver {}
 
     @Nested
@@ -425,7 +420,6 @@ class ParameterValidatorTest {
         @Test
         @DisplayName("collects multiple validation errors")
         void collectsMultipleValidationErrors() {
-            @DriverCapability(prefix = "pvmulti", description = "Test driver with multiple params")
             @DriverParameter(name = "a", type = ParameterType.INTEGER, min = 0)
             @DriverParameter(name = "b", type = ParameterType.INTEGER, min = 0)
             class MultiParamDriver {}
