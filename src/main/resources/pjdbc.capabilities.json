@@ -373,6 +373,52 @@
       "terminal": false
     },
     {
+      "name": "AuditDriver",
+      "prefix": "audit",
+      "class": "org.pjdbc.drivers.AuditDriver",
+      "description": "Compliance audit logging for database operations",
+      "capabilities": ["logging", "security"],
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Audit log name for identification",
+          "default": "audit"
+        },
+        {
+          "name": "logLevel",
+          "type": "string",
+          "description": "What to log: all, success, or failure",
+          "default": "all",
+          "enum": ["all", "success", "failure"]
+        },
+        {
+          "name": "includeSql",
+          "type": "boolean",
+          "description": "Include SQL statements in audit log",
+          "default": true
+        },
+        {
+          "name": "includeTime",
+          "type": "boolean",
+          "description": "Include execution time in audit log",
+          "default": true
+        },
+        {
+          "name": "includeRows",
+          "type": "boolean",
+          "description": "Include row counts in audit log",
+          "default": true
+        }
+      ],
+      "sideEffects": {
+        "logging": true,
+        "stateful": true
+      },
+      "composable": true,
+      "terminal": false
+    },
+    {
       "name": "ChaosDriver",
       "prefix": "chaos",
       "class": "org.pjdbc.drivers.ChaosDriver",

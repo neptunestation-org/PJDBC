@@ -322,6 +322,57 @@ Notes:
 - In "wait" mode, threads block until tokens become available
 - Burst capacity allows handling traffic spikes above the sustained rate
 
+### AuditDriver (`jdbc:audit:...`)
+
+Provides compliance audit logging for all database operations. Records detailed audit events including user, SQL, execution time, rows affected, and success/failure status.
+
+```java
+// Basic audit logging
+Connection conn = DriverManager.getConnection(
+    "jdbc:audit:jdbc:postgresql://localhost/mydb"
+);
+
+// Named audit log with custom log level
+Connection conn = DriverManager.getConnection(
+    "jdbc:audit[name=prod-audit,logLevel=failure]:jdbc:postgresql://localhost/mydb"
+);
+
+// Include SQL in audit records
+Connection conn = DriverManager.getConnection(
+    "jdbc:audit[includeSql=true]:jdbc:postgresql://localhost/mydb"
+);
+
+// Register a custom audit handler (e.g., to send to SIEM)
+AuditDriver.addGlobalHandler(event -> {
+    siem.log(event.toJson());
+});
+
+// Access audit events for testing/analysis
+List<AuditDriver.AuditEvent> events = AuditDriver.getAuditLog();
+for (AuditDriver.AuditEvent event : events) {
+    System.out.println(event.timestamp() + " " + event.user() + " " + event.operationType());
+}
+```
+
+Parameters:
+- `name`: Audit log name for identification (default: "default")
+- `logLevel`: Which operations to log (default: "all")
+  - `all`: Log all operations
+  - `success`: Log only successful operations
+  - `failure`: Log only failed operations
+- `includeSql`: Include SQL statement in audit record (default: false)
+- `includeTime`: Include execution time (default: true)
+- `includeRows`: Include rows affected count (default: true)
+
+Audit Events capture:
+- Unique event ID and timestamp
+- Connection ID and user identity
+- Operation type (QUERY, UPDATE, BATCH, COMMIT, ROLLBACK, etc.)
+- SQL statement (if includeSql=true)
+- Execution time in milliseconds
+- Rows affected (for updates)
+- Success/failure status with error details
+
 ### ChaosDriver (`jdbc:chaos:...`)
 
 Injects configurable failures and latency for resilience testing. Use this driver to test how your application handles database errors, slow queries, and connection drops.
@@ -691,6 +742,7 @@ Drivers are tagged with capabilities for easy discovery:
 | `logging`        | SQL statement logging | log                                    |
 | `tracing`        | Distributed tracing   | trace                                  |
 | `metrics`        | Performance metrics   | metrics                                |
+| `audit`          | Compliance auditing   | audit                                  |
 | `resilience`     | Fault tolerance       | retry, circuitbreaker, timeout, ratelimit, chaos |
 | `security`       | Access control        | readonly, mapuser, mask                |
 | `testing`        | Test utilities        | mock, sink, chaos                      |
