@@ -121,6 +121,9 @@ public class RedisCachingDriver extends AbstractProxyDriver {
      * Configuration for Redis cache.
      */
     public static class RedisCacheConfig {
+        /** Default max bytes: 10 MB */
+        private static final long DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
+
         private final String host;
         private final int port;
         private final String password;
@@ -129,6 +132,7 @@ public class RedisCachingDriver extends AbstractProxyDriver {
         private final int ttlSeconds;
         private final int maxPoolSize;
         private final int maxCacheRows;
+        private final long maxCacheBytes;
         private final boolean includeContext;
         private final boolean invalidateOnWrite;
         private final boolean enabled;
@@ -143,6 +147,7 @@ public class RedisCachingDriver extends AbstractProxyDriver {
             this.ttlSeconds = parseInt(parser.getParameter("ttl", "60"));
             this.maxPoolSize = parseInt(parser.getParameter("maxPoolSize", "8"));
             this.maxCacheRows = parseIntDefault(parser.getParameter("maxCacheRows", "10000"), 10000);
+            this.maxCacheBytes = parseLong(parser.getParameter("maxCacheBytes", String.valueOf(DEFAULT_MAX_BYTES)));
             // Default to true for distributed caches to prevent cross-user data leakage
             this.includeContext = parseBoolean(parser.getParameter("includeContext", "true"));
             this.invalidateOnWrite = parseBoolean(parser.getParameter("invalidateOnWrite", "true"));
@@ -155,6 +160,10 @@ public class RedisCachingDriver extends AbstractProxyDriver {
 
         private static int parseIntDefault(String s, int defaultVal) {
             try { return Integer.parseInt(s); } catch (NumberFormatException e) { return defaultVal; }
+        }
+
+        private static long parseLong(String s) {
+            try { return Long.parseLong(s); } catch (NumberFormatException e) { return DEFAULT_MAX_BYTES; }
         }
 
         private static boolean parseBoolean(String s) {
@@ -170,6 +179,8 @@ public class RedisCachingDriver extends AbstractProxyDriver {
         public int getMaxPoolSize() { return maxPoolSize; }
         /** Maximum rows to cache per query. 0 = unlimited. Default: 10000 */
         public int getMaxCacheRows() { return maxCacheRows; }
+        /** Maximum estimated bytes to cache per query. 0 = unlimited. Default: 10MB */
+        public long getMaxCacheBytes() { return maxCacheBytes; }
         /** Include catalog/schema/user in cache key. Default: true for distributed cache */
         public boolean isIncludeContext() { return includeContext; }
         public boolean isInvalidateOnWrite() { return invalidateOnWrite; }
@@ -658,9 +669,11 @@ public class RedisCachingDriver extends AbstractProxyDriver {
                 return new CachedResultSetWrapper(this, cached);
             }
 
-            // Execute and cache (respecting maxCacheRows limit)
+            // Execute and cache (respecting maxCacheRows and maxCacheBytes limits)
             ResultSet rs = super.executeQuery(sql);
-            SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs, cache.getConfig().getMaxCacheRows());
+            SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs,
+                cache.getConfig().getMaxCacheRows(),
+                cache.getConfig().getMaxCacheBytes());
             rs.close();
             if (!cachedResult.isTooLargeToCache()) {
                 cache.put(sql, context, cachedResult);
@@ -817,7 +830,9 @@ public class RedisCachingDriver extends AbstractProxyDriver {
                 }
 
                 ResultSet rs = super.executeQuery();
-                SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs, cache.getConfig().getMaxCacheRows());
+                SafeResultSetSerializer.CachedData cachedResult = SafeResultSetSerializer.fromResultSet(rs,
+                    cache.getConfig().getMaxCacheRows(),
+                    cache.getConfig().getMaxCacheBytes());
                 rs.close();
                 if (!cachedResult.isTooLargeToCache()) {
                     cache.putByKey(cacheKey, cachedResult);

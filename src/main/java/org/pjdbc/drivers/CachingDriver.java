@@ -112,9 +112,13 @@ public class CachingDriver extends AbstractProxyDriver {
      * Configuration for the cache.
      */
     public static class CacheConfig {
+        /** Default max bytes: 10 MB */
+        private static final long DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
+
         private final long ttlMs;
         private final int maxSize;
         private final int maxCacheRows;
+        private final long maxCacheBytes;
         private final boolean includeContext;
         private final boolean invalidateOnWrite;
         private final boolean enabled;
@@ -124,6 +128,7 @@ public class CachingDriver extends AbstractProxyDriver {
             this.ttlMs = parseLong(parser.getParameter("ttl", "60")) * 1000;
             this.maxSize = parseInt(parser.getParameter("maxSize", "1000"));
             this.maxCacheRows = parseInt(parser.getParameter("maxCacheRows", "10000"));
+            this.maxCacheBytes = parseLong(parser.getParameter("maxCacheBytes", String.valueOf(DEFAULT_MAX_BYTES)));
             this.includeContext = parseBoolean(parser.getParameter("includeContext", "false"));
             this.invalidateOnWrite = parseBoolean(parser.getParameter("invalidateOnWrite", "true"));
             this.enabled = parseBoolean(parser.getParameter("enabled", "true"));
@@ -145,6 +150,8 @@ public class CachingDriver extends AbstractProxyDriver {
         public int getMaxSize() { return maxSize; }
         /** Maximum rows to cache per query. 0 = unlimited. Default: 10000 */
         public int getMaxCacheRows() { return maxCacheRows; }
+        /** Maximum estimated bytes to cache per query. 0 = unlimited. Default: 10MB */
+        public long getMaxCacheBytes() { return maxCacheBytes; }
         /** Include catalog/schema/user in cache key. Default: false for in-memory cache */
         public boolean isIncludeContext() { return includeContext; }
         public boolean isInvalidateOnWrite() { return invalidateOnWrite; }
@@ -255,10 +262,14 @@ public class CachingDriver extends AbstractProxyDriver {
         private final boolean tooLargeToCache;
 
         public CachedResultSet(ResultSet rs) throws SQLException {
-            this(rs, 0);
+            this(rs, 0, 0);
         }
 
         public CachedResultSet(ResultSet rs, int maxRows) throws SQLException {
+            this(rs, maxRows, 0);
+        }
+
+        public CachedResultSet(ResultSet rs, int maxRows, long maxBytes) throws SQLException {
             ResultSetMetaData meta = rs.getMetaData();
             int columnCount = meta.getColumnCount();
 
@@ -271,6 +282,7 @@ public class CachingDriver extends AbstractProxyDriver {
 
             this.rows = new ArrayList<>();
             boolean exceeded = false;
+            long estimatedBytes = 0;
             while (rs.next()) {
                 if (maxRows > 0 && rows.size() >= maxRows) {
                     exceeded = true;
@@ -278,7 +290,14 @@ public class CachingDriver extends AbstractProxyDriver {
                 }
                 Object[] row = new Object[columnCount];
                 for (int i = 0; i < columnCount; i++) {
-                    row[i] = rs.getObject(i + 1);
+                    Object val = rs.getObject(i + 1);
+                    row[i] = val;
+                    estimatedBytes += SafeResultSetSerializer.estimateSize(val);
+                }
+                // Check byte limit after reading the row
+                if (maxBytes > 0 && estimatedBytes >= maxBytes) {
+                    exceeded = true;
+                    break;
                 }
                 rows.add(row);
             }
@@ -289,7 +308,7 @@ public class CachingDriver extends AbstractProxyDriver {
         public int[] getColumnTypes() { return columnTypes; }
         public List<Object[]> getRows() { return rows; }
         public int getRowCount() { return rows.size(); }
-        /** Returns true if the result set exceeded maxRows and should not be cached */
+        /** Returns true if the result set exceeded maxRows/maxBytes and should not be cached */
         public boolean isTooLargeToCache() { return tooLargeToCache; }
     }
 
@@ -636,11 +655,13 @@ public class CachingDriver extends AbstractProxyDriver {
                 return new CachedResultSetWrapper(this, cached);
             }
 
-            // Execute and cache (respecting maxCacheRows limit)
+            // Execute and cache (respecting maxCacheRows and maxCacheBytes limits)
             ResultSet rs = super.executeQuery(sql);
-            CachedResultSet cachedResult = new CachedResultSet(rs, cache.getConfig().getMaxCacheRows());
+            CachedResultSet cachedResult = new CachedResultSet(rs,
+                cache.getConfig().getMaxCacheRows(),
+                cache.getConfig().getMaxCacheBytes());
             rs.close();
-            // Only cache if result set didn't exceed the row limit
+            // Only cache if result set didn't exceed the limits
             if (!cachedResult.isTooLargeToCache()) {
                 cache.put(cacheKey, cachedResult);
             }
@@ -797,7 +818,9 @@ public class CachingDriver extends AbstractProxyDriver {
                 }
 
                 ResultSet rs = super.executeQuery();
-                CachedResultSet cachedResult = new CachedResultSet(rs, cache.getConfig().getMaxCacheRows());
+                CachedResultSet cachedResult = new CachedResultSet(rs,
+                    cache.getConfig().getMaxCacheRows(),
+                    cache.getConfig().getMaxCacheBytes());
                 rs.close();
                 if (!cachedResult.isTooLargeToCache()) {
                     cache.put(cacheKey, cachedResult);

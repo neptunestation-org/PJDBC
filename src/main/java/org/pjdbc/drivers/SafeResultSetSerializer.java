@@ -98,6 +98,17 @@ public final class SafeResultSetSerializer {
      * @return CachedData with tooLargeToCache flag set if limit was exceeded
      */
     public static CachedData fromResultSet(ResultSet rs, int maxRows) throws SQLException {
+        return fromResultSet(rs, maxRows, 0);
+    }
+
+    /**
+     * Extract data from a ResultSet into a cacheable structure with row and byte limits.
+     * @param rs the ResultSet to read
+     * @param maxRows maximum rows to read (0 = unlimited)
+     * @param maxBytes maximum estimated bytes to read (0 = unlimited)
+     * @return CachedData with tooLargeToCache flag set if either limit was exceeded
+     */
+    public static CachedData fromResultSet(ResultSet rs, int maxRows, long maxBytes) throws SQLException {
         ResultSetMetaData meta = rs.getMetaData();
         int columnCount = meta.getColumnCount();
 
@@ -110,6 +121,7 @@ public final class SafeResultSetSerializer {
 
         List<Object[]> rows = new ArrayList<>();
         boolean exceeded = false;
+        long estimatedBytes = 0;
         while (rs.next()) {
             if (maxRows > 0 && rows.size() >= maxRows) {
                 exceeded = true;
@@ -118,12 +130,54 @@ public final class SafeResultSetSerializer {
             Object[] row = new Object[columnCount];
             for (int i = 0; i < columnCount; i++) {
                 Object val = rs.getObject(i + 1);
-                row[i] = sanitizeValue(val);
+                Object sanitized = sanitizeValue(val);
+                row[i] = sanitized;
+                estimatedBytes += estimateSize(sanitized);
+            }
+            // Check byte limit after reading the row (to get accurate estimate)
+            if (maxBytes > 0 && estimatedBytes >= maxBytes) {
+                exceeded = true;
+                break;
             }
             rows.add(row);
         }
 
         return new CachedData(columnNames, columnTypes, rows, exceeded);
+    }
+
+    /**
+     * Estimate the in-memory size of a value in bytes.
+     * This is a rough estimate for common types used in result sets.
+     * @param val the value to estimate
+     * @return estimated size in bytes
+     */
+    public static long estimateSize(Object val) {
+        if (val == null) return 0;
+        if (val instanceof String s) return 40 + (long) s.length() * 2;  // Object header + UTF-16 chars
+        if (val instanceof byte[] b) return 16 + b.length;  // Array header + bytes
+        if (val instanceof BigDecimal bd) return 48 + bd.toString().length();
+        if (val instanceof Timestamp) return 32;  // Object + long + nanos
+        if (val instanceof Date) return 24;  // Object + long
+        if (val instanceof Long) return 24;  // Boxed Long
+        if (val instanceof Double) return 24;  // Boxed Double
+        if (val instanceof Integer) return 16;  // Boxed Integer
+        if (val instanceof Float) return 16;  // Boxed Float
+        if (val instanceof Boolean) return 16;  // Boxed Boolean
+        return 16;  // Default for unknown types
+    }
+
+    /**
+     * Estimate the total size of a row in bytes.
+     * @param row the row to estimate
+     * @return estimated size in bytes
+     */
+    public static long estimateRowSize(Object[] row) {
+        if (row == null) return 0;
+        long size = 16 + (long) row.length * 8;  // Array header + references
+        for (Object val : row) {
+            size += estimateSize(val);
+        }
+        return size;
     }
 
     /**

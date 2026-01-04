@@ -130,6 +130,9 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
      */
     public static class HazelcastCacheConfig {
         private static final String KEY_PREFIX = "q:";
+        /** Default max bytes: 10 MB */
+        private static final long DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
+
         private final String mode;
         private final String clusterName;
         private final String members;
@@ -137,6 +140,7 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
         private final int ttlSeconds;
         private final int maxIdleSeconds;
         private final int maxCacheRows;
+        private final long maxCacheBytes;
         private final boolean includeContext;
         private final boolean invalidateOnWrite;
         private final boolean enabled;
@@ -150,6 +154,7 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
             this.ttlSeconds = parseInt(parser.getParameter("ttl", "60"));
             this.maxIdleSeconds = parseInt(parser.getParameter("maxIdle", "0"));
             this.maxCacheRows = parseIntDefault(parser.getParameter("maxCacheRows", "10000"), 10000);
+            this.maxCacheBytes = parseLong(parser.getParameter("maxCacheBytes", String.valueOf(DEFAULT_MAX_BYTES)));
             // Default to true for distributed caches to prevent cross-user data leakage
             this.includeContext = parseBoolean(parser.getParameter("includeContext", "true"));
             this.invalidateOnWrite = parseBoolean(parser.getParameter("invalidateOnWrite", "true"));
@@ -164,6 +169,10 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
             try { return Integer.parseInt(s); } catch (NumberFormatException e) { return defaultVal; }
         }
 
+        private static long parseLong(String s) {
+            try { return Long.parseLong(s); } catch (NumberFormatException e) { return DEFAULT_MAX_BYTES; }
+        }
+
         private static boolean parseBoolean(String s) {
             return "true".equalsIgnoreCase(s) || "1".equals(s) || "yes".equalsIgnoreCase(s);
         }
@@ -176,6 +185,8 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
         public int getMaxIdleSeconds() { return maxIdleSeconds; }
         /** Maximum rows to cache per query. 0 = unlimited. Default: 10000 */
         public int getMaxCacheRows() { return maxCacheRows; }
+        /** Maximum estimated bytes to cache per query. 0 = unlimited. Default: 10MB */
+        public long getMaxCacheBytes() { return maxCacheBytes; }
         /** Include catalog/schema/user in cache key. Default: true for distributed cache */
         public boolean isIncludeContext() { return includeContext; }
         public boolean isInvalidateOnWrite() { return invalidateOnWrite; }
@@ -207,10 +218,14 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
         private final boolean tooLargeToCache;
 
         public SerializableCachedResultSet(ResultSet rs) throws SQLException {
-            this(rs, 0);
+            this(rs, 0, 0);
         }
 
         public SerializableCachedResultSet(ResultSet rs, int maxRows) throws SQLException {
+            this(rs, maxRows, 0);
+        }
+
+        public SerializableCachedResultSet(ResultSet rs, int maxRows, long maxBytes) throws SQLException {
             ResultSetMetaData meta = rs.getMetaData();
             int columnCount = meta.getColumnCount();
 
@@ -223,6 +238,7 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
 
             this.rows = new ArrayList<>();
             boolean exceeded = false;
+            long estimatedBytes = 0;
             while (rs.next()) {
                 if (maxRows > 0 && rows.size() >= maxRows) {
                     exceeded = true;
@@ -236,6 +252,12 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
                         val = val.toString();
                     }
                     row[i] = val;
+                    estimatedBytes += SafeResultSetSerializer.estimateSize(val);
+                }
+                // Check byte limit after reading the row
+                if (maxBytes > 0 && estimatedBytes >= maxBytes) {
+                    exceeded = true;
+                    break;
                 }
                 rows.add(row);
             }
@@ -246,7 +268,7 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
         public int[] getColumnTypes() { return columnTypes; }
         public List<Object[]> getRows() { return rows; }
         public int getRowCount() { return rows.size(); }
-        /** Returns true if the result set exceeded maxRows and should not be cached */
+        /** Returns true if the result set exceeded maxRows/maxBytes and should not be cached */
         public boolean isTooLargeToCache() { return tooLargeToCache; }
     }
 
@@ -790,9 +812,11 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
                 return new CachedResultSetWrapper(this, cached);
             }
 
-            // Execute and cache (respecting maxCacheRows limit)
+            // Execute and cache (respecting maxCacheRows and maxCacheBytes limits)
             ResultSet rs = super.executeQuery(sql);
-            SerializableCachedResultSet cachedResult = new SerializableCachedResultSet(rs, cache.getConfig().getMaxCacheRows());
+            SerializableCachedResultSet cachedResult = new SerializableCachedResultSet(rs,
+                cache.getConfig().getMaxCacheRows(),
+                cache.getConfig().getMaxCacheBytes());
             rs.close();
             if (!cachedResult.isTooLargeToCache()) {
                 cache.put(sql, context, cachedResult);
@@ -949,7 +973,9 @@ public class HazelcastCachingDriver extends AbstractProxyDriver {
                 }
 
                 ResultSet rs = super.executeQuery();
-                SerializableCachedResultSet cachedResult = new SerializableCachedResultSet(rs, cache.getConfig().getMaxCacheRows());
+                SerializableCachedResultSet cachedResult = new SerializableCachedResultSet(rs,
+                    cache.getConfig().getMaxCacheRows(),
+                    cache.getConfig().getMaxCacheBytes());
                 rs.close();
                 if (!cachedResult.isTooLargeToCache()) {
                     cache.putByKey(cacheKey, cachedResult);
