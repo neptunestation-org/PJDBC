@@ -42,6 +42,91 @@ Connection conn = DriverManager.getConnection(
 
 PJDBC drivers are chained by nesting JDBC URLs. Each proxy driver handles its prefix and forwards to the next driver in the chain.
 
+## CLI Tool
+
+PJDBC includes a command-line tool for URL validation and driver discovery.
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `list` | Show all available drivers |
+| `show <prefix>` | Display driver details and parameters |
+| `validate <url>` | Parse and validate a PJDBC URL |
+| `chain <url>` | Visualize the driver chain |
+| `test <url>` | Test database connectivity |
+
+### Usage
+
+```bash
+# Via Maven
+mvn exec:java -Dexec.args="list"
+mvn exec:java -Dexec.args="show retry"
+mvn exec:java -Dexec.args='validate "jdbc:retry[maxRetries=5]:jdbc:postgresql://localhost/db"'
+
+# Via JAR
+java -jar target/PJDBC-1.6.0.jar list
+java -jar target/PJDBC-1.6.0.jar chain "jdbc:cache:jdbc:retry:jdbc:postgresql://localhost/db"
+```
+
+### Examples
+
+**List all drivers:**
+```
+$ pjdbc list
+Available PJDBC Drivers
+=======================
+
+  audit            Compliance audit logging for database operations
+  cache            Caches SELECT query results in memory
+  retry            Automatically retries failed queries on transient errors
+  timeout          Enforces query timeout limits
+  ...
+
+Total: 24 drivers
+```
+
+**Show driver details:**
+```
+$ pjdbc show retry
+Driver: retry
+=============
+
+Description: Automatically retries failed queries on transient errors
+Class:       org.pjdbc.drivers.RetryDriver
+
+Parameters:
+-----------
+
+  maxRetries
+    Type:        integer
+    Description: Maximum retry attempts
+    Default:     3
+    Min:         0
+  ...
+```
+
+**Visualize driver chain:**
+```
+$ pjdbc chain "jdbc:cache[ttl=300]:jdbc:retry[maxRetries=5]:jdbc:postgresql://localhost/db"
+Driver Chain Analysis
+=====================
+
+Chain (3 layers):
+→ CachingDriver [ttl=300]
+  └─→ RetryDriver [maxRetries=5]
+    └─→ postgresql
+```
+
+**Validate URL with error detection:**
+```
+$ pjdbc validate "jdbc:retry[maxRetries=-5]:jdbc:postgresql://localhost/db"
+✓ URL structure is valid
+  Driver: RetryDriver
+  ✗ Parameter validation failed:
+    Parameter 'maxRetries' value -5 is less than minimum 0
+```
+
 ## Available Drivers
 
 ### CatDriver (`jdbc:cat:...`)
