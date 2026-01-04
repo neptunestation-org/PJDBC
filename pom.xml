@@ -89,6 +89,18 @@
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.4.2</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>org.pjdbc.cli.PjdbcCli</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-source-plugin</artifactId>
         <version>3.4.0</version>
         <executions>
@@ -99,6 +111,15 @@
             </goals>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <!-- Run CLI with: mvn exec:java -Dexec.args="list" -->
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.5.0</version>
+        <configuration>
+          <mainClass>org.pjdbc.cli.PjdbcCli</mainClass>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
