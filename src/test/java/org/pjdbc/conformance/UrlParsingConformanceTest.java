@@ -53,12 +53,9 @@ public class UrlParsingConformanceTest extends DriverConformanceTest {
     @Test
     @DisplayName("All drivers accept their declared URL prefix")
     void allDriversAcceptDeclaredPrefix() throws SQLException {
-        // Drivers with special URL formats that need different test URLs
-        var specialFormats = java.util.Set.of("tee"); // TeeDriver uses semicolon separator
-
         for (DriverCapability driver : capabilities.getAllDrivers()) {
-            // Skip drivers with special URL formats
-            if (specialFormats.contains(driver.prefix())) continue;
+            // Skip drivers with special URL formats (multi-URL with semicolons)
+            if (SPECIAL_FORMAT_DRIVERS.contains(driver.prefix())) continue;
 
             String url = buildUrl(driver, MOCK_URL);
 

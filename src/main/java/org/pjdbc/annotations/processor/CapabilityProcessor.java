@@ -41,7 +41,7 @@ import org.pjdbc.annotations.DriverSideEffects;
 @SupportedSourceVersion(SourceVersion.RELEASE_21)
 public class CapabilityProcessor extends AbstractProcessor {
 
-    private static final String MANIFEST_PATH = "pjdbc.capabilities.generated.json";
+    private static final String MANIFEST_PATH = "pjdbc.capabilities.json";
     private static final String MANIFEST_VERSION = "1.0";
 
     private Filer filer;

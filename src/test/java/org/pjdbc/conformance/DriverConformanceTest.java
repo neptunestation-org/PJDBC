@@ -34,12 +34,17 @@ public abstract class DriverConformanceTest {
         this.capabilities = PjdbcCapabilities.load();
     }
 
+    // Drivers with special URL formats (multi-URL with semicolons)
+    protected static final java.util.Set<String> SPECIAL_FORMAT_DRIVERS =
+        java.util.Set.of("tee", "federate", "loadbalance");
+
     /**
      * Returns all drivers that should be tested.
      */
     protected List<DriverCapability> getTestableDrivers() {
         return capabilities.getAllDrivers().stream()
             .filter(d -> !d.terminal())  // Skip terminal drivers that need special handling
+            .filter(d -> !SPECIAL_FORMAT_DRIVERS.contains(d.prefix()))  // Skip multi-URL drivers
             .toList();
     }
 

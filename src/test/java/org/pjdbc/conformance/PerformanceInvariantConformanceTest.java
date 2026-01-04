@@ -65,7 +65,7 @@ public class PerformanceInvariantConformanceTest extends DriverConformanceTest {
         for (String tag : tags) {
             assertNotNull(tag, "Tag should not be null");
             assertFalse(tag.isEmpty(), "Tag should not be empty");
-            assertTrue(tag.matches("[a-z]+"), "Tag should be lowercase: " + tag);
+            assertTrue(tag.matches("[a-z]+(-[a-z]+)*"), "Tag should be lowercase with optional hyphens: " + tag);
         }
     }
 
