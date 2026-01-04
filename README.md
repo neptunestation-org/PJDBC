@@ -26,7 +26,7 @@ Add to your `pom.xml`:
 <dependency>
   <groupId>org.pjdbc</groupId>
   <artifactId>PJDBC</artifactId>
-  <version>1.6.0</version>
+  <version>1.7.0</version>
 </dependency>
 ```
 
@@ -65,8 +65,8 @@ mvn exec:java -Dexec.args="show retry"
 mvn exec:java -Dexec.args='validate "jdbc:retry[maxRetries=5]:jdbc:postgresql://localhost/db"'
 
 # Via JAR
-java -jar target/PJDBC-1.6.0.jar list
-java -jar target/PJDBC-1.6.0.jar chain "jdbc:cache:jdbc:retry:jdbc:postgresql://localhost/db"
+java -jar target/PJDBC-1.7.0.jar list
+java -jar target/PJDBC-1.7.0.jar chain "jdbc:cache:jdbc:retry:jdbc:postgresql://localhost/db"
 ```
 
 ### Examples

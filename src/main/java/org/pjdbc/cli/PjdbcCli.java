@@ -36,7 +36,7 @@ import org.pjdbc.validation.ParameterValidator;
  */
 public class PjdbcCli {
 
-    private static final String VERSION = "1.6.0";
+    private static final String VERSION = "1.7.0";
     private static final String USAGE = """
         PJDBC CLI - URL Validation and Driver Discovery Tool
 
