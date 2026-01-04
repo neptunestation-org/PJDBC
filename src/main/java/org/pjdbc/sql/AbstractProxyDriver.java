@@ -81,9 +81,21 @@ public abstract class AbstractProxyDriver extends AbstractDriver {
 	if (delegate == null) return null;
 	return new AbstractResultSet(stmt, delegate) {};}
 
+    /**
+     * Whether to automatically validate parameters on connect.
+     * Subclasses can override to enable/disable validation.
+     * @return true to validate parameters, false to skip validation
+     */
+    protected boolean isValidateParametersEnabled() {
+        return true;
+    }
+
     @Override
     public Connection connect (String url, Properties info) throws SQLException {
 	if (!acceptsURL(url)) return null;
+	if (isValidateParametersEnabled()) {
+	    validateParameters(url);
+	}
 	return proxyConnection(DriverManager.getConnection(subname(url)), url, info, this);}
 
     @Override

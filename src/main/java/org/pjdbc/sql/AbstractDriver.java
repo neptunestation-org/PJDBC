@@ -4,6 +4,8 @@ import java.sql.*;
 import java.util.*;
 import java.util.logging.*;
 
+import org.pjdbc.validation.ParameterValidator;
+
 public abstract class AbstractDriver implements Driver {
 
     /**
@@ -63,6 +65,21 @@ public abstract class AbstractDriver implements Driver {
     protected Map<String, String> getUrlParameters(String url) {
         JdbcUrlParser parser = parseUrl(url);
         return parser != null ? parser.getParameters() : Collections.emptyMap();
+    }
+
+    /**
+     * Validates URL parameters against @DriverParameter annotations on this driver class.
+     *
+     * <p>Call this method at the beginning of {@link #connect(String, Properties)} to
+     * validate parameters before using them. Throws SQLException with detailed error
+     * messages if validation fails.</p>
+     *
+     * @param url the JDBC URL containing parameters
+     * @throws SQLException if parameter validation fails
+     */
+    protected void validateParameters(String url) throws SQLException {
+        Map<String, String> params = getUrlParameters(url);
+        ParameterValidator.validate(this.getClass(), params);
     }
 
     protected boolean acceptsProtocol (String protocol) {return "jdbc".equals(protocol);}
