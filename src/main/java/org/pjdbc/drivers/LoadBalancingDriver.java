@@ -14,19 +14,16 @@ import org.pjdbc.sql.*;
 /**
  * LoadBalancingDriver distributes read load across replicas while broadcasting writes to all.
  *
- * Unlike TeeDriver (sends all ops to all) or FederatingDriver (merges query results),
+ * <p>Unlike TeeDriver (sends all ops to all) or FederatingDriver (merges query results),
  * LoadBalancingDriver selects ONE connection for reads and broadcasts writes.
  *
- * URL format: jdbc:loadbalance[readStrategy=round_robin,failoverEnabled=true]:url1;url2;...
+ * <p>URL format: {@code jdbc:loadbalance[readStrategy=round_robin,failoverEnabled=true]:url1;url2;...}
  *
- * Parameters:
- * - readStrategy: round_robin|random|least_connections|primary_only|replica_only (default: round_robin)
- * - healthCheckInterval: milliseconds between health checks (default: 30000)
- * - failoverEnabled: true|false - automatically failover to healthy connections (default: true)
- *
- * Example:
- *   jdbc:loadbalance:jdbc:postgresql://primary:5432/db;jdbc:postgresql://replica1:5432/db
- *   jdbc:loadbalance[readStrategy=random]:jdbc:h2:mem:db1;jdbc:h2:mem:db2
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:loadbalance:jdbc:postgresql://primary:5432/db;jdbc:postgresql://replica1:5432/db
+ * jdbc:loadbalance[readStrategy=random]:jdbc:h2:mem:db1;jdbc:h2:mem:db2
+ * </pre>
  */
 @DriverCapability(
     prefix = "loadbalance",

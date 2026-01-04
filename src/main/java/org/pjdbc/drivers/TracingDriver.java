@@ -30,25 +30,20 @@ import org.pjdbc.sql.JdbcUrlParser;
 /**
  * TracingDriver provides distributed tracing for JDBC operations.
  *
- * URL format: jdbc:trace[param=value,...]:jdbc:target:...
+ * <p>URL format: {@code jdbc:trace[param=value,...]:jdbc:target:...}
  *
- * Parameters:
- *   tracerName   - Name identifier for the tracer (default: jdbc)
- *   spanPrefix   - Prefix for span names (default: db.)
- *   includeSql   - Include SQL in span attributes (default: true)
- *   includeParams - Include parameter values (default: false, for security)
- *   includeRowCount - Include row counts (default: true)
+ * <p>The driver uses a pluggable JdbcTracer interface. Register a tracer using:
+ * {@code TracingDriver.setTracer("mytracer", myTracerInstance);}
  *
- * The driver uses a pluggable JdbcTracer interface. Register a tracer using:
- *   TracingDriver.setTracer("mytracer", myTracerInstance);
+ * <p>A default in-memory tracer is available for testing via:
+ * {@code TracingDriver.getDefaultTracer().getSpans();}
  *
- * A default in-memory tracer is available for testing via:
- *   TracingDriver.getDefaultTracer().getSpans();
- *
- * Example URLs:
- *   jdbc:trace:jdbc:postgresql://localhost/mydb
- *   jdbc:trace[tracerName=myapp,includeSql=true]:jdbc:postgresql://localhost/mydb
- *   jdbc:trace[spanPrefix=sql.,includeParams=true]:jdbc:mysql://localhost/db
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:trace:jdbc:postgresql://localhost/mydb
+ * jdbc:trace[tracerName=myapp,includeSql=true]:jdbc:postgresql://localhost/mydb
+ * jdbc:trace[spanPrefix=sql.,includeParams=true]:jdbc:mysql://localhost/db
+ * </pre>
  */
 @DriverCapability(
     prefix = "trace",

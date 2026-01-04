@@ -35,32 +35,29 @@ import org.pjdbc.sql.JdbcUrlParser;
 /**
  * AuditDriver provides compliance audit logging for database operations.
  *
- * This driver logs detailed information about all SQL operations including:
- * - Timestamp of execution
- * - User/connection information
- * - SQL statement executed
- * - Execution time
- * - Rows affected
- * - Success/failure status
+ * <p>This driver logs detailed information about all SQL operations including:
+ * <ul>
+ *   <li>Timestamp of execution</li>
+ *   <li>User/connection information</li>
+ *   <li>SQL statement executed</li>
+ *   <li>Execution time</li>
+ *   <li>Rows affected</li>
+ *   <li>Success/failure status</li>
+ * </ul>
  *
- * Useful for compliance requirements (SOX, HIPAA, PCI-DSS, GDPR, etc.)
+ * <p>Useful for compliance requirements (SOX, HIPAA, PCI-DSS, GDPR, etc.)
  *
- * URL format: jdbc:audit[param=value,...]:jdbc:target:...
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:audit:jdbc:postgresql://localhost/mydb
+ * jdbc:audit[logLevel=failure]:jdbc:postgresql://localhost/mydb
+ * jdbc:audit[name=payments-db,includeSql=false]:jdbc:mysql://localhost/db
+ * </pre>
  *
- * Parameters:
- *   logLevel     - Logging level: all, success, failure (default: all)
- *   includeSql   - Include SQL in audit log: true/false (default: true)
- *   includeTime  - Include execution time: true/false (default: true)
- *   includeRows  - Include row counts: true/false (default: true)
- *   name         - Audit log name for identification (default: "audit")
- *
- * Example URLs:
- *   jdbc:audit:jdbc:postgresql://localhost/mydb
- *   jdbc:audit[logLevel=failure]:jdbc:postgresql://localhost/mydb
- *   jdbc:audit[name=payments-db,includeSql=false]:jdbc:mysql://localhost/db
- *
- * Custom audit handlers can be registered via:
- *   AuditDriver.setAuditHandler("myhandler", event -> { ... });
+ * <p>Custom audit handlers can be registered via:
+ * <pre>
+ * AuditDriver.setAuditHandler("myhandler", event -&gt; { ... });
+ * </pre>
  */
 @DriverCapability(
     prefix = "audit",

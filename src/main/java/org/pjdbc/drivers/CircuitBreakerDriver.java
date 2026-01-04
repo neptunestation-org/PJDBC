@@ -27,29 +27,29 @@ import org.pjdbc.sql.JdbcUrlParser;
 /**
  * CircuitBreakerDriver implements the circuit breaker pattern for fault tolerance.
  *
- * The circuit breaker has three states:
- *   CLOSED   - Normal operation, requests pass through to the database
- *   OPEN     - Circuit is tripped, all requests fail fast without attempting the operation
- *   HALF_OPEN - Testing state, allows limited requests to check if backend has recovered
+ * <p>The circuit breaker has three states:
+ * <ul>
+ *   <li>CLOSED - Normal operation, requests pass through to the database</li>
+ *   <li>OPEN - Circuit is tripped, all requests fail fast without attempting the operation</li>
+ *   <li>HALF_OPEN - Testing state, allows limited requests to check if backend has recovered</li>
+ * </ul>
  *
- * State transitions:
- *   CLOSED -> OPEN: After failureThreshold consecutive failures
- *   OPEN -> HALF_OPEN: After resetTimeout milliseconds have elapsed
- *   HALF_OPEN -> CLOSED: After successThreshold consecutive successes
- *   HALF_OPEN -> OPEN: On any failure
+ * <p>State transitions:
+ * <ul>
+ *   <li>CLOSED to OPEN: After failureThreshold consecutive failures</li>
+ *   <li>OPEN to HALF_OPEN: After resetTimeout milliseconds have elapsed</li>
+ *   <li>HALF_OPEN to CLOSED: After successThreshold consecutive successes</li>
+ *   <li>HALF_OPEN to OPEN: On any failure</li>
+ * </ul>
  *
- * URL format: jdbc:circuitbreaker[param=value,...]:jdbc:target:...
+ * <p>URL format: {@code jdbc:circuitbreaker[param=value,...]:jdbc:target:...}
  *
- * Parameters:
- *   failureThreshold  - Failures before opening circuit (default: 5)
- *   successThreshold  - Successes in half-open to close circuit (default: 1)
- *   resetTimeout      - Time in ms before open -> half-open (default: 30000)
- *   name              - Circuit breaker name for monitoring (default: "default")
- *
- * Example URLs:
- *   jdbc:circuitbreaker:jdbc:postgresql://localhost/mydb
- *   jdbc:circuitbreaker[failureThreshold=3,resetTimeout=60000]:jdbc:postgresql://localhost/mydb
- *   jdbc:circuitbreaker[name=primary-db,failureThreshold=10]:jdbc:mysql://localhost/db
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:circuitbreaker:jdbc:postgresql://localhost/mydb
+ * jdbc:circuitbreaker[failureThreshold=3,resetTimeout=60000]:jdbc:postgresql://localhost/mydb
+ * jdbc:circuitbreaker[name=primary-db,failureThreshold=10]:jdbc:mysql://localhost/db
+ * </pre>
  */
 @DriverCapability(
     prefix = "circuitbreaker",

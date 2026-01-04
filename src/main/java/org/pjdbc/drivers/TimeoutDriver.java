@@ -23,25 +23,25 @@ import org.pjdbc.sql.JdbcUrlParser;
 /**
  * TimeoutDriver enforces query timeout limits on all statements.
  *
- * This driver wraps statements and applies a configurable query timeout
- * using JDBC's Statement.setQueryTimeout() method. When a query exceeds
+ * <p>This driver wraps statements and applies a configurable query timeout
+ * using JDBC's {@code Statement.setQueryTimeout()} method. When a query exceeds
  * the timeout, the database driver throws a SQLException.
  *
- * URL format: jdbc:timeout[param=value,...]:jdbc:target:...
+ * <p>URL format: {@code jdbc:timeout[param=value,...]:jdbc:target:...}
  *
- * Parameters:
- *   queryTimeout  - Query timeout in seconds (default: 30)
- *   cancelOnTimeout - Whether to attempt cancellation on timeout (default: true)
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:timeout:jdbc:postgresql://localhost/mydb
+ * jdbc:timeout[queryTimeout=60]:jdbc:postgresql://localhost/mydb
+ * jdbc:timeout[queryTimeout=10,cancelOnTimeout=false]:jdbc:mysql://localhost/db
+ * </pre>
  *
- * Example URLs:
- *   jdbc:timeout:jdbc:postgresql://localhost/mydb
- *   jdbc:timeout[queryTimeout=60]:jdbc:postgresql://localhost/mydb
- *   jdbc:timeout[queryTimeout=10,cancelOnTimeout=false]:jdbc:mysql://localhost/db
- *
- * Notes:
- * - Timeout of 0 means no timeout (unlimited)
- * - The actual timeout behavior depends on the underlying JDBC driver
- * - Some databases may not support query cancellation
+ * <p>Notes:
+ * <ul>
+ *   <li>Timeout of 0 means no timeout (unlimited)</li>
+ *   <li>The actual timeout behavior depends on the underlying JDBC driver</li>
+ *   <li>Some databases may not support query cancellation</li>
+ * </ul>
  */
 @DriverCapability(
     prefix = "timeout",

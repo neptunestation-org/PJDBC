@@ -25,24 +25,20 @@ import org.pjdbc.sql.JdbcUrlParser;
 /**
  * RateLimitDriver limits the rate of database queries using a token bucket algorithm.
  *
- * This driver prevents overwhelming the database by enforcing a maximum number
+ * <p>This driver prevents overwhelming the database by enforcing a maximum number
  * of requests per time window. It can either reject excess requests immediately
  * or block until capacity becomes available.
  *
- * URL format: jdbc:ratelimit[param=value,...]:jdbc:target:...
+ * <p>URL format: {@code jdbc:ratelimit[param=value,...]:jdbc:target:...}
  *
- * Parameters:
- *   maxRequests  - Maximum requests per window (default: 100)
- *   windowMs     - Time window in milliseconds (default: 1000)
- *   mode         - "reject" to fail fast, "wait" to block (default: reject)
- *   burstSize    - Maximum burst capacity (default: maxRequests)
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:ratelimit:jdbc:postgresql://localhost/mydb
+ * jdbc:ratelimit[maxRequests=50,windowMs=1000]:jdbc:postgresql://localhost/mydb
+ * jdbc:ratelimit[maxRequests=10,mode=wait]:jdbc:mysql://localhost/db
+ * </pre>
  *
- * Example URLs:
- *   jdbc:ratelimit:jdbc:postgresql://localhost/mydb
- *   jdbc:ratelimit[maxRequests=50,windowMs=1000]:jdbc:postgresql://localhost/mydb
- *   jdbc:ratelimit[maxRequests=10,mode=wait]:jdbc:mysql://localhost/db
- *
- * Note: Rate limiting is per-connection. For application-wide limiting,
+ * <p>Note: Rate limiting is per-connection. For application-wide limiting,
  * use a shared RateLimiter instance.
  */
 @DriverCapability(

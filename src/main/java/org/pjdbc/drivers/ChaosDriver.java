@@ -25,20 +25,14 @@ import org.pjdbc.sql.JdbcUrlParser;
 /**
  * ChaosDriver injects configurable failures and latency for resilience testing.
  *
- * URL format: jdbc:chaos[param=value,...]:jdbc:target:...
+ * <p>URL format: {@code jdbc:chaos[param=value,...]:jdbc:target:...}
  *
- * Parameters:
- *   failureRate     - Probability (0.0-1.0) of throwing SQLException on query (default: 0.0)
- *   latency         - Fixed delay in milliseconds before each query (default: 0)
- *   latencyVariance - Random additional delay up to this value in ms (default: 0)
- *   connectionDropRate - Probability of closing connection unexpectedly (default: 0.0)
- *   resultSetLatency - Delay in ms for each ResultSet.next() call (default: 0)
- *   exceptionMessage - Custom exception message (default: "ChaosDriver: Induced failure")
- *
- * Example URLs:
- *   jdbc:chaos[failureRate=0.1]:jdbc:postgresql://localhost/mydb
- *   jdbc:chaos[latency=100,latencyVariance=50]:jdbc:h2:mem:test
- *   jdbc:chaos[failureRate=0.05,connectionDropRate=0.01]:jdbc:mysql://localhost/db
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:chaos[failureRate=0.1]:jdbc:postgresql://localhost/mydb
+ * jdbc:chaos[latency=100,latencyVariance=50]:jdbc:h2:mem:test
+ * jdbc:chaos[failureRate=0.05,connectionDropRate=0.01]:jdbc:mysql://localhost/db
+ * </pre>
  */
 @DriverCapability(
     prefix = "chaos",

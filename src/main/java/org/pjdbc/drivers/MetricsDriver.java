@@ -28,25 +28,24 @@ import org.pjdbc.sql.JdbcUrlParser;
 /**
  * MetricsDriver collects detailed performance metrics for JDBC operations.
  *
- * URL format: jdbc:metrics[param=value,...]:jdbc:target:...
+ * <p>URL format: {@code jdbc:metrics[param=value,...]:jdbc:target:...}
  *
- * Parameters:
- *   slowThreshold  - Threshold in ms for slow queries (default: 1000)
- *   enabled        - Enable metrics collection (default: true)
- *   trackByType    - Track metrics by operation type (default: true)
+ * <p>Metrics collected:
+ * <ul>
+ *   <li>Total query/update/execute count</li>
+ *   <li>Execution time (min, max, avg, total)</li>
+ *   <li>Error count</li>
+ *   <li>Slow query count</li>
+ *   <li>Rows affected (for updates)</li>
+ *   <li>Active connections</li>
+ * </ul>
  *
- * Metrics collected:
- *   - Total query/update/execute count
- *   - Execution time (min, max, avg, total)
- *   - Error count
- *   - Slow query count
- *   - Rows affected (for updates)
- *   - Active connections
- *
- * Example URLs:
- *   jdbc:metrics:jdbc:postgresql://localhost/mydb
- *   jdbc:metrics[slowThreshold=500]:jdbc:postgresql://localhost/mydb
- *   jdbc:metrics[trackByType=true]:jdbc:mysql://localhost/db
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:metrics:jdbc:postgresql://localhost/mydb
+ * jdbc:metrics[slowThreshold=500]:jdbc:postgresql://localhost/mydb
+ * jdbc:metrics[trackByType=true]:jdbc:mysql://localhost/db
+ * </pre>
  */
 @DriverCapability(
     prefix = "metrics",

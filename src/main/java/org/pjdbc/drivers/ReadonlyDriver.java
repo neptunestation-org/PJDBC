@@ -24,23 +24,22 @@ import org.pjdbc.sql.JdbcUrlParser;
 /**
  * ReadonlyDriver enforces read-only database access by blocking write operations.
  *
- * URL format: jdbc:readonly[param=value,...]:jdbc:target:...
+ * <p>URL format: {@code jdbc:readonly[param=value,...]:jdbc:target:...}
  *
- * Parameters:
- *   allowDDL    - Allow DDL statements like CREATE, ALTER, DROP (default: false)
- *   allowDML    - Allow DML statements like INSERT, UPDATE, DELETE (default: false)
- *   message     - Custom error message for blocked operations (default: "ReadonlyDriver: Write operation not permitted")
+ * <p>Blocked operations (by default):
+ * <ul>
+ *   <li>DML: INSERT, UPDATE, DELETE, MERGE, UPSERT, REPLACE, TRUNCATE</li>
+ *   <li>DDL: CREATE, ALTER, DROP, RENAME</li>
+ *   <li>DCL: GRANT, REVOKE</li>
+ *   <li>TCL: (transactions are allowed)</li>
+ * </ul>
  *
- * Blocked operations (by default):
- *   DML: INSERT, UPDATE, DELETE, MERGE, UPSERT, REPLACE, TRUNCATE
- *   DDL: CREATE, ALTER, DROP, RENAME
- *   DCL: GRANT, REVOKE
- *   TCL: (transactions are allowed)
- *
- * Example URLs:
- *   jdbc:readonly:jdbc:postgresql://localhost/mydb
- *   jdbc:readonly[allowDDL=true]:jdbc:postgresql://localhost/mydb
- *   jdbc:readonly[message=No writes allowed in reporting mode]:jdbc:mysql://localhost/db
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:readonly:jdbc:postgresql://localhost/mydb
+ * jdbc:readonly[allowDDL=true]:jdbc:postgresql://localhost/mydb
+ * jdbc:readonly[message=No writes allowed in reporting mode]:jdbc:mysql://localhost/db
+ * </pre>
  */
 @DriverCapability(
     prefix = "readonly",

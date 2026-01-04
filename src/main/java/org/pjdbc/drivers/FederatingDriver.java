@@ -16,19 +16,16 @@ import org.pjdbc.sql.*;
 /**
  * FederatingDriver queries multiple databases and merges results.
  *
- * Unlike TeeDriver (write replication) or LoadBalancingDriver (read scaling),
+ * <p>Unlike TeeDriver (write replication) or LoadBalancingDriver (read scaling),
  * FederatingDriver merges query results from all data sources into a unified view.
  *
- * URL format: jdbc:federate[mergeStrategy=concat,parallelExecution=false]:url1;url2;...
+ * <p>URL format: {@code jdbc:federate[mergeStrategy=concat,parallelExecution=false]:url1;url2;...}
  *
- * Parameters:
- * - mergeStrategy: concat|union_all|first_non_empty (default: concat)
- * - parallelExecution: true|false (default: false)
- * - timeout: milliseconds for parallel execution (default: 30000)
- *
- * Example:
- *   jdbc:federate:jdbc:h2:mem:db1;jdbc:h2:mem:db2
- *   jdbc:federate[mergeStrategy=first_non_empty]:jdbc:postgresql://db1/sales;jdbc:mysql://db2/inventory
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:federate:jdbc:h2:mem:db1;jdbc:h2:mem:db2
+ * jdbc:federate[mergeStrategy=first_non_empty]:jdbc:postgresql://db1/sales;jdbc:mysql://db2/inventory
+ * </pre>
  */
 @DriverCapability(
     prefix = "federate",

@@ -36,28 +36,23 @@ import org.pjdbc.sql.JdbcUrlParser;
 /**
  * CachingDriver caches SELECT query results to reduce database load.
  *
- * URL format: jdbc:cache[param=value,...]:jdbc:target:...
+ * <p>Features:
+ * <ul>
+ *   <li>Caches SELECT query results in memory</li>
+ *   <li>LRU eviction when maxSize is exceeded</li>
+ *   <li>Automatic invalidation on write operations</li>
+ *   <li>Table-aware invalidation (only clears affected tables when enabled)</li>
+ *   <li>Cache statistics (hits, misses, evictions)</li>
+ *   <li>Thread-safe implementation</li>
+ * </ul>
  *
- * Parameters:
- *   ttl              - Time-to-live in seconds for cache entries (default: 60)
- *   maxSize          - Maximum number of cached queries (default: 1000)
- *   invalidateOnWrite - Clear cache on INSERT/UPDATE/DELETE (default: true)
- *   tableAwareInvalidation - Only invalidate queries for affected tables (default: false)
- *   enabled          - Enable caching (default: true)
- *
- * Features:
- *   - Caches SELECT query results in memory
- *   - LRU eviction when maxSize is exceeded
- *   - Automatic invalidation on write operations
- *   - Table-aware invalidation (only clears affected tables when enabled)
- *   - Cache statistics (hits, misses, evictions)
- *   - Thread-safe implementation
- *
- * Example URLs:
- *   jdbc:cache:jdbc:postgresql://localhost/mydb
- *   jdbc:cache[ttl=300,maxSize=5000]:jdbc:postgresql://localhost/mydb
- *   jdbc:cache[invalidateOnWrite=false]:jdbc:mysql://localhost/db
- *   jdbc:cache[tableAwareInvalidation=true]:jdbc:postgresql://localhost/mydb
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:cache:jdbc:postgresql://localhost/mydb
+ * jdbc:cache[ttl=300,maxSize=5000]:jdbc:postgresql://localhost/mydb
+ * jdbc:cache[invalidateOnWrite=false]:jdbc:mysql://localhost/db
+ * jdbc:cache[tableAwareInvalidation=true]:jdbc:postgresql://localhost/mydb
+ * </pre>
  */
 @DriverCapability(
     prefix = "cache",

@@ -43,30 +43,24 @@ import com.hazelcast.map.IMap;
 /**
  * HazelcastCachingDriver caches SELECT query results in Hazelcast for distributed caching.
  *
- * URL format: jdbc:hazelcast[param=value,...]:jdbc:target:...
+ * <p>URL format: {@code jdbc:hazelcast[param=value,...]:jdbc:target:...}
  *
- * Parameters:
- *   mode             - "embedded" or "client" (default: embedded)
- *   clusterName      - Hazelcast cluster name (default: pjdbc-cache)
- *   members          - Semicolon-separated list of host:port for client mode (default: localhost:5701)
- *   mapName          - Name of the IMap to use for caching (default: pjdbc-query-cache)
- *   ttl              - Time-to-live in seconds for cache entries (default: 60)
- *   maxIdle          - Max idle time in seconds before eviction (default: 0, disabled)
- *   invalidateOnWrite - Clear cache on INSERT/UPDATE/DELETE (default: true)
- *   enabled          - Enable caching (default: true)
+ * <p>Features:
+ * <ul>
+ *   <li>Distributed caching across multiple application instances</li>
+ *   <li>Embedded mode for simple deployments or client mode for dedicated clusters</li>
+ *   <li>TTL and max-idle support via Hazelcast IMap</li>
+ *   <li>Near-cache support for read-heavy workloads</li>
+ *   <li>Cache statistics (hits, misses)</li>
+ *   <li>Thread-safe implementation</li>
+ * </ul>
  *
- * Features:
- *   - Distributed caching across multiple application instances
- *   - Embedded mode for simple deployments or client mode for dedicated clusters
- *   - TTL and max-idle support via Hazelcast IMap
- *   - Near-cache support for read-heavy workloads
- *   - Cache statistics (hits, misses)
- *   - Thread-safe implementation
- *
- * Example URLs:
- *   jdbc:hazelcast:jdbc:postgresql://localhost/mydb
- *   jdbc:hazelcast[mode=client,members=hz1:5701;hz2:5701]:jdbc:postgresql://localhost/mydb
- *   jdbc:hazelcast[ttl=300,mapName=myapp-cache]:jdbc:mysql://localhost/db
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:hazelcast:jdbc:postgresql://localhost/mydb
+ * jdbc:hazelcast[mode=client,members=hz1:5701;hz2:5701]:jdbc:postgresql://localhost/mydb
+ * jdbc:hazelcast[ttl=300,mapName=myapp-cache]:jdbc:mysql://localhost/db
+ * </pre>
  */
 @DriverCapability(
     prefix = "hazelcast",

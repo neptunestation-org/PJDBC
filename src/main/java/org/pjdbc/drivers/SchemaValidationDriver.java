@@ -31,30 +31,22 @@ import org.pjdbc.sql.JdbcUrlParser;
 /**
  * SchemaValidationDriver validates SQL statements against a defined schema.
  *
- * URL format: jdbc:schema[param=value,...]:jdbc:target:...
+ * <p>URL format: {@code jdbc:schema[param=value,...]:jdbc:target:...}
  *
- * Parameters:
- *   allowedTables   - Semicolon-separated list of allowed table names (whitelist mode)
- *   blockedTables   - Semicolon-separated list of blocked table names (blacklist mode)
- *   allowedColumns  - Semicolon-separated list of allowed column patterns (table.column or just column)
- *   blockedColumns  - Semicolon-separated list of blocked column patterns
- *   mode            - Validation mode: "whitelist" (default), "blacklist", or "metadata"
- *   caseSensitive   - Whether table/column names are case-sensitive (default: false)
- *   message         - Custom error message prefix (default: "SchemaValidationDriver")
- *   loadFromDb      - Load allowed tables from database metadata (default: false)
- *   schemaPattern   - Schema pattern for metadata loading (default: null = all schemas)
- *   tableTypes      - Semicolon-separated table types for metadata (default: TABLE;VIEW)
+ * <p>Modes:
+ * <ul>
+ *   <li>whitelist - Only tables in allowedTables list are permitted</li>
+ *   <li>blacklist - All tables except those in blockedTables list are permitted</li>
+ *   <li>metadata - Load allowed tables from database metadata at connection time</li>
+ * </ul>
  *
- * Modes:
- *   whitelist - Only tables in allowedTables list are permitted
- *   blacklist - All tables except those in blockedTables list are permitted
- *   metadata  - Load allowed tables from database metadata at connection time
- *
- * Example URLs:
- *   jdbc:schema[allowedTables=users;orders;products]:jdbc:postgresql://localhost/mydb
- *   jdbc:schema[blockedTables=audit_log;secrets,mode=blacklist]:jdbc:mysql://localhost/db
- *   jdbc:schema[mode=metadata,schemaPattern=public]:jdbc:postgresql://localhost/mydb
- *   jdbc:schema[blockedColumns=ssn;credit_card]:jdbc:postgresql://localhost/mydb
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:schema[allowedTables=users;orders;products]:jdbc:postgresql://localhost/mydb
+ * jdbc:schema[blockedTables=audit_log;secrets,mode=blacklist]:jdbc:mysql://localhost/db
+ * jdbc:schema[mode=metadata,schemaPattern=public]:jdbc:postgresql://localhost/mydb
+ * jdbc:schema[blockedColumns=ssn;credit_card]:jdbc:postgresql://localhost/mydb
+ * </pre>
  */
 @DriverCapability(
     prefix = "schema",

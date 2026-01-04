@@ -36,27 +36,24 @@ import net.spy.memcached.MemcachedClient;
 /**
  * MemcachedCachingDriver caches SELECT query results in Memcached for distributed caching.
  *
- * URL format: jdbc:memcache[param=value,...]:jdbc:target:...
+ * <p>URL format: {@code jdbc:memcache[param=value,...]:jdbc:target:...}
  *
- * Parameters:
- *   servers          - Semicolon-separated list of host:port (default: localhost:11211)
- *   keyPrefix        - Prefix for cache keys (default: "pjdbc:")
- *   ttl              - Time-to-live in seconds for cache entries (default: 60)
- *   invalidateOnWrite - Clear cache on INSERT/UPDATE/DELETE (default: true)
- *   enabled          - Enable caching (default: true)
+ * <p>Features:
+ * <ul>
+ *   <li>Distributed caching across multiple application instances</li>
+ *   <li>TTL support via Memcached expiration</li>
+ *   <li>Support for multiple Memcached servers (consistent hashing)</li>
+ *   <li>Key prefix for namespace isolation</li>
+ *   <li>Cache statistics (hits, misses)</li>
+ *   <li>Thread-safe implementation</li>
+ * </ul>
  *
- * Features:
- *   - Distributed caching across multiple application instances
- *   - TTL support via Memcached expiration
- *   - Support for multiple Memcached servers (consistent hashing)
- *   - Key prefix for namespace isolation
- *   - Cache statistics (hits, misses)
- *   - Thread-safe implementation
- *
- * Example URLs:
- *   jdbc:memcache:jdbc:postgresql://localhost/mydb
- *   jdbc:memcache[servers=cache1:11211;cache2:11211]:jdbc:postgresql://localhost/mydb
- *   jdbc:memcache[ttl=300,keyPrefix=myapp:]:jdbc:mysql://localhost/db
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:memcache:jdbc:postgresql://localhost/mydb
+ * jdbc:memcache[servers=cache1:11211;cache2:11211]:jdbc:postgresql://localhost/mydb
+ * jdbc:memcache[ttl=300,keyPrefix=myapp:]:jdbc:mysql://localhost/db
+ * </pre>
  */
 @DriverCapability(
     prefix = "memcache",

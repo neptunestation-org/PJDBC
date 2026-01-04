@@ -36,32 +36,25 @@ import redis.clients.jedis.JedisPoolConfig;
 /**
  * RedisCachingDriver caches SELECT query results in Redis for distributed caching.
  *
- * URL format: jdbc:rediscache[param=value,...]:jdbc:target:...
+ * <p>URL format: {@code jdbc:rediscache[param=value,...]:jdbc:target:...}
  *
- * Parameters:
- *   host             - Redis server hostname (default: localhost)
- *   port             - Redis server port (default: 6379)
- *   password         - Redis password (default: none)
- *   database         - Redis database number (default: 0)
- *   keyPrefix        - Prefix for cache keys (default: "pjdbc:")
- *   ttl              - Time-to-live in seconds for cache entries (default: 60)
- *   maxPoolSize      - Maximum connections in pool (default: 8)
- *   invalidateOnWrite - Clear cache on INSERT/UPDATE/DELETE (default: true)
- *   enabled          - Enable caching (default: true)
+ * <p>Features:
+ * <ul>
+ *   <li>Distributed caching across multiple application instances</li>
+ *   <li>TTL support via Redis SETEX</li>
+ *   <li>Connection pooling with JedisPool</li>
+ *   <li>Key prefix for namespace isolation</li>
+ *   <li>Cache statistics (hits, misses)</li>
+ *   <li>Thread-safe implementation</li>
+ * </ul>
  *
- * Features:
- *   - Distributed caching across multiple application instances
- *   - TTL support via Redis SETEX
- *   - Connection pooling with JedisPool
- *   - Key prefix for namespace isolation
- *   - Cache statistics (hits, misses)
- *   - Thread-safe implementation
- *
- * Example URLs:
- *   jdbc:rediscache:jdbc:postgresql://localhost/mydb
- *   jdbc:rediscache[host=redis.example.com,port=6379]:jdbc:postgresql://localhost/mydb
- *   jdbc:rediscache[password=secret,ttl=300]:jdbc:mysql://localhost/db
- *   jdbc:rediscache[keyPrefix=myapp:,database=1]:jdbc:postgresql://localhost/mydb
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:rediscache:jdbc:postgresql://localhost/mydb
+ * jdbc:rediscache[host=redis.example.com,port=6379]:jdbc:postgresql://localhost/mydb
+ * jdbc:rediscache[password=secret,ttl=300]:jdbc:mysql://localhost/db
+ * jdbc:rediscache[keyPrefix=myapp:,database=1]:jdbc:postgresql://localhost/mydb
+ * </pre>
  */
 @DriverCapability(
     prefix = "rediscache",

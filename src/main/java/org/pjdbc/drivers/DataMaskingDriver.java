@@ -28,27 +28,24 @@ import org.pjdbc.sql.JdbcUrlParser;
 /**
  * DataMaskingDriver masks sensitive data in query results on-the-fly.
  *
- * URL format: jdbc:mask[param=value,...]:jdbc:target:...
+ * <p>URL format: {@code jdbc:mask[param=value,...]:jdbc:target:...}
  *
- * Parameters:
- *   columns     - Semicolon-separated column name patterns (regex) to mask
- *   strategy    - Masking strategy: FULL, PARTIAL, EMAIL, REDACT, HASH (default: PARTIAL)
- *   mask        - Character to use for masking (default: *)
- *   showLast    - Characters to show at end for PARTIAL strategy (default: 4)
- *   showFirst   - Characters to show at start for PARTIAL strategy (default: 0)
+ * <p>Masking Strategies:
+ * <ul>
+ *   <li>FULL - Replace entire value with mask characters (e.g., "********")</li>
+ *   <li>PARTIAL - Show first/last N characters (e.g., "****1234")</li>
+ *   <li>EMAIL - Mask email preserving first char and domain (e.g., "j***@example.com")</li>
+ *   <li>REDACT - Replace with "[REDACTED]"</li>
+ *   <li>HASH - Replace with hash prefix (e.g., "a1b2c3d4...")</li>
+ * </ul>
  *
- * Masking Strategies:
- *   FULL    - Replace entire value with mask characters (e.g., "********")
- *   PARTIAL - Show first/last N characters (e.g., "****1234")
- *   EMAIL   - Mask email preserving first char and domain (e.g., "j***@example.com")
- *   REDACT  - Replace with "[REDACTED]"
- *   HASH    - Replace with hash prefix (e.g., "a1b2c3d4...")
- *
- * Example URLs:
- *   jdbc:mask[columns=ssn;credit_card]:jdbc:postgresql://localhost/mydb
- *   jdbc:mask[columns=.*email.*,strategy=EMAIL]:jdbc:postgresql://localhost/mydb
- *   jdbc:mask[columns=password;secret,strategy=REDACT]:jdbc:postgresql://localhost/mydb
- *   jdbc:mask[columns=card_number,showLast=4,showFirst=0]:jdbc:mysql://localhost/db
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:mask[columns=ssn;credit_card]:jdbc:postgresql://localhost/mydb
+ * jdbc:mask[columns=.*email.*,strategy=EMAIL]:jdbc:postgresql://localhost/mydb
+ * jdbc:mask[columns=password;secret,strategy=REDACT]:jdbc:postgresql://localhost/mydb
+ * jdbc:mask[columns=card_number,showLast=4,showFirst=0]:jdbc:mysql://localhost/db
+ * </pre>
  */
 @DriverCapability(
     prefix = "mask",

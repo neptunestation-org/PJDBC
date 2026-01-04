@@ -27,26 +27,20 @@ import org.pjdbc.sql.JdbcUrlParser;
 /**
  * RetryDriver automatically retries failed queries on transient errors.
  *
- * URL format: jdbc:retry[param=value,...]:jdbc:target:...
+ * <p>Default retryable SQL states:
+ * <ul>
+ *   <li>08001, 08003, 08004, 08006, 08007 - Connection errors</li>
+ *   <li>40001, 40P01 - Deadlock/serialization failures</li>
+ *   <li>57P01 - Admin shutdown</li>
+ *   <li>HYT00, HYT01 - Timeout errors</li>
+ * </ul>
  *
- * Parameters:
- *   maxRetries       - Maximum retry attempts (default: 3)
- *   initialDelay     - Initial delay in ms before first retry (default: 100)
- *   maxDelay         - Maximum delay cap in ms (default: 5000)
- *   backoffMultiplier - Multiplier for exponential backoff (default: 2.0)
- *   jitter           - Add random jitter to delays: true/false (default: true)
- *   retryOnSqlStates - Semicolon-separated SQL states to retry on (default: transient errors)
- *
- * Default retryable SQL states:
- *   08001, 08003, 08004, 08006, 08007 - Connection errors
- *   40001, 40P01 - Deadlock/serialization failures
- *   57P01 - Admin shutdown
- *   HYT00, HYT01 - Timeout errors
- *
- * Example URLs:
- *   jdbc:retry:jdbc:postgresql://localhost/mydb
- *   jdbc:retry[maxRetries=5,initialDelay=200]:jdbc:postgresql://localhost/mydb
- *   jdbc:retry[retryOnSqlStates=40001;08006]:jdbc:mysql://localhost/db
+ * <p>Example URLs:
+ * <pre>
+ * jdbc:retry:jdbc:postgresql://localhost/mydb
+ * jdbc:retry[maxRetries=5,initialDelay=200]:jdbc:postgresql://localhost/mydb
+ * jdbc:retry[retryOnSqlStates=40001;08006]:jdbc:mysql://localhost/db
+ * </pre>
  */
 @DriverCapability(
     prefix = "retry",
