@@ -10,10 +10,13 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
@@ -35,12 +38,14 @@ import org.pjdbc.sql.JdbcUrlParser;
  *   ttl              - Time-to-live in seconds for cache entries (default: 60)
  *   maxSize          - Maximum number of cached queries (default: 1000)
  *   invalidateOnWrite - Clear cache on INSERT/UPDATE/DELETE (default: true)
+ *   tableAwareInvalidation - Only invalidate queries for affected tables (default: false)
  *   enabled          - Enable caching (default: true)
  *
  * Features:
  *   - Caches SELECT query results in memory
  *   - LRU eviction when maxSize is exceeded
  *   - Automatic invalidation on write operations
+ *   - Table-aware invalidation (only clears affected tables when enabled)
  *   - Cache statistics (hits, misses, evictions)
  *   - Thread-safe implementation
  *
@@ -48,6 +53,7 @@ import org.pjdbc.sql.JdbcUrlParser;
  *   jdbc:cache:jdbc:postgresql://localhost/mydb
  *   jdbc:cache[ttl=300,maxSize=5000]:jdbc:postgresql://localhost/mydb
  *   jdbc:cache[invalidateOnWrite=false]:jdbc:mysql://localhost/db
+ *   jdbc:cache[tableAwareInvalidation=true]:jdbc:postgresql://localhost/mydb
  */
 public class CachingDriver extends AbstractProxyDriver {
 
@@ -121,6 +127,7 @@ public class CachingDriver extends AbstractProxyDriver {
         private final long maxCacheBytes;
         private final boolean includeContext;
         private final boolean invalidateOnWrite;
+        private final boolean tableAwareInvalidation;
         private final boolean enabled;
 
         public CacheConfig(String url) {
@@ -131,6 +138,7 @@ public class CachingDriver extends AbstractProxyDriver {
             this.maxCacheBytes = parseLong(parser.getParameter("maxCacheBytes", String.valueOf(DEFAULT_MAX_BYTES)));
             this.includeContext = parseBoolean(parser.getParameter("includeContext", "false"));
             this.invalidateOnWrite = parseBoolean(parser.getParameter("invalidateOnWrite", "true"));
+            this.tableAwareInvalidation = parseBoolean(parser.getParameter("tableAwareInvalidation", "false"));
             this.enabled = parseBoolean(parser.getParameter("enabled", "true"));
         }
 
@@ -155,6 +163,8 @@ public class CachingDriver extends AbstractProxyDriver {
         /** Include catalog/schema/user in cache key. Default: false for in-memory cache */
         public boolean isIncludeContext() { return includeContext; }
         public boolean isInvalidateOnWrite() { return invalidateOnWrite; }
+        /** If true, only invalidate cache entries for affected tables. Default: false */
+        public boolean isTableAwareInvalidation() { return tableAwareInvalidation; }
         public boolean isEnabled() { return enabled; }
     }
 
@@ -209,8 +219,35 @@ public class CachingDriver extends AbstractProxyDriver {
             cache.put(key, new CacheEntry(result, config.getTtlMs()));
         }
 
+        public synchronized void put(String key, CachedResultSet result, Set<String> tables) {
+            if (!config.isEnabled()) return;
+            cache.put(key, new CacheEntry(result, config.getTtlMs(), tables));
+        }
+
         public synchronized void clear() {
             cache.clear();
+        }
+
+        /**
+         * Invalidate cache entries that depend on any of the specified tables.
+         * Returns the number of entries invalidated.
+         */
+        public synchronized int invalidateForTables(Set<String> tables) {
+            if (!config.isEnabled() || tables.isEmpty()) return 0;
+
+            List<String> keysToRemove = new ArrayList<>();
+            for (Map.Entry<String, CacheEntry> entry : cache.entrySet()) {
+                if (entry.getValue().dependsOnAny(tables)) {
+                    keysToRemove.add(entry.getKey());
+                }
+            }
+
+            for (String key : keysToRemove) {
+                cache.remove(key);
+                evictions.incrementAndGet();
+            }
+
+            return keysToRemove.size();
         }
 
         public synchronized int size() {
@@ -234,21 +271,40 @@ public class CachingDriver extends AbstractProxyDriver {
     }
 
     /**
-     * Cache entry with expiration time.
+     * Cache entry with expiration time and table dependencies.
      */
     private static class CacheEntry {
         private final CachedResultSet result;
         private final long expiresAt;
+        private final Set<String> tables;
 
         public CacheEntry(CachedResultSet result, long ttlMs) {
+            this(result, ttlMs, Collections.emptySet());
+        }
+
+        public CacheEntry(CachedResultSet result, long ttlMs, Set<String> tables) {
             this.result = result;
             this.expiresAt = System.currentTimeMillis() + ttlMs;
+            this.tables = tables != null ? tables : Collections.emptySet();
         }
 
         public CachedResultSet getResult() { return result; }
+        public Set<String> getTables() { return tables; }
 
         public boolean isExpired() {
             return System.currentTimeMillis() > expiresAt;
+        }
+
+        public boolean dependsOnAny(Set<String> affectedTables) {
+            if (tables.isEmpty() || affectedTables.isEmpty()) {
+                return false;
+            }
+            for (String table : affectedTables) {
+                if (tables.contains(table)) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 
@@ -637,7 +693,20 @@ public class CachingDriver extends AbstractProxyDriver {
         }
 
         private void invalidateIfWrite(String sql) {
-            if (cache.getConfig().isInvalidateOnWrite() && isWrite(sql)) {
+            if (!cache.getConfig().isInvalidateOnWrite() || !isWrite(sql)) {
+                return;
+            }
+
+            if (cache.getConfig().isTableAwareInvalidation()) {
+                // Only invalidate entries for affected tables
+                Set<String> affectedTables = TableExtractor.extractTablesFromWrite(sql);
+                if (!affectedTables.isEmpty()) {
+                    cache.invalidateForTables(affectedTables);
+                } else {
+                    // Couldn't parse tables, fall back to full clear
+                    cache.clear();
+                }
+            } else {
                 cache.clear();
             }
         }
@@ -663,7 +732,13 @@ public class CachingDriver extends AbstractProxyDriver {
             rs.close();
             // Only cache if result set didn't exceed the limits
             if (!cachedResult.isTooLargeToCache()) {
-                cache.put(cacheKey, cachedResult);
+                if (cache.getConfig().isTableAwareInvalidation()) {
+                    // Extract and store table dependencies for selective invalidation
+                    Set<String> tables = TableExtractor.extractTablesFromSelect(sql);
+                    cache.put(cacheKey, cachedResult, tables);
+                } else {
+                    cache.put(cacheKey, cachedResult);
+                }
             }
             return new CachedResultSetWrapper(this, cachedResult);
         }
@@ -824,6 +899,23 @@ public class CachingDriver extends AbstractProxyDriver {
             super.clearParameters();
         }
 
+        private void invalidateIfWrite() {
+            if (!cache.getConfig().isInvalidateOnWrite() || !isWrite()) {
+                return;
+            }
+
+            if (cache.getConfig().isTableAwareInvalidation()) {
+                Set<String> affectedTables = TableExtractor.extractTablesFromWrite(sql);
+                if (!affectedTables.isEmpty()) {
+                    cache.invalidateForTables(affectedTables);
+                } else {
+                    cache.clear();
+                }
+            } else {
+                cache.clear();
+            }
+        }
+
         @Override
         public ResultSet executeQuery() throws SQLException {
             try {
@@ -843,7 +935,12 @@ public class CachingDriver extends AbstractProxyDriver {
                     cache.getConfig().getMaxCacheBytes());
                 rs.close();
                 if (!cachedResult.isTooLargeToCache()) {
-                    cache.put(cacheKey, cachedResult);
+                    if (cache.getConfig().isTableAwareInvalidation()) {
+                        Set<String> tables = TableExtractor.extractTablesFromSelect(sql);
+                        cache.put(cacheKey, cachedResult, tables);
+                    } else {
+                        cache.put(cacheKey, cachedResult);
+                    }
                 }
                 return new CachedResultSetWrapper(this, cachedResult);
             } finally {
@@ -857,9 +954,7 @@ public class CachingDriver extends AbstractProxyDriver {
             try {
                 // Execute first, then invalidate on success
                 int result = super.executeUpdate();
-                if (cache.getConfig().isInvalidateOnWrite() && isWrite()) {
-                    cache.clear();
-                }
+                invalidateIfWrite();
                 return result;
             } finally {
                 parameters.clear();
@@ -871,9 +966,7 @@ public class CachingDriver extends AbstractProxyDriver {
             try {
                 // Execute first, then invalidate on success
                 boolean result = super.execute();
-                if (cache.getConfig().isInvalidateOnWrite() && isWrite()) {
-                    cache.clear();
-                }
+                invalidateIfWrite();
                 return result;
             } finally {
                 parameters.clear();

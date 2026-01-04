@@ -454,4 +454,223 @@ public class CachingDriverTest {
             }
         }
     }
+
+    @Test
+    public void testTableAwareInvalidationConfig() {
+        CachingDriver.CacheConfig config = new CachingDriver.CacheConfig(
+            "jdbc:cache[tableAwareInvalidation=true]:jdbc:h2:mem:test"
+        );
+        assertTrue(config.isTableAwareInvalidation());
+
+        CachingDriver.CacheConfig configDefault = new CachingDriver.CacheConfig(
+            "jdbc:cache:jdbc:h2:mem:test"
+        );
+        assertFalse(configDefault.isTableAwareInvalidation());
+    }
+
+    private void setupMultipleTables(String dbName) throws SQLException {
+        try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE TABLE IF NOT EXISTS users (id INT PRIMARY KEY, name VARCHAR(100))");
+                stmt.execute("CREATE TABLE IF NOT EXISTS orders (id INT PRIMARY KEY, user_id INT, total DECIMAL(10,2))");
+                stmt.execute("DELETE FROM users");
+                stmt.execute("DELETE FROM orders");
+                stmt.execute("INSERT INTO users VALUES (1, 'Alice')");
+                stmt.execute("INSERT INTO users VALUES (2, 'Bob')");
+                stmt.execute("INSERT INTO orders VALUES (1, 1, 100.00)");
+                stmt.execute("INSERT INTO orders VALUES (2, 2, 200.00)");
+            }
+        }
+    }
+
+    @Test
+    public void testTableAwareInvalidationOnlyAffectedTable() throws SQLException {
+        setupMultipleTables("cache_test_table_aware");
+        String url = "jdbc:cache[tableAwareInvalidation=true]:jdbc:h2:mem:cache_test_table_aware;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            CachingDriver.QueryCache cache = CachingDriver.getCache(conn);
+
+            // Cache queries on both tables
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeQuery("SELECT * FROM users");
+                stmt.executeQuery("SELECT * FROM orders");
+            }
+            assertEquals(2, cache.size());
+
+            // Update users table - should only invalidate users query
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("UPDATE users SET name = 'Alice2' WHERE id = 1");
+            }
+
+            // Users query should be invalidated, orders should remain
+            assertEquals(1, cache.size());
+
+            // Verify orders query is still cached (cache hit)
+            long hitsBefore = cache.getHits();
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeQuery("SELECT * FROM orders");
+            }
+            assertEquals(hitsBefore + 1, cache.getHits());
+        }
+    }
+
+    @Test
+    public void testTableAwareInvalidationInsert() throws SQLException {
+        setupMultipleTables("cache_test_table_aware_insert");
+        String url = "jdbc:cache[tableAwareInvalidation=true]:jdbc:h2:mem:cache_test_table_aware_insert;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            CachingDriver.QueryCache cache = CachingDriver.getCache(conn);
+
+            // Cache queries on both tables
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeQuery("SELECT * FROM users");
+                stmt.executeQuery("SELECT * FROM orders");
+            }
+            assertEquals(2, cache.size());
+
+            // Insert into orders - should only invalidate orders query
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("INSERT INTO orders VALUES (3, 1, 50.00)");
+            }
+
+            assertEquals(1, cache.size());
+
+            // Verify users query is still cached
+            long hitsBefore = cache.getHits();
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeQuery("SELECT * FROM users");
+            }
+            assertEquals(hitsBefore + 1, cache.getHits());
+        }
+    }
+
+    @Test
+    public void testTableAwareInvalidationDelete() throws SQLException {
+        setupMultipleTables("cache_test_table_aware_delete");
+        String url = "jdbc:cache[tableAwareInvalidation=true]:jdbc:h2:mem:cache_test_table_aware_delete;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            CachingDriver.QueryCache cache = CachingDriver.getCache(conn);
+
+            // Cache queries
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeQuery("SELECT * FROM users");
+                stmt.executeQuery("SELECT * FROM orders");
+            }
+            assertEquals(2, cache.size());
+
+            // Delete from users
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("DELETE FROM users WHERE id = 2");
+            }
+
+            assertEquals(1, cache.size());
+        }
+    }
+
+    @Test
+    public void testTableAwareInvalidationWithJoin() throws SQLException {
+        setupMultipleTables("cache_test_table_aware_join");
+        String url = "jdbc:cache[tableAwareInvalidation=true]:jdbc:h2:mem:cache_test_table_aware_join;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            CachingDriver.QueryCache cache = CachingDriver.getCache(conn);
+
+            // Cache a join query (depends on both tables)
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeQuery("SELECT u.name, o.total FROM users u JOIN orders o ON u.id = o.user_id");
+            }
+            assertEquals(1, cache.size());
+
+            // Update users - should invalidate the join query
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("UPDATE users SET name = 'Alice2' WHERE id = 1");
+            }
+
+            assertEquals(0, cache.size());
+        }
+    }
+
+    @Test
+    public void testTableAwareInvalidationWithPreparedStatement() throws SQLException {
+        setupMultipleTables("cache_test_table_aware_pstmt");
+        String url = "jdbc:cache[tableAwareInvalidation=true]:jdbc:h2:mem:cache_test_table_aware_pstmt;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            CachingDriver.QueryCache cache = CachingDriver.getCache(conn);
+
+            // Cache queries using PreparedStatement
+            try (PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM users WHERE id = ?")) {
+                pstmt.setInt(1, 1);
+                pstmt.executeQuery();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM orders WHERE id = ?")) {
+                pstmt.setInt(1, 1);
+                pstmt.executeQuery();
+            }
+            assertEquals(2, cache.size());
+
+            // Update users using PreparedStatement
+            try (PreparedStatement pstmt = conn.prepareStatement("UPDATE users SET name = ? WHERE id = ?")) {
+                pstmt.setString(1, "Updated");
+                pstmt.setInt(2, 1);
+                pstmt.executeUpdate();
+            }
+
+            // Only users query should be invalidated
+            assertEquals(1, cache.size());
+        }
+    }
+
+    @Test
+    public void testTableAwareDisabledClearsAll() throws SQLException {
+        setupMultipleTables("cache_test_table_aware_disabled");
+        // Default: tableAwareInvalidation=false
+        String url = "jdbc:cache:jdbc:h2:mem:cache_test_table_aware_disabled;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            CachingDriver.QueryCache cache = CachingDriver.getCache(conn);
+
+            // Cache queries on both tables
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeQuery("SELECT * FROM users");
+                stmt.executeQuery("SELECT * FROM orders");
+            }
+            assertEquals(2, cache.size());
+
+            // Update users - should clear ALL cache (not table-aware)
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("UPDATE users SET name = 'Alice2' WHERE id = 1");
+            }
+
+            assertEquals(0, cache.size());
+        }
+    }
+
+    @Test
+    public void testTableAwareInvalidationTruncate() throws SQLException {
+        setupMultipleTables("cache_test_table_aware_truncate");
+        String url = "jdbc:cache[tableAwareInvalidation=true]:jdbc:h2:mem:cache_test_table_aware_truncate;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            CachingDriver.QueryCache cache = CachingDriver.getCache(conn);
+
+            // Cache queries
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeQuery("SELECT * FROM users");
+                stmt.executeQuery("SELECT * FROM orders");
+            }
+            assertEquals(2, cache.size());
+
+            // Truncate orders
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("TRUNCATE TABLE orders");
+            }
+
+            // Only orders should be invalidated
+            assertEquals(1, cache.size());
+
+            // Verify users is still cached
+            long hitsBefore = cache.getHits();
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeQuery("SELECT * FROM users");
+            }
+            assertEquals(hitsBefore + 1, cache.getHits());
+        }
+    }
 }
