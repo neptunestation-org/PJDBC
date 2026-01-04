@@ -836,6 +836,149 @@ public class MyDriver extends AbstractProxyDriver {
 }
 ```
 
+### Annotating Custom Drivers
+
+Annotate your driver class to include it in the capabilities manifest. The annotation processor generates `pjdbc.capabilities.json` at compile time.
+
+#### Available Annotations
+
+| Annotation | Purpose |
+|------------|---------|
+| `@DriverCapability` | **Required.** Declares driver prefix, description, and capability tags |
+| `@DriverParameter` | Declares URL parameters the driver accepts (repeatable) |
+| `@DriverDependency` | Declares external library dependencies (repeatable) |
+| `@DriverSideEffects` | Declares side effects (stateful, logging, network, etc.) |
+
+#### Complete Example
+
+```java
+import org.pjdbc.annotations.*;
+import org.pjdbc.annotations.DriverParameter.ParameterType;
+
+@DriverCapability(
+    prefix = "mydriver",
+    description = "My custom driver with configurable behavior",
+    capabilities = {"custom", "transformation"}
+)
+@DriverParameter(
+    name = "timeout",
+    type = ParameterType.INTEGER,
+    description = "Operation timeout in milliseconds",
+    defaultValue = "5000",
+    min = 0,
+    max = 60000
+)
+@DriverParameter(
+    name = "mode",
+    type = ParameterType.STRING,
+    description = "Operating mode",
+    defaultValue = "normal",
+    enumValues = {"normal", "strict", "lenient"}
+)
+@DriverParameter(
+    name = "enabled",
+    type = ParameterType.BOOLEAN,
+    description = "Enable custom behavior",
+    defaultValue = "true"
+)
+@DriverDependency(
+    groupId = "com.example",
+    artifactId = "example-lib",
+    version = "1.0.0",
+    optional = true,
+    description = "Required for advanced features"
+)
+@DriverSideEffects(
+    stateful = true,
+    logging = true
+)
+public class MyDriver extends AbstractProxyDriver {
+    // ... implementation
+}
+```
+
+This generates the following manifest entry:
+
+```json
+{
+  "name": "MyDriver",
+  "prefix": "mydriver",
+  "class": "com.example.MyDriver",
+  "description": "My custom driver with configurable behavior",
+  "capabilities": ["custom", "transformation"],
+  "parameters": [
+    {"name": "timeout", "type": "integer", "description": "Operation timeout in milliseconds", "default": 5000, "min": 0, "max": 60000},
+    {"name": "mode", "type": "string", "description": "Operating mode", "default": "normal", "enum": ["normal", "strict", "lenient"]},
+    {"name": "enabled", "type": "boolean", "description": "Enable custom behavior", "default": true}
+  ],
+  "dependencies": [
+    {"groupId": "com.example", "artifactId": "example-lib", "version": "1.0.0", "optional": true, "description": "Required for advanced features"}
+  ],
+  "sideEffects": {"stateful": true, "logging": true},
+  "composable": true,
+  "terminal": false
+}
+```
+
+#### @DriverCapability Reference
+
+| Attribute | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `prefix` | String | Yes | - | URL prefix (e.g., "cache" for `jdbc:cache:...`) |
+| `description` | String | Yes | - | Human-readable description |
+| `capabilities` | String[] | No | `{}` | Capability tags for discovery |
+| `name` | String | No | Class name | Override driver name in manifest |
+| `composable` | boolean | No | `true` | Can be chained with other drivers |
+| `terminal` | boolean | No | `false` | Does not delegate to another driver |
+
+**Validation rules:**
+- Prefix must be lowercase alphanumeric, starting with a letter (e.g., `cache`, `pool2`)
+- Capability tags must be lowercase with optional hyphens (e.g., `caching`, `load-balancing`)
+- Duplicate prefixes across drivers cause a compilation error
+
+#### @DriverParameter Reference
+
+| Attribute | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `name` | String | Yes | - | Parameter name in URL |
+| `type` | ParameterType | No | `STRING` | `STRING`, `INTEGER`, `FLOAT`, or `BOOLEAN` |
+| `description` | String | No | `""` | Parameter description |
+| `defaultValue` | String | No | `""` | Default value (empty = required) |
+| `min` | long | No | `Long.MIN_VALUE` | Minimum for numeric types |
+| `max` | long | No | `Long.MAX_VALUE` | Maximum for numeric types |
+| `enumValues` | String[] | No | `{}` | Valid values for STRING type |
+| `required` | boolean | No | `false` | Parameter is required |
+
+**Validation rules:**
+- Parameter names must be unique within a driver
+- `min` must not exceed `max`
+- Default value must be valid for the declared type
+- Default value must be within min/max constraints
+- Default value must be in enumValues (if specified)
+
+#### @DriverDependency Reference
+
+| Attribute | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `groupId` | String | Yes | - | Maven group ID |
+| `artifactId` | String | Yes | - | Maven artifact ID |
+| `version` | String | No | `""` | Version (recommended) |
+| `optional` | boolean | No | `false` | Dependency is optional |
+| `description` | String | No | `""` | Why this dependency is needed |
+
+#### @DriverSideEffects Reference
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `stateful` | boolean | `false` | Maintains state across calls |
+| `logging` | boolean | `false` | Writes to logs |
+| `network` | boolean | `false` | Makes network calls |
+| `filesystem` | boolean | `false` | Accesses filesystem |
+| `metrics` | boolean | `false` | Collects metrics |
+| `tracing` | boolean | `false` | Emits trace spans |
+| `modifiesQueries` | boolean | `false` | Transforms SQL statements |
+| `modifiesResults` | boolean | `false` | Transforms query results |
+
 ## JdbcTransformer Interface
 
 For comprehensive input/output transformation, implement `JdbcTransformer`:
