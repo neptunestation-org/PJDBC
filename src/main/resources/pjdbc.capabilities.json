@@ -331,6 +331,48 @@
       "terminal": false
     },
     {
+      "name": "RateLimitDriver",
+      "prefix": "ratelimit",
+      "class": "org.pjdbc.drivers.RateLimitDriver",
+      "description": "Limits query rate using token bucket algorithm",
+      "capabilities": ["resilience"],
+      "parameters": [
+        {
+          "name": "maxRequests",
+          "type": "integer",
+          "description": "Maximum requests per window",
+          "default": 100,
+          "min": 1
+        },
+        {
+          "name": "windowMs",
+          "type": "integer",
+          "description": "Time window in milliseconds",
+          "default": 1000,
+          "min": 1
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "description": "Behavior when limit exceeded: reject or wait",
+          "default": "reject",
+          "enum": ["reject", "wait"]
+        },
+        {
+          "name": "burstSize",
+          "type": "integer",
+          "description": "Maximum burst capacity",
+          "default": 100,
+          "min": 1
+        }
+      ],
+      "sideEffects": {
+        "stateful": true
+      },
+      "composable": true,
+      "terminal": false
+    },
+    {
       "name": "ChaosDriver",
       "prefix": "chaos",
       "class": "org.pjdbc.drivers.ChaosDriver",

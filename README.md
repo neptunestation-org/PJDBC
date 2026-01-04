@@ -276,6 +276,52 @@ Notes:
 - Individual statements can override the timeout using `setQueryTimeout()`
 - Actual timeout behavior depends on the underlying JDBC driver and database
 
+### RateLimitDriver (`jdbc:ratelimit:...`)
+
+Limits the rate of database queries using a token bucket algorithm. Prevents overwhelming the database by enforcing a maximum number of requests per time window.
+
+```java
+// Basic rate limiting (100 requests per second)
+Connection conn = DriverManager.getConnection(
+    "jdbc:ratelimit:jdbc:postgresql://localhost/mydb"
+);
+
+// Custom rate limit (50 requests per second)
+Connection conn = DriverManager.getConnection(
+    "jdbc:ratelimit[maxRequests=50,windowMs=1000]:jdbc:postgresql://localhost/mydb"
+);
+
+// Wait mode - block instead of failing when limit exceeded
+Connection conn = DriverManager.getConnection(
+    "jdbc:ratelimit[maxRequests=10,mode=wait]:jdbc:postgresql://localhost/mydb"
+);
+
+// Custom burst capacity for handling spikes
+Connection conn = DriverManager.getConnection(
+    "jdbc:ratelimit[maxRequests=10,burstSize=50]:jdbc:postgresql://localhost/mydb"
+);
+
+// Access rate limiter statistics
+RateLimitDriver.RateLimiter rl = RateLimitDriver.getRateLimiter(conn);
+System.out.println("Total requests: " + rl.getTotalRequests());
+System.out.println("Rejected: " + rl.getRejectedRequests());
+System.out.println("Available tokens: " + rl.getAvailableTokens());
+```
+
+Parameters:
+- `maxRequests`: Maximum requests per time window (default: 100)
+- `windowMs`: Time window in milliseconds (default: 1000)
+- `mode`: Behavior when limit exceeded (default: "reject")
+  - `reject`: Throw SQLException immediately
+  - `wait`: Block until capacity is available
+- `burstSize`: Maximum burst capacity (default: maxRequests)
+
+Notes:
+- Rate limiting is per-connection
+- In "reject" mode, exceeds throw SQLException with message "Rate limit exceeded"
+- In "wait" mode, threads block until tokens become available
+- Burst capacity allows handling traffic spikes above the sustained rate
+
 ### ChaosDriver (`jdbc:chaos:...`)
 
 Injects configurable failures and latency for resilience testing. Use this driver to test how your application handles database errors, slow queries, and connection drops.
@@ -645,7 +691,7 @@ Drivers are tagged with capabilities for easy discovery:
 | `logging`        | SQL statement logging | log                                    |
 | `tracing`        | Distributed tracing   | trace                                  |
 | `metrics`        | Performance metrics   | metrics                                |
-| `resilience`     | Fault tolerance       | retry, circuitbreaker, timeout, chaos  |
+| `resilience`     | Fault tolerance       | retry, circuitbreaker, timeout, ratelimit, chaos |
 | `security`       | Access control        | readonly, mapuser, mask                |
 | `testing`        | Test utilities        | mock, sink, chaos                      |
 | `transformation` | SQL modification      | filter                                 |

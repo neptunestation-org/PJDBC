@@ -11,6 +11,7 @@ org.pjdbc.drivers.ChaosDriver
 org.pjdbc.drivers.RetryDriver
 org.pjdbc.drivers.CircuitBreakerDriver
 org.pjdbc.drivers.TimeoutDriver
+org.pjdbc.drivers.RateLimitDriver
 org.pjdbc.drivers.ReadonlyDriver
 org.pjdbc.drivers.DataMaskingDriver
 org.pjdbc.drivers.TracingDriver
