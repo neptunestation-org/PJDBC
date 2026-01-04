@@ -22,6 +22,7 @@ import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
@@ -56,6 +57,7 @@ public class CapabilityProcessor extends AbstractProcessor {
 
     private Filer filer;
     private Messager messager;
+    private Elements elementUtils;
     private boolean processed = false;
     private boolean hasErrors = false;
 
@@ -64,6 +66,7 @@ public class CapabilityProcessor extends AbstractProcessor {
         super.init(processingEnv);
         this.filer = processingEnv.getFiler();
         this.messager = processingEnv.getMessager();
+        this.elementUtils = processingEnv.getElementUtils();
     }
 
     @Override
@@ -175,6 +178,9 @@ public class CapabilityProcessor extends AbstractProcessor {
 
         driver.put("composable", capability.composable());
         driver.put("terminal", capability.terminal());
+
+        // Check for potential drift between JavaDocs and annotations
+        checkJavaDocDrift(element);
 
         return driver;
     }
@@ -456,6 +462,71 @@ public class CapabilityProcessor extends AbstractProcessor {
         }
 
         return sideEffects;
+    }
+
+    // ========== JavaDoc Drift Detection ==========
+
+    /**
+     * Checks if JavaDoc comments might be drifting from annotation metadata.
+     *
+     * <p>Warns when:
+     * <ul>
+     *   <li>JavaDoc contains a "Parameters:" section that may become stale</li>
+     *   <li>JavaDoc explicitly lists parameter names that are also in annotations</li>
+     *   <li>JavaDoc is missing when the driver has documented parameters</li>
+     * </ul>
+     *
+     * <p>This encourages developers to rely on generated docs from annotations
+     * rather than manually maintaining parameter documentation in JavaDocs.
+     */
+    private void checkJavaDocDrift(TypeElement element) {
+        String docComment = elementUtils.getDocComment(element);
+        if (docComment == null || docComment.isBlank()) {
+            // No JavaDoc at all - check if we should warn
+            DriverParameter[] params = element.getAnnotationsByType(DriverParameter.class);
+            if (params.length > 0) {
+                note("Driver " + element.getSimpleName() +
+                    " has @DriverParameter annotations but no JavaDoc. " +
+                    "Consider adding a class-level description (parameter docs will be generated).");
+            }
+            return;
+        }
+
+        DriverParameter[] params = element.getAnnotationsByType(DriverParameter.class);
+        if (params.length == 0) {
+            return; // No parameters to drift
+        }
+
+        // Check for manual parameter documentation patterns that may drift
+        String docLower = docComment.toLowerCase();
+
+        // Pattern 1: "Parameters:" section
+        if (docLower.contains("parameters:") || docLower.contains("* parameters:")) {
+            warning("JavaDoc contains 'Parameters:' section that may drift from @DriverParameter annotations. " +
+                "Consider removing manual parameter docs - they will be generated from annotations. " +
+                "See: org.pjdbc.doclet.CapabilityDoclet",
+                element);
+        }
+
+        // Pattern 2: Parameter names explicitly listed
+        List<String> documentedParams = new ArrayList<>();
+        for (DriverParameter param : params) {
+            String name = param.name();
+            // Check if parameter name appears with explanation patterns
+            if (docComment.contains(name + " -") ||
+                docComment.contains(name + ":") ||
+                docComment.contains("@param " + name)) {
+                documentedParams.add(name);
+            }
+        }
+
+        if (!documentedParams.isEmpty()) {
+            warning("JavaDoc manually documents parameters " + documentedParams +
+                " which are also declared via @DriverParameter. " +
+                "This duplication may lead to drift. " +
+                "Consider removing parameter details from JavaDoc - they will be generated from annotations.",
+                element);
+        }
     }
 
     private void generateManifest(List<Map<String, Object>> drivers) {
