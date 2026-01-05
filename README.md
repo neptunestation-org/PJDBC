@@ -484,7 +484,7 @@ The `pjdbc.capabilities.json` manifest describes all drivers in a machine-readab
 
 ```json
 {
-  "version": "2.0",
+  "version": "1.0",
   "drivers": [
     {
       "name": "RetryDriver",
@@ -834,11 +834,6 @@ To configure:
    - Go to Settings → Secrets and variables → Actions → New repository secret
    - Name: `NVD_API_KEY`
    - Value: your API key
-
-## Requirements
-
-- Java 21 or higher
-- Maven 3.x
 
 ## Author
 
