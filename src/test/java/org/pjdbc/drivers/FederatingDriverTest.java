@@ -191,13 +191,13 @@ public class FederatingDriverTest {
         FederatingDriver.FederateConfig config;
 
         // Default config
-        config = FederatingDriver.FederateConfig.fromUrl("jdbc:federate:jdbc:mock:a;jdbc:mock:b");
+        config = FederatingDriver.FederateConfig.fromUrl("jdbc:federate:jdbc:mock:a;jdbc:mock:b", List.of());
         assertEquals(FederatingDriver.MergeStrategy.CONCAT, config.getMergeStrategy());
         assertFalse(config.isParallelExecution());
         assertEquals(30000, config.getTimeout());
 
         // Custom config
-        config = FederatingDriver.FederateConfig.fromUrl("jdbc:federate[mergeStrategy=union_all,parallelExecution=true,timeout=5000]:jdbc:mock:a;jdbc:mock:b");
+        config = FederatingDriver.FederateConfig.fromUrl("jdbc:federate[mergeStrategy=union_all,parallelExecution=true,timeout=5000]:jdbc:mock:a;jdbc:mock:b", List.of());
         assertEquals(FederatingDriver.MergeStrategy.UNION_ALL, config.getMergeStrategy());
         assertTrue(config.isParallelExecution());
         assertEquals(5000, config.getTimeout());

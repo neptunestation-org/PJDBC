@@ -21,6 +21,7 @@ import org.pjdbc.sql.AbstractProxyDriver;
 import org.pjdbc.sql.AbstractResultSet;
 import org.pjdbc.sql.AbstractStatement;
 import org.pjdbc.sql.JdbcUrlParser;
+import static org.pjdbc.sql.PjdbcListeners.fireChaosInjected;
 
 /**
  * ChaosDriver injects configurable failures and latency for resilience testing.
@@ -229,11 +230,12 @@ public class ChaosDriver extends AbstractProxyDriver {
     /**
      * Base chaos behavior shared by all statement types.
      */
-    private static void introduceChaos(ChaosConfig config, Connection conn) throws SQLException {
+    private static void introduceChaos(ChaosConfig config, Connection conn, String sql) throws SQLException {
         Random random = config.getRandom();
 
         // Check for connection drop
         if (config.getConnectionDropRate() > 0 && random.nextDouble() < config.getConnectionDropRate()) {
+            fireChaosInjected("connection_drop", sql, "Connection closed unexpectedly");
             try {
                 conn.close();
             } catch (SQLException suppressed) {
@@ -244,6 +246,7 @@ public class ChaosDriver extends AbstractProxyDriver {
 
         // Check for failure
         if (config.getFailureRate() > 0 && random.nextDouble() < config.getFailureRate()) {
+            fireChaosInjected("failure", sql, config.getExceptionMessage());
             throw new SQLException(config.getExceptionMessage());
         }
 
@@ -253,6 +256,7 @@ public class ChaosDriver extends AbstractProxyDriver {
             totalLatency += random.nextInt(config.getLatencyVariance());
         }
         if (totalLatency > 0) {
+            fireChaosInjected("latency", sql, totalLatency + "ms");
             try {
                 Thread.sleep(totalLatency);
             } catch (InterruptedException e) {
@@ -275,26 +279,26 @@ public class ChaosDriver extends AbstractProxyDriver {
 
         @Override
         public boolean execute(String sql) throws SQLException {
-            introduceChaos(config, getConnection());
+            introduceChaos(config, getConnection(), sql);
             return super.execute(sql);
         }
 
         @Override
         public ResultSet executeQuery(String sql) throws SQLException {
-            introduceChaos(config, getConnection());
+            introduceChaos(config, getConnection(), sql);
             ResultSet rs = super.executeQuery(sql);
             return new ChaosResultSet(this, rs, config);
         }
 
         @Override
         public int executeUpdate(String sql) throws SQLException {
-            introduceChaos(config, getConnection());
+            introduceChaos(config, getConnection(), sql);
             return super.executeUpdate(sql);
         }
 
         @Override
         public int[] executeBatch() throws SQLException {
-            introduceChaos(config, getConnection());
+            introduceChaos(config, getConnection(), null);
             return super.executeBatch();
         }
     }
@@ -312,26 +316,26 @@ public class ChaosDriver extends AbstractProxyDriver {
 
         @Override
         public boolean execute() throws SQLException {
-            introduceChaos(config, getConnection());
+            introduceChaos(config, getConnection(), null);
             return super.execute();
         }
 
         @Override
         public ResultSet executeQuery() throws SQLException {
-            introduceChaos(config, getConnection());
+            introduceChaos(config, getConnection(), null);
             ResultSet rs = super.executeQuery();
             return new ChaosResultSet(this, rs, config);
         }
 
         @Override
         public int executeUpdate() throws SQLException {
-            introduceChaos(config, getConnection());
+            introduceChaos(config, getConnection(), null);
             return super.executeUpdate();
         }
 
         @Override
         public int[] executeBatch() throws SQLException {
-            introduceChaos(config, getConnection());
+            introduceChaos(config, getConnection(), null);
             return super.executeBatch();
         }
     }
@@ -349,26 +353,26 @@ public class ChaosDriver extends AbstractProxyDriver {
 
         @Override
         public boolean execute() throws SQLException {
-            introduceChaos(config, getConnection());
+            introduceChaos(config, getConnection(), null);
             return super.execute();
         }
 
         @Override
         public ResultSet executeQuery() throws SQLException {
-            introduceChaos(config, getConnection());
+            introduceChaos(config, getConnection(), null);
             ResultSet rs = super.executeQuery();
             return new ChaosResultSet(this, rs, config);
         }
 
         @Override
         public int executeUpdate() throws SQLException {
-            introduceChaos(config, getConnection());
+            introduceChaos(config, getConnection(), null);
             return super.executeUpdate();
         }
 
         @Override
         public int[] executeBatch() throws SQLException {
-            introduceChaos(config, getConnection());
+            introduceChaos(config, getConnection(), null);
             return super.executeBatch();
         }
     }

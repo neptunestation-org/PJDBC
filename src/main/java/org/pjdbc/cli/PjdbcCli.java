@@ -42,7 +42,7 @@ public class PjdbcCli {
     private static final String USAGE = """
         PJDBC CLI - URL Validation and Driver Discovery Tool
 
-        Usage: pjdbc <command> [options]
+        Usage: pjdbc [options] <command> [args]
 
         Commands:
           validate <url>    Parse and validate a PJDBC URL
@@ -55,14 +55,24 @@ public class PjdbcCli {
         Options:
           --help, -h        Show this help message
           --version, -v     Show version information
+          --verbose         Enable verbose output with real-time event logging
 
         Examples:
           pjdbc validate "jdbc:retry[maxRetries=5]:jdbc:postgresql://localhost/db"
           pjdbc list
           pjdbc show retry
           pjdbc chain "jdbc:retry:jdbc:timeout:jdbc:postgresql://localhost/db"
+          pjdbc --verbose test "jdbc:retry:jdbc:h2:mem:test"
 
-        Debug Mode:
+        Verbose Mode:
+          When --verbose is specified, PJDBC events are logged in real-time:
+          - Retry attempts with delay and cause
+          - Circuit breaker state changes
+          - SQL transformations
+          - Federated query targets
+          - Chaos injection events
+
+        Debug Mode (programmatic):
           Enable via system property: -Dpjdbc.debug=true
           Or programmatically: PjdbcDebug.enable()
         """;
@@ -91,7 +101,33 @@ public class PjdbcCli {
             return 0;
         }
 
-        String command = args[0];
+        // Parse global options and find command
+        boolean verbose = false;
+        int commandIndex = 0;
+
+        for (int i = 0; i < args.length; i++) {
+            String arg = args[i];
+            if (arg.equals("--verbose")) {
+                verbose = true;
+            } else if (!arg.startsWith("-")) {
+                commandIndex = i;
+                break;
+            } else if (arg.equals("--help") || arg.equals("-h") || arg.equals("--version") || arg.equals("-v")) {
+                // These are commands, not just options
+                commandIndex = i;
+                break;
+            }
+        }
+
+        // Enable verbose mode if requested
+        if (verbose) {
+            PjdbcDebug.enable();
+            out.println("[verbose] Debug event logging enabled");
+            out.println();
+        }
+
+        String command = args[commandIndex];
+        String[] commandArgs = Arrays.copyOfRange(args, commandIndex, args.length);
 
         return switch (command) {
             case "--help", "-h", "help" -> {
@@ -103,18 +139,18 @@ public class PjdbcCli {
                 yield 0;
             }
             case "validate" -> {
-                if (args.length < 2) {
+                if (commandArgs.length < 2) {
                     err.println("Error: validate requires a URL argument");
                     err.println();
                     err.println("Usage: pjdbc validate <url>");
                     err.println("Example: pjdbc validate \"jdbc:retry[maxRetries=5]:jdbc:postgresql://localhost/db\"");
                     yield 1;
                 }
-                yield validate(args[1]);
+                yield validate(commandArgs[1]);
             }
             case "list" -> list();
             case "show" -> {
-                if (args.length < 2) {
+                if (commandArgs.length < 2) {
                     err.println("Error: show requires a driver prefix argument");
                     err.println();
                     err.println("Usage: pjdbc show <prefix>");
@@ -123,27 +159,27 @@ public class PjdbcCli {
                     err.println("Run 'pjdbc list' to see available drivers");
                     yield 1;
                 }
-                yield show(args[1]);
+                yield show(commandArgs[1]);
             }
             case "chain" -> {
-                if (args.length < 2) {
+                if (commandArgs.length < 2) {
                     err.println("Error: chain requires a URL argument");
                     err.println();
                     err.println("Usage: pjdbc chain <url>");
                     err.println("Example: pjdbc chain \"jdbc:retry:jdbc:timeout:jdbc:postgresql://localhost/db\"");
                     yield 1;
                 }
-                yield chain(args[1]);
+                yield chain(commandArgs[1]);
             }
             case "test" -> {
-                if (args.length < 2) {
+                if (commandArgs.length < 2) {
                     err.println("Error: test requires a URL argument");
                     err.println();
                     err.println("Usage: pjdbc test <url>");
                     err.println("Example: pjdbc test \"jdbc:h2:mem:testdb\"");
                     yield 1;
                 }
-                yield test(args[1]);
+                yield test(commandArgs[1]);
             }
             case "debug-info" -> debugInfo();
             default -> {
