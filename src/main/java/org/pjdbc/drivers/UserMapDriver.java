@@ -30,12 +30,15 @@ public class UserMapDriver extends AbstractProxyDriver {
     public Connection connect (String url, Properties info) throws SQLException {
 	if (!acceptsURL(url)) return null;
 	String user = info.getProperty("user");
+	if (user == null) {
+	    throw new SQLException("PJDBC: User not specified in connection properties");
+	}
 	String mapping = p.getProperty(user);
 	if (mapping == null) {
 	    throw new SQLException("PJDBC: No mapping found for user: " + user);
 	}
-	String[] credentials = mapping.split("/");
-	if (credentials.length < 2) {
+	String[] credentials = mapping.split("/", 2);
+	if (credentials.length < 2 || credentials[0].isEmpty()) {
 	    throw new SQLException("PJDBC: Invalid mapping for user: " + user);
 	}
 	Properties delegateInfo = new Properties();

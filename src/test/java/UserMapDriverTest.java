@@ -99,12 +99,13 @@ public class UserMapDriverTest {
 	    props.setProperty("user", "unknownuser");
 	    new UserMapDriver().connect("jdbc:mapuser:jdbc:mock:testdb", props);
 	    fail("Should throw exception for unmapped user");}
-	catch (NullPointerException e) {
-	    // Expected - user not in mapping file
+	catch (SQLException e) {
+	    // Expected for unmapped user.
+	    assertTrue(e.getMessage().contains("No mapping found for user: unknownuser"));
 	}
 	catch (Exception e) {
-	    // Could be NullPointerException or other exception
-	    assertTrue(e instanceof NullPointerException || e.getMessage().contains("unknownuser"));}}
+	    fail("Expected SQLException for unmapped user, but got " + e.getClass().getName());
+	}}
 
     @Test
     public void nullUserThrowsException () {
@@ -112,12 +113,13 @@ public class UserMapDriverTest {
 	    Properties props = new Properties();
 	    new UserMapDriver().connect("jdbc:mapuser:jdbc:mock:testdb", props);
 	    fail("Should throw exception for null user");}
-	catch (NullPointerException e) {
+	catch (SQLException e) {
 	    // Expected - no user specified
+	    assertTrue(e.getMessage().contains("User not specified"));
 	}
 	catch (Exception e) {
-	    // Could be NullPointerException
-	    assertTrue(e instanceof NullPointerException);}}
+	    fail("Expected SQLException for null user, but got " + e.getClass().getName());
+	}}
 
     @Test
     public void compliance () {
