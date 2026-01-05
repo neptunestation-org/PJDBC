@@ -12,7 +12,9 @@ import java.util.Map;
 import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverParameter;
 import org.pjdbc.capabilities.PjdbcCapabilities;
+import org.pjdbc.debug.PjdbcDebug;
 import org.pjdbc.sql.JdbcUrlParser;
+import org.pjdbc.sql.PjdbcListeners;
 import org.pjdbc.validation.ParameterValidator;
 
 /**
@@ -48,6 +50,7 @@ public class PjdbcCli {
           show <prefix>     Show details for a specific driver
           chain <url>       Show the driver chain for a URL
           test <url>        Test a database connection
+          debug-info        Show debug configuration
 
         Options:
           --help, -h        Show this help message
@@ -59,8 +62,9 @@ public class PjdbcCli {
           pjdbc show retry
           pjdbc chain "jdbc:retry:jdbc:timeout:jdbc:postgresql://localhost/db"
 
-        Debug Logging:
-          Enable with: -Dorg.pjdbc.level=FINE
+        Debug Mode:
+          Enable via system property: -Dpjdbc.debug=true
+          Or programmatically: PjdbcDebug.enable()
         """;
 
     private final PrintStream out;
@@ -141,6 +145,7 @@ public class PjdbcCli {
                 }
                 yield test(args[1]);
             }
+            case "debug-info" -> debugInfo();
             default -> {
                 err.println("Unknown command: " + command);
                 err.println();
@@ -427,11 +432,36 @@ public class PjdbcCli {
     }
 
     /**
+     * Show debug configuration and status.
+     */
+    private int debugInfo() {
+        out.println("PJDBC Debug Information");
+        out.println("=======================");
+        out.println();
+        out.println("Debug mode:        " + (PjdbcDebug.isEnabled() ? "enabled" : "disabled"));
+        out.println("Event listeners:   " + PjdbcListeners.listenerCount());
+        out.println("Java version:      " + System.getProperty("java.version"));
+        out.println("PJDBC version:     " + VERSION);
+        out.println();
+        out.println("To enable debug mode:");
+        out.println("  System property: -Dpjdbc.debug=true");
+        out.println("  Programmatic:    PjdbcDebug.enable()");
+        out.println();
+        out.println("Debug output includes:");
+        out.println("  - Retry attempts with delay and cause");
+        out.println("  - Circuit breaker state changes");
+        out.println("  - SQL transformations");
+        out.println("  - Federated query targets");
+        out.println("  - Chaos injection events");
+        return 0;
+    }
+
+    /**
      * Suggest a command based on a misspelled input.
      * Uses simple prefix matching and Levenshtein distance.
      */
     private String suggestCommand(String input) {
-        String[] commands = {"validate", "list", "show", "chain", "test", "help", "version"};
+        String[] commands = {"validate", "list", "show", "chain", "test", "debug-info", "help", "version"};
         String lowerInput = input.toLowerCase();
 
         // Try prefix match first
