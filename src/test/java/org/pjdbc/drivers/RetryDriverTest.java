@@ -258,4 +258,67 @@ public class RetryDriverTest {
             }
         }
     }
+
+    @Test
+    public void testIsConnectionError() {
+        RetryDriver.RetryConfig config = new RetryDriver.RetryConfig("jdbc:retry:jdbc:h2:mem:test");
+
+        // 08xxx states are connection errors
+        assertTrue(config.isConnectionError(new SQLException("Connection failed", "08001")));
+        assertTrue(config.isConnectionError(new SQLException("Connection failed", "08003")));
+        assertTrue(config.isConnectionError(new SQLException("Connection failed", "08006")));
+
+        // Non-08 states are not connection errors
+        assertFalse(config.isConnectionError(new SQLException("Deadlock", "40001")));
+        assertFalse(config.isConnectionError(new SQLException("Syntax error", "42000")));
+        assertFalse(config.isConnectionError(new SQLException("Error", (String) null)));
+    }
+
+    /**
+     * Documents that PreparedStatement cannot be retried after connection failures.
+     *
+     * <p>This is a design limitation: when a connection dies, we cannot recreate
+     * a PreparedStatement with its parameter bindings because JDBC doesn't provide
+     * a way to introspect bound parameters. Silently retrying with unbound parameters
+     * would cause data corruption.</p>
+     *
+     * <p>The RetryDriver now throws SQLException with a clear message instead of
+     * silently proceeding with NULL parameters.</p>
+     *
+     * <p>Note: This test verifies the limitation is documented. A full integration
+     * test would require simulating connection failure mid-query, which is complex
+     * to set up reliably.</p>
+     */
+    @Test
+    public void testPreparedStatementConnectionErrorLimitation() throws SQLException {
+        // Verify that PreparedStatements work normally (no connection error)
+        String url = "jdbc:retry:jdbc:h2:mem:test_ps_limit";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE TABLE IF NOT EXISTS ps_test (id INT, name VARCHAR(50))");
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement("INSERT INTO ps_test VALUES (?, ?)")) {
+                pstmt.setInt(1, 1);
+                pstmt.setString(2, "test");
+                assertEquals(1, pstmt.executeUpdate());
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM ps_test WHERE id = ?")) {
+                pstmt.setInt(1, 1);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    assertTrue(rs.next());
+                    assertEquals("test", rs.getString("name"));
+                }
+            }
+        }
+
+        // Note: Full test of connection failure behavior would require:
+        // 1. Establish connection and create PreparedStatement
+        // 2. Bind parameters
+        // 3. Kill connection mid-execution (hard to simulate reliably)
+        // 4. Verify SQLException is thrown with message containing
+        //    "Parameter bindings cannot be preserved"
+        //
+        // The implementation in RetryDriver.RetryPreparedStatement.recreateStatement()
+        // now throws SQLException instead of logging a warning and proceeding.
+    }
 }

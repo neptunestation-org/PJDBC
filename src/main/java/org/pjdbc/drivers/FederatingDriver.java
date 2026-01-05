@@ -40,7 +40,8 @@ import org.pjdbc.sql.*;
 @DriverParameter(name = "timeout", type = ParameterType.INTEGER,
     description = "Timeout in milliseconds for parallel execution", defaultValue = "30000", min = 0)
 @DriverParameter(name = "strictTransactions", type = ParameterType.BOOLEAN,
-    description = "Throw exception when transactions are used (no cross-DB coordination)", defaultValue = "false")
+    description = "Throw exception when transactions are used (no cross-DB coordination). " +
+        "Set to false to allow uncoordinated transactions at your own risk.", defaultValue = "true")
 @DriverSideEffects(stateful = true)
 public class FederatingDriver extends AbstractDriver {
     private static final java.util.logging.Logger LOG =
@@ -118,7 +119,7 @@ public class FederatingDriver extends AbstractDriver {
             MergeStrategy strategy = MergeStrategy.CONCAT;
             boolean parallel = false;
             long timeout = 30000;
-            boolean strict = false;
+            boolean strict = true;
 
             try {
                 JdbcUrlParser parser = JdbcUrlParser.parse(url);
@@ -131,7 +132,7 @@ public class FederatingDriver extends AbstractDriver {
                 parallel = "true".equalsIgnoreCase(parser.getParameter("parallelExecution", "false"));
                 String timeoutParam = parser.getParameter("timeout", "30000");
                 timeout = Long.parseLong(timeoutParam);
-                strict = "true".equalsIgnoreCase(parser.getParameter("strictTransactions", "false"));
+                strict = !"false".equalsIgnoreCase(parser.getParameter("strictTransactions", "true"));
             } catch (Exception e) {
                 // Use defaults on parse error
             }

@@ -54,6 +54,33 @@ import org.pjdbc.sql.ProxyConnection;
  * combination with RetryDriver, or implement application-level idempotency
  * using idempotency keys or optimistic locking.</p>
  *
+ * <h2>LIMITATION: PreparedStatement and Connection Failures</h2>
+ * <p><strong>PreparedStatement and CallableStatement cannot be retried after
+ * connection failures.</strong> When the database connection is lost (SQL states
+ * starting with "08"), this driver throws SQLException instead of retrying because
+ * parameter bindings cannot be preserved across reconnection.</p>
+ *
+ * <p>Attempting to silently retry would execute queries with NULL/default parameters,
+ * causing silent data corruption. For PreparedStatements that need retry on connection
+ * failure, implement application-level retry that can re-bind parameters:</p>
+ *
+ * <pre>{@code
+ * // Application-level retry for PreparedStatement
+ * for (int attempt = 0; attempt < maxRetries; attempt++) {
+ *     try (Connection conn = dataSource.getConnection();
+ *          PreparedStatement ps = conn.prepareStatement(sql)) {
+ *         ps.setInt(1, id);  // Re-bind parameters each attempt
+ *         return ps.executeQuery();
+ *     } catch (SQLException e) {
+ *         if (!isRetryable(e) || attempt == maxRetries - 1) throw e;
+ *         Thread.sleep(calculateBackoff(attempt));
+ *     }
+ * }
+ * }</pre>
+ *
+ * <p>Plain {@link Statement} operations (without parameters) can be retried after
+ * connection failures because the SQL string is preserved.</p>
+ *
  * <h2>Default Retryable SQL States</h2>
  * <ul>
  *   <li>08001, 08003, 08004, 08006, 08007 - Connection errors</li>
@@ -513,25 +540,32 @@ public class RetryDriver extends AbstractProxyDriver {
 
         /**
          * Recreate this statement after a connection failure.
-         * <p><strong>Warning:</strong> Parameter bindings are lost!
+         *
+         * <p><strong>This method always throws SQLException.</strong> PreparedStatement
+         * retry after connection failure is not supported because parameter bindings
+         * cannot be preserved across reconnection. Silently proceeding would cause
+         * queries to execute with NULL/default parameters, risking data corruption.</p>
+         *
+         * @throws SQLException always, explaining that retry is not possible
          */
         private void recreateStatement() throws SQLException {
             if (sql == null) {
-                LOG.warning(() -> "RetryDriver: Cannot recreate PreparedStatement - SQL not available");
-                return;
+                throw new SQLException(
+                    "RetryDriver: Cannot retry PreparedStatement after connection failure. " +
+                    "SQL was not available for statement recreation. " +
+                    "Use application-level retry or plain Statement for retryable operations.",
+                    "08006"); // Connection failure SQL state
             }
 
-            RetryConnection conn = (RetryConnection) getConnection();
-            conn.reconnect();
-
-            // Create new PreparedStatement from reconnected connection
-            PreparedStatement newStmt = conn.getDelegateConnection().prepareStatement(sql);
-
-            // Replace our delegate
-            getStatements().clear();
-            getStatements().add(newStmt);
-
-            LOG.warning(() -> "RetryDriver: Recreated PreparedStatement. Parameter bindings were lost and must be re-applied.");
+            // Even with SQL available, we cannot preserve parameter bindings.
+            // Proceeding would execute the query with NULL/default parameters,
+            // which could cause silent data corruption.
+            throw new SQLException(
+                "RetryDriver: Cannot retry PreparedStatement after connection failure. " +
+                "Parameter bindings cannot be preserved across reconnection. " +
+                "Use application-level retry that re-binds parameters, " +
+                "or use plain Statement for retryable read-only operations.",
+                "08006"); // Connection failure SQL state
         }
 
         /**
@@ -634,25 +668,31 @@ public class RetryDriver extends AbstractProxyDriver {
 
         /**
          * Recreate this statement after a connection failure.
-         * <p><strong>Warning:</strong> Parameter bindings are lost!
+         *
+         * <p><strong>This method always throws SQLException.</strong> CallableStatement
+         * retry after connection failure is not supported because parameter bindings
+         * cannot be preserved across reconnection. Silently proceeding would cause
+         * queries to execute with NULL/default parameters, risking data corruption.</p>
+         *
+         * @throws SQLException always, explaining that retry is not possible
          */
         private void recreateStatement() throws SQLException {
             if (sql == null) {
-                LOG.warning(() -> "RetryDriver: Cannot recreate CallableStatement - SQL not available");
-                return;
+                throw new SQLException(
+                    "RetryDriver: Cannot retry CallableStatement after connection failure. " +
+                    "SQL was not available for statement recreation. " +
+                    "Use application-level retry or plain Statement for retryable operations.",
+                    "08006"); // Connection failure SQL state
             }
 
-            RetryConnection conn = (RetryConnection) getConnection();
-            conn.reconnect();
-
-            // Create new CallableStatement from reconnected connection
-            CallableStatement newStmt = conn.getDelegateConnection().prepareCall(sql);
-
-            // Replace our delegate
-            getStatements().clear();
-            getStatements().add(newStmt);
-
-            LOG.warning(() -> "RetryDriver: Recreated CallableStatement. Parameter bindings were lost and must be re-applied.");
+            // Even with SQL available, we cannot preserve parameter bindings.
+            // Proceeding would execute the query with NULL/default parameters,
+            // which could cause silent data corruption.
+            throw new SQLException(
+                "RetryDriver: Cannot retry CallableStatement after connection failure. " +
+                "Parameter bindings cannot be preserved across reconnection. " +
+                "Use application-level retry that re-binds parameters.",
+                "08006"); // Connection failure SQL state
         }
 
         /**

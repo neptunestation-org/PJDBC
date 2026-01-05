@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -407,86 +408,124 @@ public class DataMaskingDriverTest {
     }
 
     @Test
-    public void testGetIntMasked() throws SQLException {
+    public void testGetIntMaskedThrows() throws SQLException {
         setupNumericTable("test_int");
         String url = "jdbc:mask[columns=secret_int]:jdbc:h2:mem:test_int;DB_CLOSE_DELAY=-1";
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT secret_int, public_int FROM numeric_data WHERE id = 1")) {
                     assertTrue(rs.next());
-                    assertEquals(0, rs.getInt("secret_int")); // masked
-                    assertEquals(999, rs.getInt("public_int")); // not masked
+                    // Unmasked column still works
+                    assertEquals(999, rs.getInt("public_int"));
+                    // Masked column throws
+                    try {
+                        rs.getInt("secret_int");
+                        fail("Expected SQLException for masked column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                        assertTrue(e.getMessage().contains("getInt"));
+                    }
                 }
             }
         }
     }
 
     @Test
-    public void testGetLongMasked() throws SQLException {
+    public void testGetLongMaskedThrows() throws SQLException {
         setupNumericTable("test_long");
         String url = "jdbc:mask[columns=secret_long]:jdbc:h2:mem:test_long;DB_CLOSE_DELAY=-1";
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT secret_long FROM numeric_data WHERE id = 1")) {
                     assertTrue(rs.next());
-                    assertEquals(0L, rs.getLong("secret_long"));
-                    assertEquals(0L, rs.getLong(1)); // by index
+                    try {
+                        rs.getLong("secret_long");
+                        fail("Expected SQLException for masked column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
+                    try {
+                        rs.getLong(1);
+                        fail("Expected SQLException for masked column by index");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
                 }
             }
         }
     }
 
     @Test
-    public void testGetDoubleMasked() throws SQLException {
+    public void testGetDoubleMaskedThrows() throws SQLException {
         setupNumericTable("test_double");
         String url = "jdbc:mask[columns=secret_double]:jdbc:h2:mem:test_double;DB_CLOSE_DELAY=-1";
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT secret_double FROM numeric_data WHERE id = 1")) {
                     assertTrue(rs.next());
-                    assertEquals(0.0, rs.getDouble("secret_double"), 0.001);
+                    try {
+                        rs.getDouble("secret_double");
+                        fail("Expected SQLException for masked column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
                 }
             }
         }
     }
 
     @Test
-    public void testGetFloatMasked() throws SQLException {
+    public void testGetFloatMaskedThrows() throws SQLException {
         setupNumericTable("test_float");
         String url = "jdbc:mask[columns=secret_float]:jdbc:h2:mem:test_float;DB_CLOSE_DELAY=-1";
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT secret_float FROM numeric_data WHERE id = 1")) {
                     assertTrue(rs.next());
-                    assertEquals(0.0f, rs.getFloat("secret_float"), 0.001);
+                    try {
+                        rs.getFloat("secret_float");
+                        fail("Expected SQLException for masked column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
                 }
             }
         }
     }
 
     @Test
-    public void testGetBigDecimalMasked() throws SQLException {
+    public void testGetBigDecimalMaskedThrows() throws SQLException {
         setupNumericTable("test_bigdecimal");
         String url = "jdbc:mask[columns=secret_decimal]:jdbc:h2:mem:test_bigdecimal;DB_CLOSE_DELAY=-1";
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT secret_decimal FROM numeric_data WHERE id = 1")) {
                     assertTrue(rs.next());
-                    assertEquals(java.math.BigDecimal.ZERO, rs.getBigDecimal("secret_decimal"));
+                    try {
+                        rs.getBigDecimal("secret_decimal");
+                        fail("Expected SQLException for masked column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
                 }
             }
         }
     }
 
     @Test
-    public void testGetBooleanMasked() throws SQLException {
+    public void testGetBooleanMaskedThrows() throws SQLException {
         setupNumericTable("test_boolean");
         String url = "jdbc:mask[columns=secret_bool]:jdbc:h2:mem:test_boolean;DB_CLOSE_DELAY=-1";
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT secret_bool FROM numeric_data WHERE id = 1")) {
                     assertTrue(rs.next());
-                    assertFalse(rs.getBoolean("secret_bool")); // masked to false
+                    try {
+                        rs.getBoolean("secret_bool");
+                        fail("Expected SQLException for masked column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
                 }
             }
         }
@@ -565,28 +604,38 @@ public class DataMaskingDriverTest {
     }
 
     @Test
-    public void testGetShortMasked() throws SQLException {
+    public void testGetShortMaskedThrows() throws SQLException {
         setupNumericTable("test_short");
         String url = "jdbc:mask[columns=secret_int]:jdbc:h2:mem:test_short;DB_CLOSE_DELAY=-1";
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT secret_int FROM numeric_data WHERE id = 1")) {
                     assertTrue(rs.next());
-                    assertEquals((short) 0, rs.getShort("secret_int"));
+                    try {
+                        rs.getShort("secret_int");
+                        fail("Expected SQLException for masked column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
                 }
             }
         }
     }
 
     @Test
-    public void testGetByteMasked() throws SQLException {
+    public void testGetByteMaskedThrows() throws SQLException {
         setupNumericTable("test_byte");
         String url = "jdbc:mask[columns=secret_int]:jdbc:h2:mem:test_byte;DB_CLOSE_DELAY=-1";
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT secret_int FROM numeric_data WHERE id = 1")) {
                     assertTrue(rs.next());
-                    assertEquals((byte) 0, rs.getByte("secret_int"));
+                    try {
+                        rs.getByte("secret_int");
+                        fail("Expected SQLException for masked column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
                 }
             }
         }
@@ -616,10 +665,89 @@ public class DataMaskingDriverTest {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT secret_int, secret_long, secret_bool, public_int FROM numeric_data WHERE id = 1")) {
                     assertTrue(rs.next());
-                    assertEquals(0, rs.getInt("secret_int")); // masked
-                    assertEquals(9876543210L, rs.getLong("secret_long")); // not masked
-                    assertTrue(rs.getBoolean("secret_bool")); // not masked
-                    assertEquals(999, rs.getInt("public_int")); // not masked
+                    // Masked column throws
+                    try {
+                        rs.getInt("secret_int");
+                        fail("Expected SQLException for masked column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
+                    // Unmasked columns still work
+                    assertEquals(9876543210L, rs.getLong("secret_long"));
+                    assertTrue(rs.getBoolean("secret_bool"));
+                    assertEquals(999, rs.getInt("public_int"));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetDateMaskedThrows() throws SQLException {
+        try (Connection setupConn = DriverManager.getConnection("jdbc:h2:mem:test_date;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = setupConn.createStatement()) {
+                stmt.execute("CREATE TABLE datetest (id INT, secret_date DATE)");
+                stmt.execute("INSERT INTO datetest VALUES (1, '2024-01-15')");
+            }
+        }
+        String url = "jdbc:mask[columns=secret_date]:jdbc:h2:mem:test_date;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_date FROM datetest WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    try {
+                        rs.getDate("secret_date");
+                        fail("Expected SQLException for masked date column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                        assertTrue(e.getMessage().contains("getDate"));
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetTimestampMaskedThrows() throws SQLException {
+        try (Connection setupConn = DriverManager.getConnection("jdbc:h2:mem:test_timestamp;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = setupConn.createStatement()) {
+                stmt.execute("CREATE TABLE tstest (id INT, secret_ts TIMESTAMP)");
+                stmt.execute("INSERT INTO tstest VALUES (1, '2024-01-15 10:30:00')");
+            }
+        }
+        String url = "jdbc:mask[columns=secret_ts]:jdbc:h2:mem:test_timestamp;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_ts FROM tstest WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    try {
+                        rs.getTimestamp("secret_ts");
+                        fail("Expected SQLException for masked timestamp column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                        assertTrue(e.getMessage().contains("getTimestamp"));
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testMaskedColumnCanUseGetString() throws SQLException {
+        setupNumericTable("test_use_getstring");
+        String url = "jdbc:mask[columns=secret_int,strategy=REDACT]:jdbc:h2:mem:test_use_getstring;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_int FROM numeric_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    // getInt throws
+                    try {
+                        rs.getInt("secret_int");
+                        fail("Expected SQLException");
+                    } catch (SQLException e) {
+                        // expected
+                    }
+                    // But getString works and returns masked value
+                    assertEquals("[REDACTED]", rs.getString("secret_int"));
                 }
             }
         }
