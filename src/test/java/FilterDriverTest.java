@@ -2,6 +2,7 @@ import java.sql.*;
 import java.util.regex.*;
 import org.junit.*;
 import org.pjdbc.drivers.*;
+import org.pjdbc.sql.*;
 import static org.junit.Assert.*;
 
 public class FilterDriverTest {
@@ -16,8 +17,8 @@ public class FilterDriverTest {
     public void assertionFilter () {
 	try {
 	    ((FilterDriver)DriverManager.getDriver("jdbc:filter:jdbc:mock:foo"))
-		.setFilter(new FilterDriver.Filter() {
-			public String apply (String sql) {
+		.setTransformer(new AbstractJdbcTransformer() {
+			public String transformSql (String sql) {
 			    Matcher m1 = Pattern.compile("CREATE\\s+ASSERTION\\s+(\\w+)\\s+CHECK\\s+(.*)").matcher((""+sql).trim().toUpperCase());
 			    if (m1.matches()) {
 				Matcher m2 = Pattern.compile("\\((.*)=(.*)\\)").matcher(m1.group(2));
@@ -65,8 +66,8 @@ public class FilterDriverTest {
     @Test
     public void upcaseFilter () {
 	try {
-	    ((FilterDriver)DriverManager.getDriver("jdbc:filter:jdbc:mock:foo")).setFilter(new FilterDriver.Filter() {
-		    public String apply (String sql) {return sql==null ? null : sql.toUpperCase();}});
+	    ((FilterDriver)DriverManager.getDriver("jdbc:filter:jdbc:mock:foo")).setTransformer(new AbstractJdbcTransformer() {
+		    public String transformSql (String sql) {return sql==null ? null : sql.toUpperCase();}});
 	    DriverManager.getConnection("jdbc:filter:jdbc:mock:foo").createStatement().executeQuery("select * from person;");
 	    String log = MockDriver.getLog("jdbc:mock:foo");
 	    assertEquals("executeQuery[SELECT * FROM PERSON;]", log);}

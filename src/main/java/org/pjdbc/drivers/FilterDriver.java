@@ -17,38 +17,6 @@ import org.pjdbc.sql.*;
 public class FilterDriver extends AbstractProxyDriver {
     static {try {DriverManager.registerDriver(new FilterDriver());} catch (Exception e) {throw new RuntimeException(e);}}
 
-    /**
-     * Legacy Filter interface for SQL transformation.
-     * @deprecated Use {@link JdbcTransformer} instead for more comprehensive transformation support.
-     */
-    @Deprecated
-    public static interface Filter {
-        public String apply (String sql);}
-
-    /**
-     * Legacy abstract Filter implementation.
-     * @deprecated Use {@link AbstractJdbcTransformer} instead.
-     */
-    @Deprecated
-    public static abstract class AbstractFilter implements Filter {
-        public String apply (String sql) {return sql;}}
-
-    /**
-     * Adapter that wraps a legacy Filter as a JdbcTransformer.
-     */
-    private static class FilterAdapter extends AbstractJdbcTransformer {
-        private final Filter filter;
-
-        FilterAdapter(Filter filter) {
-            this.filter = filter;
-        }
-
-        @Override
-        public String transformSql(String sql) throws SQLException {
-            return filter.apply(sql);
-        }
-    }
-
     protected ThreadLocal<JdbcTransformer> transformer =
         ThreadLocal.withInitial(() -> new AbstractJdbcTransformer() {});
 
@@ -93,26 +61,4 @@ public class FilterDriver extends AbstractProxyDriver {
      * @param transformer the JdbcTransformer to use
      */
     public void setTransformer(JdbcTransformer transformer) {
-        this.transformer.set(transformer);}
-
-    /**
-     * Get the current filter as a legacy Filter for this thread.
-     * @deprecated Use {@link #getTransformer()} instead.
-     * @return the Filter, or null if a non-Filter transformer is set
-     */
-    @Deprecated
-    public Filter getFilter () {
-        JdbcTransformer t = transformer.get();
-        if (t instanceof FilterAdapter fa) {
-            return fa.filter;
-        }
-        return null;}
-
-    /**
-     * Set the filter using a legacy Filter for this thread.
-     * @deprecated Use {@link #setTransformer(JdbcTransformer)} instead.
-     * @param filter the Filter to use for SQL transformation
-     */
-    @Deprecated
-    public void setFilter (Filter filter) {
-        this.transformer.set(new FilterAdapter(filter));}}
+        this.transformer.set(transformer);}}
