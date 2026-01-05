@@ -24,6 +24,36 @@ PJDBC intentionally excludes:
 
 These concerns are better served by purpose-built tools with established ecosystems.
 
+## Security Limitations
+
+PJDBC's access control drivers provide **defense-in-depth**, not security boundaries. They use regex-based SQL parsing which can be bypassed by sufficiently complex queries:
+
+| Driver | Limitation |
+|--------|------------|
+| `readonly` | CTEs with DML (`WITH x AS (DELETE...) SELECT...`) may bypass detection |
+| `schema` | Subqueries and views (`SELECT * FROM (SELECT secret...)`) may bypass table checks |
+| `mask` | Non-string getters now throw SQLException, but LOB types (Clob, Blob) are not yet covered |
+
+**Use these drivers for:**
+- Preventing accidental writes in read-only contexts
+- Reducing attack surface in development/staging environments
+- Adding friction to casual data access mistakes
+
+**Do NOT rely on these drivers for:**
+- Enforcing security boundaries against malicious actors
+- PCI/HIPAA/SOC2 compliance without additional controls
+- Protecting against SQL injection (use parameterized queries)
+
+For true security boundaries, use database-level permissions (GRANT/REVOKE), row-level security (RLS), or dedicated security proxies.
+
+### Breaking Changes in v3.0
+
+**RetryDriver**: PreparedStatement/CallableStatement now throws SQLException on connection failure instead of silently proceeding with lost parameters. This prevents silent data corruption but may require application-level retry logic for prepared statements.
+
+**FederatingDriver**: `strictTransactions` now defaults to `true`. Transactions across federated connections will fail unless you explicitly set `strictTransactions=false`.
+
+**DataMaskingDriver**: Numeric, boolean, and date/time getters on masked columns now throw SQLException instead of returning default values. Use `getString()` to retrieve masked values.
+
 ## Requirements
 
 - Java 17 or higher (uses virtual threads on Java 21+ when available)
