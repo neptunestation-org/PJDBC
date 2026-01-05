@@ -78,6 +78,35 @@ public abstract class AbstractProxyDriver extends AbstractDriver {
 	    protected ResultSet wrap (ResultSet r) throws SQLException {
 		return driver.proxyResultSet(this, r);}};}
 
+    /**
+     * Proxy a PreparedStatement with access to the original SQL.
+     * Override this method when you need to recreate the statement (e.g., on connection failure).
+     * The default implementation ignores the SQL and delegates to {@link #proxyPreparedStatement(PreparedStatement, Connection)}.
+     *
+     * @param delegate the delegate PreparedStatement
+     * @param conn the connection
+     * @param sql the SQL used to prepare the statement
+     * @return the proxied PreparedStatement
+     * @throws SQLException if an error occurs
+     */
+    protected PreparedStatement proxyPreparedStatement (PreparedStatement delegate, Connection conn, String sql) throws SQLException {
+        return proxyPreparedStatement(delegate, conn);
+    }
+
+    /**
+     * Proxy a CallableStatement with access to the original SQL.
+     * Override this method when you need to recreate the statement (e.g., on connection failure).
+     * The default implementation ignores the SQL and delegates to {@link #proxyCallableStatement(CallableStatement, Connection)}.
+     *
+     * @param delegate the delegate CallableStatement
+     * @param conn the connection
+     * @param sql the SQL used to prepare the statement
+     * @return the proxied CallableStatement
+     * @throws SQLException if an error occurs
+     */
+    protected CallableStatement proxyCallableStatement (CallableStatement delegate, Connection conn, String sql) throws SQLException {
+        return proxyCallableStatement(delegate, conn);
+    }
 
     public ResultSet proxyResultSet (Statement stmt, ResultSet delegate) throws SQLException {
 	if (delegate == null) return null;

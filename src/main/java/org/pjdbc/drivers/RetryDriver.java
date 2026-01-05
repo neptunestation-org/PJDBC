@@ -144,14 +144,30 @@ public class RetryDriver extends AbstractProxyDriver {
 
     @Override
     protected PreparedStatement proxyPreparedStatement(PreparedStatement delegate, Connection conn) throws SQLException {
+        // Fallback without SQL - can't recreate on connection failure
         RetryConnection retryConn = (RetryConnection) conn;
-        return new RetryPreparedStatement(delegate, conn, retryConn.getConfig());
+        return new RetryPreparedStatement(delegate, conn, retryConn.getConfig(), null);
+    }
+
+    @Override
+    protected PreparedStatement proxyPreparedStatement(PreparedStatement delegate, Connection conn, String sql) throws SQLException {
+        // With SQL - can recreate on connection failure
+        RetryConnection retryConn = (RetryConnection) conn;
+        return new RetryPreparedStatement(delegate, conn, retryConn.getConfig(), sql);
     }
 
     @Override
     protected CallableStatement proxyCallableStatement(CallableStatement delegate, Connection conn) throws SQLException {
+        // Fallback without SQL - can't recreate on connection failure
         RetryConnection retryConn = (RetryConnection) conn;
-        return new RetryCallableStatement(delegate, conn, retryConn.getConfig());
+        return new RetryCallableStatement(delegate, conn, retryConn.getConfig(), null);
+    }
+
+    @Override
+    protected CallableStatement proxyCallableStatement(CallableStatement delegate, Connection conn, String sql) throws SQLException {
+        // With SQL - can recreate on connection failure
+        RetryConnection retryConn = (RetryConnection) conn;
+        return new RetryCallableStatement(delegate, conn, retryConn.getConfig(), sql);
     }
 
     /**
@@ -222,6 +238,16 @@ public class RetryDriver extends AbstractProxyDriver {
         }
 
         /**
+         * Check if an exception indicates a connection failure.
+         * Connection errors have SQL states starting with "08".
+         */
+        public boolean isConnectionError(SQLException e) {
+            String sqlState = e.getSQLState();
+            if (sqlState == null) return false;
+            return sqlState.startsWith("08");
+        }
+
+        /**
          * Calculate delay for a given retry attempt (0-indexed).
          * Uses ThreadLocalRandom for thread-safe jitter generation.
          */
@@ -242,14 +268,56 @@ public class RetryDriver extends AbstractProxyDriver {
      */
     private class RetryConnection extends ProxyConnection {
         private final RetryConfig config;
+        private final String targetUrl;
+        private final Properties connectionInfo;
 
         public RetryConnection(Connection conn, RetryDriver driver, String url, Properties info) throws SQLException {
             super(conn, driver, url, info);
             this.config = new RetryConfig(url);
+            // Store the target URL for reconnection
+            this.targetUrl = driver.subname(url);
+            this.connectionInfo = info != null ? (Properties) info.clone() : new Properties();
         }
 
         public RetryConfig getConfig() {
             return config;
+        }
+
+        /**
+         * Get the underlying delegate connection.
+         * Public accessor for use by statement classes during reconnection.
+         */
+        public Connection getDelegateConnection() {
+            return getConnections().get(0);
+        }
+
+        /**
+         * Reconnect to the database after a connection failure.
+         * Creates a new underlying connection to replace the dead one.
+         *
+         * @throws SQLException if reconnection fails
+         */
+        public void reconnect() throws SQLException {
+            LOG.fine(() -> "RetryDriver: Reconnecting to " + targetUrl);
+
+            // Close old connection (ignore errors since it's likely already dead)
+            try {
+                Connection oldConn = getDelegate();
+                if (oldConn != null && !oldConn.isClosed()) {
+                    oldConn.close();
+                }
+            } catch (SQLException e) {
+                LOG.fine(() -> "RetryDriver: Error closing old connection (expected): " + e.getMessage());
+            }
+
+            // Create new connection
+            Connection newConn = DriverManager.getConnection(targetUrl, connectionInfo);
+
+            // Replace the delegate connection
+            getConnections().clear();
+            getConnections().add(newConn);
+
+            LOG.fine(() -> "RetryDriver: Successfully reconnected");
         }
     }
 
@@ -311,6 +379,7 @@ public class RetryDriver extends AbstractProxyDriver {
 
     /**
      * Statement wrapper that retries on transient errors.
+     * Automatically reconnects and recreates the statement on connection failures.
      */
     private static class RetryStatement extends AbstractStatement {
         private final RetryConfig config;
@@ -326,87 +395,342 @@ public class RetryDriver extends AbstractProxyDriver {
             return ((AbstractProxyDriver)driver).proxyResultSet(this, r);
         }
 
+        /**
+         * Recreate this statement after a connection failure.
+         * Reconnects the connection and creates a fresh statement.
+         */
+        private void recreateStatement() throws SQLException {
+            RetryConnection conn = (RetryConnection) getConnection();
+            conn.reconnect();
+
+            // Create new statement from reconnected connection
+            Statement newStmt = conn.getDelegateConnection().createStatement();
+
+            // Replace our delegate
+            getStatements().clear();
+            getStatements().add(newStmt);
+        }
+
+        /**
+         * Execute with retry, recreating statement on connection errors.
+         */
+        private <T> T executeWithReconnect(String sql, StatementOperation<T> operation) throws SQLException {
+            SQLException lastException = null;
+
+            for (int attempt = 0; attempt <= config.getMaxRetries(); attempt++) {
+                final int attemptNum = attempt;
+                try {
+                    Statement stmt = getStatements().get(0);
+                    T result = operation.execute(stmt, sql);
+                    if (attemptNum > 0) {
+                        LOG.fine(() -> String.format("RetryDriver: Operation succeeded on attempt %d/%d",
+                            attemptNum + 1, config.getMaxRetries() + 1));
+                    }
+                    return result;
+                } catch (SQLException e) {
+                    lastException = e;
+
+                    if (!config.isRetryable(e) || attemptNum >= config.getMaxRetries()) {
+                        if (attemptNum > 0) {
+                            LOG.fine(() -> String.format("RetryDriver: Exhausted retries (%d attempts), " +
+                                "final error: SQLState=%s, message=%s",
+                                attemptNum + 1, e.getSQLState(), e.getMessage()));
+                        }
+                        throw e;
+                    }
+
+                    long delay = config.calculateDelay(attemptNum);
+                    LOG.fine(() -> String.format("RetryDriver: Retry attempt %d/%d after %dms delay, " +
+                        "SQLState=%s, message=%s",
+                        attemptNum + 1, config.getMaxRetries(), delay, e.getSQLState(), e.getMessage()));
+
+                    PjdbcListeners.fireRetry(sql, e, attemptNum + 1, delay);
+
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new SQLException("RetryDriver: Interrupted during retry delay", ie);
+                    }
+
+                    // If this is a connection error, reconnect before next attempt
+                    if (config.isConnectionError(e)) {
+                        LOG.fine(() -> "RetryDriver: Connection error detected, recreating statement");
+                        recreateStatement();
+                    }
+                }
+            }
+
+            throw lastException != null ? lastException : new SQLException("RetryDriver: Unknown error");
+        }
+
+        @FunctionalInterface
+        private interface StatementOperation<T> {
+            T execute(Statement stmt, String sql) throws SQLException;
+        }
+
         @Override
         public boolean execute(String sql) throws SQLException {
-            return executeWithRetry(config, () -> super.execute(sql));
+            return executeWithReconnect(sql, (stmt, s) -> stmt.execute(s));
         }
 
         @Override
         public ResultSet executeQuery(String sql) throws SQLException {
-            return executeWithRetry(config, () -> super.executeQuery(sql));
+            return wrap(executeWithReconnect(sql, (stmt, s) -> stmt.executeQuery(s)));
         }
 
         @Override
         public int executeUpdate(String sql) throws SQLException {
-            return executeWithRetry(config, () -> super.executeUpdate(sql));
+            return executeWithReconnect(sql, (stmt, s) -> stmt.executeUpdate(s));
         }
 
         @Override
         public int[] executeBatch() throws SQLException {
+            // For batch, we can't easily recreate after connection failure
+            // because the batch contents are lost. Just retry on the same statement.
             return executeWithRetry(config, () -> super.executeBatch());
         }
     }
 
     /**
      * PreparedStatement wrapper that retries on transient errors.
+     * Automatically reconnects and recreates the statement on connection failures
+     * if SQL was provided at construction time.
+     *
+     * <p><strong>Warning:</strong> On connection failure, parameter bindings are lost
+     * and must be re-applied by the caller. Consider using idempotent operations
+     * or application-level retry logic for PreparedStatements with parameters.
      */
     private static class RetryPreparedStatement extends AbstractPreparedStatement {
         private final RetryConfig config;
+        private final String sql;
 
-        public RetryPreparedStatement(PreparedStatement delegate, Connection conn, RetryConfig config) throws SQLException {
+        public RetryPreparedStatement(PreparedStatement delegate, Connection conn, RetryConfig config, String sql) throws SQLException {
             super(delegate, conn);
             this.config = config;
+            this.sql = sql;
+        }
+
+        /**
+         * Recreate this statement after a connection failure.
+         * <p><strong>Warning:</strong> Parameter bindings are lost!
+         */
+        private void recreateStatement() throws SQLException {
+            if (sql == null) {
+                LOG.warning(() -> "RetryDriver: Cannot recreate PreparedStatement - SQL not available");
+                return;
+            }
+
+            RetryConnection conn = (RetryConnection) getConnection();
+            conn.reconnect();
+
+            // Create new PreparedStatement from reconnected connection
+            PreparedStatement newStmt = conn.getDelegateConnection().prepareStatement(sql);
+
+            // Replace our delegate
+            getStatements().clear();
+            getStatements().add(newStmt);
+
+            LOG.warning(() -> "RetryDriver: Recreated PreparedStatement. Parameter bindings were lost and must be re-applied.");
+        }
+
+        /**
+         * Execute with retry, recreating statement on connection errors.
+         */
+        private <T> T executeWithReconnect(PreparedStatementOperation<T> operation) throws SQLException {
+            SQLException lastException = null;
+
+            for (int attempt = 0; attempt <= config.getMaxRetries(); attempt++) {
+                final int attemptNum = attempt;
+                try {
+                    PreparedStatement stmt = getDelegate();
+                    T result = operation.execute(stmt);
+                    if (attemptNum > 0) {
+                        LOG.fine(() -> String.format("RetryDriver: Operation succeeded on attempt %d/%d",
+                            attemptNum + 1, config.getMaxRetries() + 1));
+                    }
+                    return result;
+                } catch (SQLException e) {
+                    lastException = e;
+
+                    if (!config.isRetryable(e) || attemptNum >= config.getMaxRetries()) {
+                        if (attemptNum > 0) {
+                            LOG.fine(() -> String.format("RetryDriver: Exhausted retries (%d attempts), " +
+                                "final error: SQLState=%s, message=%s",
+                                attemptNum + 1, e.getSQLState(), e.getMessage()));
+                        }
+                        throw e;
+                    }
+
+                    long delay = config.calculateDelay(attemptNum);
+                    LOG.fine(() -> String.format("RetryDriver: Retry attempt %d/%d after %dms delay, " +
+                        "SQLState=%s, message=%s",
+                        attemptNum + 1, config.getMaxRetries(), delay, e.getSQLState(), e.getMessage()));
+
+                    PjdbcListeners.fireRetry(sql, e, attemptNum + 1, delay);
+
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new SQLException("RetryDriver: Interrupted during retry delay", ie);
+                    }
+
+                    // If this is a connection error and we have SQL, reconnect before next attempt
+                    if (config.isConnectionError(e) && sql != null) {
+                        LOG.fine(() -> "RetryDriver: Connection error detected, recreating PreparedStatement");
+                        recreateStatement();
+                    }
+                }
+            }
+
+            throw lastException != null ? lastException : new SQLException("RetryDriver: Unknown error");
+        }
+
+        @FunctionalInterface
+        private interface PreparedStatementOperation<T> {
+            T execute(PreparedStatement stmt) throws SQLException;
         }
 
         @Override
         public boolean execute() throws SQLException {
-            return executeWithRetry(config, () -> super.execute());
+            return executeWithReconnect(PreparedStatement::execute);
         }
 
         @Override
         public ResultSet executeQuery() throws SQLException {
-            return executeWithRetry(config, () -> super.executeQuery());
+            return executeWithReconnect(PreparedStatement::executeQuery);
         }
 
         @Override
         public int executeUpdate() throws SQLException {
-            return executeWithRetry(config, () -> super.executeUpdate());
+            return executeWithReconnect(PreparedStatement::executeUpdate);
         }
 
         @Override
         public int[] executeBatch() throws SQLException {
+            // For batch, we can't easily recreate after connection failure
             return executeWithRetry(config, () -> super.executeBatch());
         }
     }
 
     /**
      * CallableStatement wrapper that retries on transient errors.
+     * Automatically reconnects and recreates the statement on connection failures
+     * if SQL was provided at construction time.
+     *
+     * <p><strong>Warning:</strong> On connection failure, parameter bindings are lost
+     * and must be re-applied by the caller.
      */
     private static class RetryCallableStatement extends AbstractCallableStatement {
         private final RetryConfig config;
+        private final String sql;
 
-        public RetryCallableStatement(CallableStatement delegate, Connection conn, RetryConfig config) throws SQLException {
+        public RetryCallableStatement(CallableStatement delegate, Connection conn, RetryConfig config, String sql) throws SQLException {
             super(delegate, conn);
             this.config = config;
+            this.sql = sql;
+        }
+
+        /**
+         * Recreate this statement after a connection failure.
+         * <p><strong>Warning:</strong> Parameter bindings are lost!
+         */
+        private void recreateStatement() throws SQLException {
+            if (sql == null) {
+                LOG.warning(() -> "RetryDriver: Cannot recreate CallableStatement - SQL not available");
+                return;
+            }
+
+            RetryConnection conn = (RetryConnection) getConnection();
+            conn.reconnect();
+
+            // Create new CallableStatement from reconnected connection
+            CallableStatement newStmt = conn.getDelegateConnection().prepareCall(sql);
+
+            // Replace our delegate
+            getStatements().clear();
+            getStatements().add(newStmt);
+
+            LOG.warning(() -> "RetryDriver: Recreated CallableStatement. Parameter bindings were lost and must be re-applied.");
+        }
+
+        /**
+         * Execute with retry, recreating statement on connection errors.
+         */
+        private <T> T executeWithReconnect(CallableStatementOperation<T> operation) throws SQLException {
+            SQLException lastException = null;
+
+            for (int attempt = 0; attempt <= config.getMaxRetries(); attempt++) {
+                final int attemptNum = attempt;
+                try {
+                    CallableStatement stmt = (CallableStatement) getDelegate();
+                    T result = operation.execute(stmt);
+                    if (attemptNum > 0) {
+                        LOG.fine(() -> String.format("RetryDriver: Operation succeeded on attempt %d/%d",
+                            attemptNum + 1, config.getMaxRetries() + 1));
+                    }
+                    return result;
+                } catch (SQLException e) {
+                    lastException = e;
+
+                    if (!config.isRetryable(e) || attemptNum >= config.getMaxRetries()) {
+                        if (attemptNum > 0) {
+                            LOG.fine(() -> String.format("RetryDriver: Exhausted retries (%d attempts), " +
+                                "final error: SQLState=%s, message=%s",
+                                attemptNum + 1, e.getSQLState(), e.getMessage()));
+                        }
+                        throw e;
+                    }
+
+                    long delay = config.calculateDelay(attemptNum);
+                    LOG.fine(() -> String.format("RetryDriver: Retry attempt %d/%d after %dms delay, " +
+                        "SQLState=%s, message=%s",
+                        attemptNum + 1, config.getMaxRetries(), delay, e.getSQLState(), e.getMessage()));
+
+                    PjdbcListeners.fireRetry(sql, e, attemptNum + 1, delay);
+
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new SQLException("RetryDriver: Interrupted during retry delay", ie);
+                    }
+
+                    // If this is a connection error and we have SQL, reconnect before next attempt
+                    if (config.isConnectionError(e) && sql != null) {
+                        LOG.fine(() -> "RetryDriver: Connection error detected, recreating CallableStatement");
+                        recreateStatement();
+                    }
+                }
+            }
+
+            throw lastException != null ? lastException : new SQLException("RetryDriver: Unknown error");
+        }
+
+        @FunctionalInterface
+        private interface CallableStatementOperation<T> {
+            T execute(CallableStatement stmt) throws SQLException;
         }
 
         @Override
         public boolean execute() throws SQLException {
-            return executeWithRetry(config, () -> super.execute());
+            return executeWithReconnect(CallableStatement::execute);
         }
 
         @Override
         public ResultSet executeQuery() throws SQLException {
-            return executeWithRetry(config, () -> super.executeQuery());
+            return executeWithReconnect(CallableStatement::executeQuery);
         }
 
         @Override
         public int executeUpdate() throws SQLException {
-            return executeWithRetry(config, () -> super.executeUpdate());
+            return executeWithReconnect(CallableStatement::executeUpdate);
         }
 
         @Override
         public int[] executeBatch() throws SQLException {
+            // For batch, we can't easily recreate after connection failure
             return executeWithRetry(config, () -> super.executeBatch());
         }
     }
