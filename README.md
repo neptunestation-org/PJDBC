@@ -73,7 +73,7 @@ java -jar target/PJDBC-2.0.0.jar chain "jdbc:retry:jdbc:timeout:jdbc:postgresql:
 
 **List all drivers:**
 ```
-$ pjdbc list
+$ java -jar target/PJDBC-2.0.0.jar list
 Available PJDBC Drivers
 =======================
 
@@ -88,7 +88,7 @@ Total: 14 drivers
 
 **Show driver details:**
 ```
-$ pjdbc show retry
+$ java -jar target/PJDBC-2.0.0.jar show retry
 Driver: retry
 =============
 
@@ -108,7 +108,7 @@ Parameters:
 
 **Visualize driver chain:**
 ```
-$ pjdbc chain "jdbc:retry[maxRetries=5]:jdbc:timeout[queryTimeout=30]:jdbc:postgresql://localhost/db"
+$ java -jar target/PJDBC-2.0.0.jar chain "jdbc:retry[maxRetries=5]:jdbc:timeout[queryTimeout=30]:jdbc:postgresql://localhost/db"
 Driver Chain Analysis
 =====================
 
@@ -120,7 +120,7 @@ Chain (3 layers):
 
 **Validate URL with error detection:**
 ```
-$ pjdbc validate "jdbc:retry[maxRetries=-5]:jdbc:postgresql://localhost/db"
+$ java -jar target/PJDBC-2.0.0.jar validate "jdbc:retry[maxRetries=-5]:jdbc:postgresql://localhost/db"
 ✓ URL structure is valid
   Driver: RetryDriver
   ✗ Parameter validation failed:
