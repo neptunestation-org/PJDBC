@@ -29,17 +29,28 @@ public class UserMapDriver extends AbstractProxyDriver {
 
     public Connection connect (String url, Properties info) throws SQLException {
 	if (!acceptsURL(url)) return null;
+
 	String user = info.getProperty("user");
+	// Prevent user enumeration by checking for null or empty user property.
+	if (user == null || user.trim().isEmpty()) {
+	    throw new SQLException("PJDBC: Authentication failed");
+	}
+
 	String mapping = p.getProperty(user);
-	if (mapping == null) {
-	    throw new SQLException("PJDBC: No mapping found for user: " + user);
+	// Prevent user enumeration by checking for a missing or empty mapping.
+	if (mapping == null || mapping.trim().isEmpty()) {
+	    throw new SQLException("PJDBC: Authentication failed");
 	}
-	String[] credentials = mapping.split("/");
+
+	String[] credentials = mapping.split("/", 2);
+	// Prevent DoS from malformed mappings and avoid leaking user existence.
 	if (credentials.length < 2) {
-	    throw new SQLException("PJDBC: Invalid mapping for user: " + user);
+	    throw new SQLException("PJDBC: Authentication failed");
 	}
+
 	Properties delegateInfo = new Properties();
 	delegateInfo.putAll(info);
-	delegateInfo.setProperty("user", credentials[0]);
-	delegateInfo.setProperty("password", credentials[1]);
+	// Trim whitespace from credentials to prevent connection issues.
+	delegateInfo.setProperty("user", credentials[0].trim());
+	delegateInfo.setProperty("password", credentials[1].trim());
 	return DriverManager.getConnection(subname(url), delegateInfo);}}

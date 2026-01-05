@@ -6,6 +6,12 @@ import static org.junit.Assert.*;
 
 public class UserMapDriverTest {
 
+    @Before
+    public void setUp() throws SQLException {
+        // Ensure the mock driver is registered for the test
+        DriverManager.registerDriver(new MockDriver());
+    }
+
     @Test
     public void acceptsURL () {
 	// Should reject invalid URLs
@@ -50,13 +56,10 @@ public class UserMapDriverTest {
 	    // Connect with alice, should be mapped to alice_db/secret123
 	    Connection c = new UserMapDriver().connect("jdbc:mapuser:jdbc:mock:testdb", props);
 	    assertNotNull(c);
-
-	    // Verify the connection was made to the underlying driver
-	    // The MockDriver should have received the mapped credentials
-	    Statement stmt = c.createStatement();
-	    stmt.executeQuery("select * from users");
-	    assertNotNull(MockDriver.getLog("jdbc:mock:testdb"));
-	    assertEquals("executeQuery[select * from users]", MockDriver.getLog("jdbc:mock:testdb"));}
+            Properties mockInfo = MockDriver.getLastConnectionInfo("jdbc:mock:testdb");
+            assertEquals("alice_db", mockInfo.getProperty("user"));
+            assertEquals("secret123", mockInfo.getProperty("password"));
+        }
 	catch (Exception e) {fail(e.getMessage());}}
 
     @Test
@@ -86,10 +89,10 @@ public class UserMapDriverTest {
 	    props.setProperty("user", "admin");
 	    Connection c = new UserMapDriver().connect("jdbc:mapuser:jdbc:mock:admindb", props);
 	    assertNotNull(c);
-
-	    Statement stmt = c.createStatement();
-	    stmt.executeQuery("select * from system");
-	    assertEquals("executeQuery[select * from system]", MockDriver.getLog("jdbc:mock:admindb"));}
+            Properties mockInfo = MockDriver.getLastConnectionInfo("jdbc:mock:admindb");
+            assertEquals("admin_db", mockInfo.getProperty("user"));
+            assertEquals("admin_secret", mockInfo.getProperty("password"));
+        }
 	catch (Exception e) {fail(e.getMessage());}}
 
     @Test
@@ -99,12 +102,13 @@ public class UserMapDriverTest {
 	    props.setProperty("user", "unknownuser");
 	    new UserMapDriver().connect("jdbc:mapuser:jdbc:mock:testdb", props);
 	    fail("Should throw exception for unmapped user");}
-	catch (NullPointerException e) {
-	    // Expected - user not in mapping file
+	catch (SQLException e) {
+            assertEquals("PJDBC: Authentication failed", e.getMessage());
 	}
 	catch (Exception e) {
-	    // Could be NullPointerException or other exception
-	    assertTrue(e instanceof NullPointerException || e.getMessage().contains("unknownuser"));}}
+            fail("Threw wrong exception type for missing user");
+        }
+    }
 
     @Test
     public void nullUserThrowsException () {
@@ -112,12 +116,38 @@ public class UserMapDriverTest {
 	    Properties props = new Properties();
 	    new UserMapDriver().connect("jdbc:mapuser:jdbc:mock:testdb", props);
 	    fail("Should throw exception for null user");}
-	catch (NullPointerException e) {
-	    // Expected - no user specified
+	catch (SQLException e) {
+            assertEquals("PJDBC: Authentication failed", e.getMessage());
 	}
 	catch (Exception e) {
-	    // Could be NullPointerException
-	    assertTrue(e instanceof NullPointerException);}}
+            fail("Threw wrong exception type for null user");
+        }
+    }
+
+    @Test
+    public void malformedUserMappingThrowsException() {
+        try {
+            Properties props = new Properties();
+            props.setProperty("user", "malformed_user");
+            new UserMapDriver().connect("jdbc:mapuser:jdbc:mock:testdb", props);
+            fail("Should throw exception for malformed user");
+        } catch (SQLException e) {
+            assertEquals("PJDBC: Authentication failed", e.getMessage());
+        } catch (Exception e) {
+            fail("Threw wrong exception type for malformed user");
+        }
+    }
+
+    @Test
+    public void whitespaceUserMapping() throws SQLException {
+        Properties props = new Properties();
+        props.setProperty("user", "whitespace_user");
+        Connection c = new UserMapDriver().connect("jdbc:mapuser:jdbc:mock:ws_db", props);
+        assertNotNull(c);
+        Properties mockInfo = MockDriver.getLastConnectionInfo("jdbc:mock:ws_db");
+        assertEquals("db_user_ws", mockInfo.getProperty("user"));
+        assertEquals("db_pass_ws", mockInfo.getProperty("password"));
+    }
 
     @Test
     public void compliance () {
@@ -138,7 +168,11 @@ public class UserMapDriverTest {
 
 	    // Should still connect successfully with mapped credentials
 	    Connection c = new UserMapDriver().connect("jdbc:mapuser:jdbc:mock:testdb2", props);
-	    assertNotNull(c);}
+	    assertNotNull(c);
+            Properties mockInfo = MockDriver.getLastConnectionInfo("jdbc:mock:testdb2");
+            assertEquals("alice_db", mockInfo.getProperty("user"));
+            assertEquals("secret123", mockInfo.getProperty("password"));
+        }
 	catch (Exception e) {fail(e.getMessage());}}
 
     @Test
