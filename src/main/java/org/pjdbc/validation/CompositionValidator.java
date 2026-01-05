@@ -234,7 +234,7 @@ public final class CompositionValidator {
                     !entry.isTerminal()) {
 
                     return Optional.of(String.format(
-                        "Terminal driver '%s' cannot have drivers below it in the chain.\n" +
+                        "Terminal driver '%s' cannot have drivers below it in the chain.%n" +
                         "    Suggestion: Move '%s' to the end of the chain, or remove drivers after it.",
                         entry.prefix(), entry.prefix()));
                 }
@@ -263,7 +263,7 @@ public final class CompositionValidator {
                     isMiddle) {
 
                     return Optional.of(String.format(
-                        "Driver '%s' is not composable and cannot be used in a chain.\n" +
+                        "Driver '%s' is not composable and cannot be used in a chain.%n" +
                         "    Suggestion: Use '%s' as the terminal driver or remove other drivers around it.",
                         entry.prefix(), entry.prefix()));
                 }
@@ -357,7 +357,7 @@ public final class CompositionValidator {
                     if (consecutiveCount > MAX_CONSECUTIVE_REPEATS) {
                         return Optional.of(String.format(
                             "Driver '%s' repeated %d times consecutively. " +
-                            "This is likely a configuration error.\n" +
+                            "This is likely a configuration error.%n" +
                             "    Suggestion: Remove duplicate '%s' drivers.",
                             entry.prefix(), consecutiveCount, entry.prefix()));
                     }
@@ -370,7 +370,7 @@ public final class CompositionValidator {
             // Check for excessive chain length
             if (chain.size() > MAX_CHAIN_LENGTH) {
                 return Optional.of(String.format(
-                    "Chain length of %d is unusually long and may indicate a problem.\n" +
+                    "Chain length of %d is unusually long and may indicate a problem.%n" +
                     "    Suggestion: Review chain composition for unnecessary drivers.",
                     chain.size()));
             }

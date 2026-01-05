@@ -459,7 +459,11 @@ public class FederatingDriver extends AbstractDriver {
             if (!closed) {
                 closed = true;
                 for (ResultSet rs : delegates) {
-                    try { rs.close(); } catch (SQLException ignored) {}
+                    try {
+                        rs.close();
+                    } catch (SQLException suppressed) {
+                        // Suppressed: best-effort cleanup of all result sets
+                    }
                 }
             }
         }

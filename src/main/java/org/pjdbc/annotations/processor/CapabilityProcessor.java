@@ -59,7 +59,7 @@ public class CapabilityProcessor extends AbstractProcessor {
     private Messager messager;
     private Elements elementUtils;
     private boolean processed = false;
-    private boolean hasErrors = false;
+    private volatile boolean hasErrors = false;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {

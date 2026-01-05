@@ -55,7 +55,6 @@ public class CapabilityDoclet implements Doclet {
     private final StandardDoclet standardDoclet = new StandardDoclet();
     private Reporter reporter;
     private Path outputDirectory;
-    private DocletEnvironment environment;
     private String outputDirArg = null;  // Captured from -d option
 
     @Override
@@ -126,8 +125,6 @@ public class CapabilityDoclet implements Doclet {
 
     @Override
     public boolean run(DocletEnvironment docEnv) {
-        this.environment = docEnv;
-
         // Find the output directory from options
         findOutputDirectory();
 

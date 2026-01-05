@@ -236,7 +236,9 @@ public class ChaosDriver extends AbstractProxyDriver {
         if (config.getConnectionDropRate() > 0 && random.nextDouble() < config.getConnectionDropRate()) {
             try {
                 conn.close();
-            } catch (SQLException ignored) {}
+            } catch (SQLException suppressed) {
+                // Suppressed: we're about to throw a new SQLException for the chaos event
+            }
             throw new SQLException("ChaosDriver: Connection dropped unexpectedly");
         }
 

@@ -144,9 +144,10 @@ public final class PjdbcCapabilities {
                 throw new PjdbcCapabilitiesException(
                     "Capabilities manifest not found: " + MANIFEST_PATH);
             }
-            String json = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))
-                .lines()
-                .collect(Collectors.joining("\n"));
+            String json;
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                json = reader.lines().collect(Collectors.joining("\n"));
+            }
             return parse(json);
         } catch (IOException e) {
             throw new PjdbcCapabilitiesException("Failed to load capabilities manifest", e);
