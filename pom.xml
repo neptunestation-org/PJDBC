@@ -8,7 +8,7 @@
   <version>2.0.0</version>
   <packaging>jar</packaging>
   <name>PJDBC</name>
-  <description>A proxying, filtering JDBC driver framework</description>
+  <description>JDBC proxy framework for SQL transformation, routing, and testing</description>
   <url>https://github.com/neptunestation-org/PJDBC</url>
   <inceptionYear>2010</inceptionYear>
 
