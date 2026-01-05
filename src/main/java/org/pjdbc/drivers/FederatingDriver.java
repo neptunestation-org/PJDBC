@@ -19,6 +19,43 @@ import org.pjdbc.sql.*;
  * <p>Unlike TeeDriver (write replication) or LoadBalancingDriver (read scaling),
  * FederatingDriver merges query results from all data sources into a unified view.
  *
+ * <h2>IMPORTANT: This is Broadcast-Style, Not True Federation</h2>
+ *
+ * <p>This driver executes <strong>the same query on all configured databases</strong>
+ * and concatenates the results. It does NOT provide:</p>
+ * <ul>
+ *   <li>Table-to-database routing (e.g., query {@code users} from db1, {@code orders} from db2)</li>
+ *   <li>Query rewriting for heterogeneous schemas</li>
+ *   <li>Cross-database JOINs</li>
+ *   <li>Shard key routing</li>
+ *   <li>Distributed query planning</li>
+ * </ul>
+ *
+ * <p><strong>Use cases where this driver IS appropriate:</strong></p>
+ * <ul>
+ *   <li>Querying identical schemas across multiple regions/tenants</li>
+ *   <li>Aggregating results from replicas with the same structure</li>
+ *   <li>Fan-out queries where all backends should receive the same query</li>
+ * </ul>
+ *
+ * <p><strong>Use cases where you need a different solution:</strong></p>
+ * <ul>
+ *   <li>Sharded databases with routing logic → Use application-level routing or a shard-aware proxy</li>
+ *   <li>Cross-database JOINs → Use a federated query engine (Trino, Presto, Dremio)</li>
+ *   <li>Heterogeneous schemas → Write custom routing logic</li>
+ * </ul>
+ *
+ * <h2>Transaction Limitations</h2>
+ *
+ * <p>This driver does NOT support coordinated transactions across databases. By default,
+ * {@code strictTransactions=true} causes transactions to fail. If you set
+ * {@code strictTransactions=false}, be aware that:</p>
+ * <ul>
+ *   <li>Commit may succeed on some backends and fail on others (split-brain)</li>
+ *   <li>Rollback cannot undo commits that already succeeded</li>
+ *   <li>There is no two-phase commit (2PC) coordination</li>
+ * </ul>
+ *
  * <p>URL format: {@code jdbc:federate[mergeStrategy=concat,parallelExecution=false]:url1;url2;...}
  *
  * <p>Example URLs:

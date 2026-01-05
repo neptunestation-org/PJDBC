@@ -349,15 +349,15 @@ public ResultSet executeQuery (String sql) throws SQLException {ArrayList<Result
 
 ## Execution Roadmap
 
-### v2.1.0 - Honesty Release
+### v2.1.0 - Honesty Release ✅ COMPLETE
 Focus: Make existing features reliable or fail clearly.
 
-- [ ] **P0.1**: RetryDriver throws on PreparedStatement connection error (fail loudly)
-- [ ] **P0.5**: DataMaskingDriver throws on masked numeric column access
-- [ ] **P1.4**: Change `strictTransactions` default to `true`
-- [ ] **P1.1**: Add "Security Limitations" section to README for regex-based drivers
-- [ ] **P1.2**: Add "Limitations" section to FederatingDriver docs clarifying it's broadcast, not federation
-- [ ] **P2.5**: Reformat AbstractStatement/AbstractPreparedStatement/AbstractCallableStatement
+- [x] **P0.1**: RetryDriver throws on PreparedStatement connection error (fail loudly)
+- [x] **P0.5**: DataMaskingDriver throws on masked numeric column access
+- [x] **P1.4**: Change `strictTransactions` default to `true`
+- [x] **P1.1**: Add "Security Limitations" section to README for regex-based drivers
+- [x] **P1.2**: Add "Limitations" section to FederatingDriver docs clarifying it's broadcast, not federation
+- [x] **P2.5**: Reformat AbstractStatement/AbstractPreparedStatement/AbstractCallableStatement (already done)
 
 ### v2.2.0 - Observability Release
 Focus: Make behavior visible.
@@ -386,6 +386,19 @@ Focus: Fix things that require API changes.
 ---
 
 ## Appendix: Current State Metrics
+
+### After v2.1.0 (Current)
+
+| Category | Issue Count | Status |
+|----------|-------------|--------|
+| Silent data corruption | 0 | ✅ Fixed (PreparedStatement throws, strictTransactions=true) |
+| Security bypassable | 3 (regex-based drivers) | ⚠️ Documented in README |
+| JDBC contract violations | 2 (MergingResultSet) | Deferred to v3.0 |
+| Missing functionality | 4 (observability, mocking, etc.) | Planned for v2.2-v2.3 |
+| Documentation gaps | 3 (integration, interop, agent) | Planned for v2.3 |
+| Code quality | 0 | ✅ Already formatted |
+
+### Before v2.1.0
 
 | Category | Issue Count | Severity |
 |----------|-------------|----------|
