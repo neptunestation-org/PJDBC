@@ -881,6 +881,12 @@ To configure:
    - Name: `NVD_API_KEY`
    - Value: your API key
 
+## Documentation
+
+- [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
+- [User Guide](docs/USER_GUIDE.md) - Driver usage examples
+- [Driver Writers Guide](docs/DRIVER_WRITERS_GUIDE.md) - Creating custom drivers
+
 ## Author
 
 David A. Ventimiglia <davidaventimiglia@neptunestation.com>
