@@ -279,25 +279,25 @@ public class FederatingDriver extends AbstractDriver {
         }
 
         private List<ResultSet> executeQueryParallel(String sql) throws SQLException {
-            ExecutorService executor = Executors.newFixedThreadPool(delegates.size());
-            List<Future<ResultSet>> futures = new ArrayList<>();
+            // Use virtual threads (Java 21+) to avoid thread pool overhead
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                List<Future<ResultSet>> futures = new ArrayList<>();
 
-            for (Statement s : delegates) {
-                futures.add(executor.submit(() -> s.executeQuery(sql)));
-            }
-
-            List<ResultSet> results = new ArrayList<>();
-            try {
-                for (Future<ResultSet> f : futures) {
-                    results.add(f.get(config.getTimeout(), TimeUnit.MILLISECONDS));
+                for (Statement s : delegates) {
+                    futures.add(executor.submit(() -> s.executeQuery(sql)));
                 }
-            } catch (InterruptedException | ExecutionException | TimeoutException e) {
-                throw new SQLException("Parallel query execution failed", e);
-            } finally {
-                executor.shutdown();
-            }
 
-            return results;
+                List<ResultSet> results = new ArrayList<>();
+                try {
+                    for (Future<ResultSet> f : futures) {
+                        results.add(f.get(config.getTimeout(), TimeUnit.MILLISECONDS));
+                    }
+                } catch (InterruptedException | ExecutionException | TimeoutException e) {
+                    throw new SQLException("Parallel query execution failed", e);
+                }
+
+                return results;
+            }
         }
 
         private ResultSet createMergingResultSet(List<ResultSet> results) throws SQLException {
@@ -373,21 +373,21 @@ public class FederatingDriver extends AbstractDriver {
             List<ResultSet> results = new ArrayList<>();
 
             if (config.isParallelExecution()) {
-                ExecutorService executor = Executors.newFixedThreadPool(getPreparedStatements().size());
-                List<Future<ResultSet>> futures = new ArrayList<>();
+                // Use virtual threads (Java 21+) to avoid thread pool overhead
+                try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                    List<Future<ResultSet>> futures = new ArrayList<>();
 
-                for (PreparedStatement s : getPreparedStatements()) {
-                    futures.add(executor.submit(() -> s.executeQuery()));
-                }
-
-                try {
-                    for (Future<ResultSet> f : futures) {
-                        results.add(f.get(config.getTimeout(), TimeUnit.MILLISECONDS));
+                    for (PreparedStatement s : getPreparedStatements()) {
+                        futures.add(executor.submit(() -> s.executeQuery()));
                     }
-                } catch (InterruptedException | ExecutionException | TimeoutException e) {
-                    throw new SQLException("Parallel query execution failed", e);
-                } finally {
-                    executor.shutdown();
+
+                    try {
+                        for (Future<ResultSet> f : futures) {
+                            results.add(f.get(config.getTimeout(), TimeUnit.MILLISECONDS));
+                        }
+                    } catch (InterruptedException | ExecutionException | TimeoutException e) {
+                        throw new SQLException("Parallel query execution failed", e);
+                    }
                 }
             } else {
                 for (PreparedStatement s : getPreparedStatements()) {
