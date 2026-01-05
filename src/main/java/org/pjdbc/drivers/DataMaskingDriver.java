@@ -256,7 +256,8 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         private String maskHash(String value) {
             int hash = value.hashCode();
-            String hex = Integer.toHexString(Math.abs(hash));
+            // Use bitwise AND to avoid overflow when hash is Integer.MIN_VALUE
+            String hex = Integer.toHexString(hash & 0x7FFFFFFF);
             // Pad to 8 characters and add ellipsis
             while (hex.length() < 8) {
                 hex = "0" + hex;

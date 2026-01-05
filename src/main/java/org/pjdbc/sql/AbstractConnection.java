@@ -9,13 +9,13 @@ public abstract class AbstractConnection extends AbstractWrapper implements Conn
     protected String url;
     protected Properties info;
 
-    protected List<Connection> delegates = new ArrayList<Connection>();
+    protected List<Connection> connectionDelegates = new ArrayList<Connection>();
 
     protected List<Connection> getConnections () {
-	return delegates;}
+	return connectionDelegates;}
 
     protected Connection getDelegate () {
-	for (Connection c : delegates) return c;
+	for (Connection c : connectionDelegates) return c;
 	return null;}
 
     public Driver getDriver () {
@@ -41,11 +41,11 @@ public abstract class AbstractConnection extends AbstractWrapper implements Conn
 
     public AbstractConnection (Connection conn) throws SQLException {
 	super(conn);
-	delegates.add(conn);}
+	connectionDelegates.add(conn);}
 
     public AbstractConnection (Connection[] conns) throws SQLException {
 	super(conns);
-	delegates = Arrays.asList(conns);}
+	connectionDelegates = Arrays.asList(conns);}
 
     public AbstractConnection (Connection conn, Driver driver, String url, Properties info) throws SQLException {
 	this(conn);
