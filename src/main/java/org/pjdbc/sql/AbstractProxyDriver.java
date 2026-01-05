@@ -3,6 +3,8 @@ package org.pjdbc.sql;
 import java.sql.*;
 import java.util.*;
 
+import org.pjdbc.validation.CompositionValidator;
+
 public abstract class AbstractProxyDriver extends AbstractDriver {
     protected boolean acceptsSubName (String subname) {
 	try {return DriverManager.getDriver(subname)!=null;}
@@ -90,9 +92,22 @@ public abstract class AbstractProxyDriver extends AbstractDriver {
         return true;
     }
 
+    /**
+     * Whether to automatically validate driver composition on connect.
+     * Subclasses can override to enable/disable validation.
+     * Can also be disabled via system property: -Dpjdbc.validation.composition=false
+     * @return true to validate composition, false to skip validation
+     */
+    protected boolean isCompositionValidationEnabled() {
+        return !"false".equalsIgnoreCase(System.getProperty("pjdbc.validation.composition", "true"));
+    }
+
     @Override
     public Connection connect (String url, Properties info) throws SQLException {
 	if (!acceptsURL(url)) return null;
+	if (isCompositionValidationEnabled()) {
+	    CompositionValidator.standard().validate(url);
+	}
 	if (isValidateParametersEnabled()) {
 	    validateParameters(url);
 	}

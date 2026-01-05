@@ -324,10 +324,12 @@ public class RuntimeIntrospectionIntegrationTest {
     }
 
     @Test
-    public void testSinkDriverIsTerminal() {
+    public void testSinkDriverIsNotTerminal() {
+        // Sink is a proxy driver that delegates to an underlying driver
+        // (it just discards operations instead of forwarding them)
         DriverCapability sink = capabilities.findByPrefix("sink").orElse(null);
         assertNotNull("Should have sink driver", sink);
-        assertTrue("Sink driver should be terminal", sink.terminal());
+        assertFalse("Sink driver should NOT be terminal (it's a proxy)", sink.terminal());
     }
 
     @Test

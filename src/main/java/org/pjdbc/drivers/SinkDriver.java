@@ -9,7 +9,7 @@ import org.pjdbc.sql.*;
     prefix = "sink",
     description = "Discards all SQL operations",
     capabilities = {"testing"},
-    terminal = true
+    terminal = false
 )
 public class SinkDriver extends AbstractProxyDriver {
     static {try {DriverManager.registerDriver(new SinkDriver());} catch (Exception e) {throw new RuntimeException(e);}}
