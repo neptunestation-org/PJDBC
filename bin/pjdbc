@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+#
+# PJDBC CLI wrapper script
+#
+# Usage: pjdbc <command> [options]
+#
+# This script finds the PJDBC JAR and runs the CLI.
+# Set PJDBC_JAR environment variable to override JAR location.
+#
+
+set -e
+
+# Find the script's directory (handles symlinks)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Find PJDBC JAR
+find_jar() {
+    # 1. Check PJDBC_JAR environment variable
+    if [[ -n "$PJDBC_JAR" && -f "$PJDBC_JAR" ]]; then
+        echo "$PJDBC_JAR"
+        return
+    fi
+
+    # 2. Check target directory (development)
+    local target_jar=$(find "$PROJECT_DIR/target" -maxdepth 1 -name "PJDBC-*.jar" ! -name "*-sources*" ! -name "*-javadoc*" 2>/dev/null | head -1)
+    if [[ -n "$target_jar" && -f "$target_jar" ]]; then
+        echo "$target_jar"
+        return
+    fi
+
+    # 3. Check lib directory (installed)
+    local lib_jar="$PROJECT_DIR/lib/pjdbc.jar"
+    if [[ -f "$lib_jar" ]]; then
+        echo "$lib_jar"
+        return
+    fi
+
+    # 4. Check ~/.pjdbc/pjdbc.jar
+    local home_jar="$HOME/.pjdbc/pjdbc.jar"
+    if [[ -f "$home_jar" ]]; then
+        echo "$home_jar"
+        return
+    fi
+
+    return 1
+}
+
+PJDBC_JAR=$(find_jar)
+
+if [[ -z "$PJDBC_JAR" ]]; then
+    echo "Error: Could not find PJDBC JAR file." >&2
+    echo "" >&2
+    echo "Solutions:" >&2
+    echo "  1. Run 'mvn package' to build the JAR" >&2
+    echo "  2. Set PJDBC_JAR environment variable to the JAR path" >&2
+    echo "  3. Copy pjdbc.jar to ~/.pjdbc/" >&2
+    exit 1
+fi
+
+# Build classpath with PJDBC and any additional JARs in lib/
+CLASSPATH="$PJDBC_JAR"
+
+if [[ -d "$PROJECT_DIR/lib" ]]; then
+    for jar in "$PROJECT_DIR/lib"/*.jar; do
+        if [[ -f "$jar" && "$jar" != "$PJDBC_JAR" ]]; then
+            CLASSPATH="$CLASSPATH:$jar"
+        fi
+    done
+fi
+
+# Add user-specified classpath
+if [[ -n "$PJDBC_CLASSPATH" ]]; then
+    CLASSPATH="$CLASSPATH:$PJDBC_CLASSPATH"
+fi
+
+# Default JVM options
+JAVA_OPTS="${PJDBC_JAVA_OPTS:-}"
+
+# Run the CLI
+exec java $JAVA_OPTS -cp "$CLASSPATH" org.pjdbc.cli.PjdbcCli "$@"

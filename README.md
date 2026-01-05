@@ -70,14 +70,27 @@ PJDBC includes a command-line tool for URL validation and driver discovery.
 ### Usage
 
 ```bash
-# Via Maven
-mvn exec:java -Dexec.args="list"
-mvn exec:java -Dexec.args="show retry"
-mvn exec:java -Dexec.args='validate "jdbc:retry[maxRetries=5]:jdbc:postgresql://localhost/db"'
+# Via wrapper script (recommended)
+bin/pjdbc list
+bin/pjdbc show retry
+bin/pjdbc validate "jdbc:retry[maxRetries=5]:jdbc:postgresql://localhost/db"
 
 # Via JAR
 java -jar target/PJDBC-2.0.0.jar list
 java -jar target/PJDBC-2.0.0.jar chain "jdbc:retry:jdbc:timeout:jdbc:postgresql://localhost/db"
+
+# Via Maven
+mvn exec:java -Dexec.args="list"
+```
+
+### Shell Completion
+
+```bash
+# Bash: add to ~/.bashrc
+source /path/to/pjdbc/bin/pjdbc-completion.bash
+
+# Zsh: copy to fpath and rename to _pjdbc
+cp bin/pjdbc-completion.zsh ~/.zsh/completions/_pjdbc
 ```
 
 ### Examples
