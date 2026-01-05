@@ -8,9 +8,9 @@ PJDBC is a pluggable JDBC driver framework that enables intercepting, transformi
 
 - **Chainable Drivers**: Stack multiple proxy drivers to build complex pipelines
 - **SQL Transformation**: Modify SQL statements before execution
-- **Connection Pooling**: Built-in connection pool driver
-- **Query Logging**: Log all SQL statements via Java logging
-- **User Mapping**: Map application users to database credentials
+- **Resilience**: Built-in retry, timeout, and circuit breaker patterns
+- **Security**: Read-only enforcement, user mapping, and data masking
+- **Testing**: Mock drivers and chaos engineering for resilience testing
 - **Extensible**: Create custom drivers by extending base classes
 
 ## Requirements
@@ -26,16 +26,16 @@ Add to your `pom.xml`:
 <dependency>
   <groupId>org.pjdbc</groupId>
   <artifactId>PJDBC</artifactId>
-  <version>1.7.0</version>
+  <version>2.0.0</version>
 </dependency>
 ```
 
 ## Quick Start
 
 ```java
-// Chain a logging driver with your actual database driver
+// Chain a retry driver with your actual database driver
 Connection conn = DriverManager.getConnection(
-    "jdbc:log:jdbc:postgresql://localhost/mydb",
+    "jdbc:retry:jdbc:postgresql://localhost/mydb",
     props
 );
 ```
@@ -65,8 +65,8 @@ mvn exec:java -Dexec.args="show retry"
 mvn exec:java -Dexec.args='validate "jdbc:retry[maxRetries=5]:jdbc:postgresql://localhost/db"'
 
 # Via JAR
-java -jar target/PJDBC-1.7.0.jar list
-java -jar target/PJDBC-1.7.0.jar chain "jdbc:cache:jdbc:retry:jdbc:postgresql://localhost/db"
+java -jar target/PJDBC-2.0.0.jar list
+java -jar target/PJDBC-2.0.0.jar chain "jdbc:retry:jdbc:timeout:jdbc:postgresql://localhost/db"
 ```
 
 ### Examples
@@ -77,13 +77,13 @@ $ pjdbc list
 Available PJDBC Drivers
 =======================
 
-  audit            Compliance audit logging for database operations
-  cache            Caches SELECT query results in memory
+  cat              Pass-through identity driver
   retry            Automatically retries failed queries on transient errors
   timeout          Enforces query timeout limits
+  circuitbreaker   Circuit breaker pattern for fault tolerance
   ...
 
-Total: 24 drivers
+Total: 14 drivers
 ```
 
 **Show driver details:**
@@ -108,13 +108,13 @@ Parameters:
 
 **Visualize driver chain:**
 ```
-$ pjdbc chain "jdbc:cache[ttl=300]:jdbc:retry[maxRetries=5]:jdbc:postgresql://localhost/db"
+$ pjdbc chain "jdbc:retry[maxRetries=5]:jdbc:timeout[queryTimeout=30]:jdbc:postgresql://localhost/db"
 Driver Chain Analysis
 =====================
 
 Chain (3 layers):
-→ CachingDriver [ttl=300]
-  └─→ RetryDriver [maxRetries=5]
+→ RetryDriver [maxRetries=5]
+  └─→ TimeoutDriver [queryTimeout=30]
     └─→ postgresql
 ```
 
@@ -131,19 +131,10 @@ $ pjdbc validate "jdbc:retry[maxRetries=-5]:jdbc:postgresql://localhost/db"
 
 ### CatDriver (`jdbc:cat:...`)
 
-Pass-through driver that forwards all calls unchanged. Useful as a base for custom drivers.
+Pass-through driver that forwards all calls unchanged. Useful as a base for custom drivers or as an identity element in driver chains.
 
 ```java
 Connection conn = DriverManager.getConnection("jdbc:cat:jdbc:postgresql://localhost/mydb");
-```
-
-### LogDriver (`jdbc:log:...`)
-
-Logs all SQL statements using `java.util.logging`. The logger name is derived from the underlying connection URL.
-
-```java
-Connection conn = DriverManager.getConnection("jdbc:log:jdbc:postgresql://localhost/mydb");
-// All SQL statements are now logged
 ```
 
 ### FilterDriver (`jdbc:filter:...`)
@@ -159,41 +150,6 @@ driver.setTransformer(new AbstractJdbcTransformer() {
     }
 });
 ```
-
-### PoolDriver (`jdbc:pool:...`)
-
-Connection pooling driver with configurable parameters:
-
-```java
-// Basic usage
-Connection conn = DriverManager.getConnection("jdbc:pool:jdbc:postgresql://localhost/mydb");
-
-// With configuration
-Connection conn = DriverManager.getConnection(
-    "jdbc:pool:jdbc:postgresql://localhost/mydb?min=5&max=20&timeout=5000"
-);
-```
-
-Parameters:
-- `min`: Minimum pool size (default: 0)
-- `max`: Maximum pool size (default: unlimited)
-- `timeout`: Connection acquisition timeout in milliseconds (default: 1000)
-
-### HikariPoolDriver (`jdbc:hikaricp:...`)
-
-A more advanced connection pooling driver that uses HikariCP.
-
-```java
-// Basic usage
-Connection conn = DriverManager.getConnection("jdbc:hikaricp:jdbc:postgresql://localhost/mydb");
-
-// With configuration
-Connection conn = DriverManager.getConnection(
-    "jdbc:hikaricp:jdbc:postgresql://localhost/mydb?maximumPoolSize=10"
-);
-```
-
-All HikariCP configuration parameters can be passed in the URL query string.
 
 ### TeeDriver (`jdbc:tee:...`)
 
@@ -361,103 +317,6 @@ Notes:
 - Individual statements can override the timeout using `setQueryTimeout()`
 - Actual timeout behavior depends on the underlying JDBC driver and database
 
-### RateLimitDriver (`jdbc:ratelimit:...`)
-
-Limits the rate of database queries using a token bucket algorithm. Prevents overwhelming the database by enforcing a maximum number of requests per time window.
-
-```java
-// Basic rate limiting (100 requests per second)
-Connection conn = DriverManager.getConnection(
-    "jdbc:ratelimit:jdbc:postgresql://localhost/mydb"
-);
-
-// Custom rate limit (50 requests per second)
-Connection conn = DriverManager.getConnection(
-    "jdbc:ratelimit[maxRequests=50,windowMs=1000]:jdbc:postgresql://localhost/mydb"
-);
-
-// Wait mode - block instead of failing when limit exceeded
-Connection conn = DriverManager.getConnection(
-    "jdbc:ratelimit[maxRequests=10,mode=wait]:jdbc:postgresql://localhost/mydb"
-);
-
-// Custom burst capacity for handling spikes
-Connection conn = DriverManager.getConnection(
-    "jdbc:ratelimit[maxRequests=10,burstSize=50]:jdbc:postgresql://localhost/mydb"
-);
-
-// Access rate limiter statistics
-RateLimitDriver.RateLimiter rl = RateLimitDriver.getRateLimiter(conn);
-System.out.println("Total requests: " + rl.getTotalRequests());
-System.out.println("Rejected: " + rl.getRejectedRequests());
-System.out.println("Available tokens: " + rl.getAvailableTokens());
-```
-
-Parameters:
-- `maxRequests`: Maximum requests per time window (default: 100)
-- `windowMs`: Time window in milliseconds (default: 1000)
-- `mode`: Behavior when limit exceeded (default: "reject")
-  - `reject`: Throw SQLException immediately
-  - `wait`: Block until capacity is available
-- `burstSize`: Maximum burst capacity (default: maxRequests)
-
-Notes:
-- Rate limiting is per-connection
-- In "reject" mode, exceeds throw SQLException with message "Rate limit exceeded"
-- In "wait" mode, threads block until tokens become available
-- Burst capacity allows handling traffic spikes above the sustained rate
-
-### AuditDriver (`jdbc:audit:...`)
-
-Provides compliance audit logging for all database operations. Records detailed audit events including user, SQL, execution time, rows affected, and success/failure status.
-
-```java
-// Basic audit logging
-Connection conn = DriverManager.getConnection(
-    "jdbc:audit:jdbc:postgresql://localhost/mydb"
-);
-
-// Named audit log with custom log level
-Connection conn = DriverManager.getConnection(
-    "jdbc:audit[name=prod-audit,logLevel=failure]:jdbc:postgresql://localhost/mydb"
-);
-
-// Include SQL in audit records
-Connection conn = DriverManager.getConnection(
-    "jdbc:audit[includeSql=true]:jdbc:postgresql://localhost/mydb"
-);
-
-// Register a custom audit handler (e.g., to send to SIEM)
-AuditDriver.addGlobalHandler(event -> {
-    siem.log(event.toJson());
-});
-
-// Access audit events for testing/analysis
-List<AuditDriver.AuditEvent> events = AuditDriver.getAuditLog();
-for (AuditDriver.AuditEvent event : events) {
-    System.out.println(event.timestamp() + " " + event.user() + " " + event.operationType());
-}
-```
-
-Parameters:
-- `name`: Audit log name for identification (default: "default")
-- `logLevel`: Which operations to log (default: "all")
-  - `all`: Log all operations
-  - `success`: Log only successful operations
-  - `failure`: Log only failed operations
-- `includeSql`: Include SQL statement in audit record (default: false)
-- `includeTime`: Include execution time (default: true)
-- `includeRows`: Include rows affected count (default: true)
-
-Audit Events capture:
-- Unique event ID and timestamp
-- Connection ID and user identity
-- Operation type (QUERY, UPDATE, BATCH, COMMIT, ROLLBACK, etc.)
-- SQL statement (if includeSql=true)
-- Execution time in milliseconds
-- Rows affected (for updates)
-- Success/failure status with error details
-
 ### SchemaValidationDriver (`jdbc:schema:...`)
 
 Validates SQL statements against a defined schema. Prevents access to unauthorized tables or columns using whitelist, blacklist, or database metadata validation.
@@ -539,211 +398,6 @@ Parameters:
 - `resultSetLatency`: Delay in ms for each ResultSet.next() call (default: 0)
 - `exceptionMessage`: Custom exception message (default: "ChaosDriver: Induced failure")
 
-### CachingDriver (`jdbc:cache:...`)
-
-Caches SELECT query results in memory to reduce database load.
-
-```java
-// Basic caching (60s TTL, 1000 max entries)
-Connection conn = DriverManager.getConnection(
-    "jdbc:cache:jdbc:postgresql://localhost/mydb"
-);
-
-// Custom TTL and size
-Connection conn = DriverManager.getConnection(
-    "jdbc:cache[ttl=300,maxSize=5000]:jdbc:postgresql://localhost/mydb"
-);
-
-// Access cache statistics
-QueryCache cache = CachingDriver.getCache(conn);
-double hitRatio = cache.getHitRatio();
-```
-
-Parameters:
-- `ttl`: Time-to-live in seconds (default: 60)
-- `maxSize`: Maximum cached queries with LRU eviction (default: 1000)
-- `invalidateOnWrite`: Clear cache on writes (default: true)
-- `enabled`: Enable caching (default: true)
-
-### RedisCachingDriver (`jdbc:rediscache:...`)
-
-Caches SELECT query results in Redis for distributed caching across multiple application instances.
-
-```java
-// Basic Redis caching (localhost:6379)
-Connection conn = DriverManager.getConnection(
-    "jdbc:rediscache:jdbc:postgresql://localhost/mydb"
-);
-
-// Custom Redis host and TTL
-Connection conn = DriverManager.getConnection(
-    "jdbc:rediscache[host=redis.example.com,ttl=300]:jdbc:postgresql://localhost/mydb"
-);
-
-// With authentication and key prefix
-Connection conn = DriverManager.getConnection(
-    "jdbc:rediscache[host=redis.example.com,password=secret,keyPrefix=myapp:]:jdbc:postgresql://localhost/mydb"
-);
-
-// Access cache statistics
-RedisQueryCache cache = RedisCachingDriver.getCache(conn);
-double hitRatio = cache.getHitRatio();
-```
-
-Parameters:
-- `host`: Redis server hostname (default: localhost)
-- `port`: Redis server port (default: 6379)
-- `password`: Redis password (default: none)
-- `database`: Redis database number (default: 0)
-- `keyPrefix`: Prefix for cache keys (default: "pjdbc:")
-- `ttl`: Time-to-live in seconds (default: 60)
-- `maxPoolSize`: Maximum connections in pool (default: 8)
-- `invalidateOnWrite`: Clear cache on writes (default: true)
-- `enabled`: Enable caching (default: true)
-
-**Note:** Requires the `jedis` dependency (included as optional).
-
-### MemcachedCachingDriver (`jdbc:memcache:...`)
-
-Caches SELECT query results in Memcached for distributed caching across multiple application instances.
-
-```java
-// Basic Memcached caching (localhost:11211)
-Connection conn = DriverManager.getConnection(
-    "jdbc:memcache:jdbc:postgresql://localhost/mydb"
-);
-
-// Multiple Memcached servers
-Connection conn = DriverManager.getConnection(
-    "jdbc:memcache[servers=cache1:11211;cache2:11211]:jdbc:postgresql://localhost/mydb"
-);
-
-// With custom TTL and key prefix
-Connection conn = DriverManager.getConnection(
-    "jdbc:memcache[ttl=300,keyPrefix=myapp:]:jdbc:postgresql://localhost/mydb"
-);
-
-// Access cache statistics
-MemcachedQueryCache cache = MemcachedCachingDriver.getCache(conn);
-double hitRatio = cache.getHitRatio();
-```
-
-Parameters:
-- `servers`: Semicolon-separated list of host:port (default: localhost:11211)
-- `keyPrefix`: Prefix for cache keys (default: "pjdbc:")
-- `ttl`: Time-to-live in seconds (default: 60)
-- `invalidateOnWrite`: Clear cache on writes (default: true)
-- `enabled`: Enable caching (default: true)
-
-**Note:** Requires the `spymemcached` dependency (included as optional).
-
-### HazelcastCachingDriver (`jdbc:hazelcast:...`)
-
-Caches SELECT query results in Hazelcast for distributed caching with automatic cluster discovery and replication.
-
-```java
-// Basic Hazelcast caching (embedded mode)
-Connection conn = DriverManager.getConnection(
-    "jdbc:hazelcast:jdbc:postgresql://localhost/mydb"
-);
-
-// Client mode connecting to existing cluster
-Connection conn = DriverManager.getConnection(
-    "jdbc:hazelcast[mode=client,members=hz1:5701;hz2:5701]:jdbc:postgresql://localhost/mydb"
-);
-
-// Custom cluster name and map
-Connection conn = DriverManager.getConnection(
-    "jdbc:hazelcast[clusterName=my-cluster,mapName=query_cache]:jdbc:postgresql://localhost/mydb"
-);
-
-// With TTL and max idle time
-Connection conn = DriverManager.getConnection(
-    "jdbc:hazelcast[ttl=300,maxIdle=60]:jdbc:postgresql://localhost/mydb"
-);
-
-// Access cache statistics
-HazelcastQueryCache cache = HazelcastCachingDriver.getCache(conn);
-double hitRatio = cache.getHitRatio();
-```
-
-Parameters:
-- `mode`: "embedded" (default) or "client" for connecting to external cluster
-- `clusterName`: Hazelcast cluster name (default: "pjdbc-cache")
-- `members`: Semicolon-separated member addresses (default: "127.0.0.1:5701")
-- `mapName`: IMap name for caching (default: "pjdbc_query_cache")
-- `ttl`: Time-to-live in seconds (default: 60)
-- `maxIdle`: Maximum idle time in seconds, 0 to disable (default: 0)
-- `invalidateOnWrite`: Clear cache on writes (default: true)
-- `enabled`: Enable caching (default: true)
-
-**Note:** Requires the `hazelcast` dependency (included as optional). Call `HazelcastCachingDriver.shutdownAll()` on application shutdown to clean up Hazelcast instances.
-
-### TracingDriver (`jdbc:trace:...`)
-
-Provides distributed tracing for JDBC operations. Useful for observability in microservices architectures.
-
-```java
-// Basic tracing
-Connection conn = DriverManager.getConnection(
-    "jdbc:trace:jdbc:postgresql://localhost/mydb"
-);
-
-// Custom span prefix
-Connection conn = DriverManager.getConnection(
-    "jdbc:trace[spanPrefix=sql.]:jdbc:postgresql://localhost/mydb"
-);
-
-// Access spans for testing
-List<SpanData> spans = TracingDriver.getDefaultTracer().getSpans();
-
-// Register custom tracer (e.g., OpenTelemetry)
-TracingDriver.setTracer("otel", myOpenTelemetryTracer);
-Connection conn = DriverManager.getConnection(
-    "jdbc:trace[tracerName=otel]:jdbc:postgresql://localhost/mydb"
-);
-```
-
-Parameters:
-- `tracerName`: Registered tracer name (default: jdbc)
-- `spanPrefix`: Prefix for span names (default: db.)
-- `includeSql`: Include SQL in spans (default: true)
-- `includeParams`: Include parameter values (default: false, for security)
-- `includeRowCount`: Include row counts (default: true)
-
-### MetricsDriver (`jdbc:metrics:...`)
-
-Collects performance metrics for JDBC operations including query counts, timing, error rates, and per-operation-type statistics.
-
-```java
-// Basic metrics collection
-Connection conn = DriverManager.getConnection(
-    "jdbc:metrics:jdbc:postgresql://localhost/mydb"
-);
-
-// Custom slow query threshold
-Connection conn = DriverManager.getConnection(
-    "jdbc:metrics[slowThreshold=500]:jdbc:postgresql://localhost/mydb"
-);
-
-// Access metrics
-MetricsDriver.Metrics metrics = MetricsDriver.getMetrics(conn);
-System.out.println("Queries: " + metrics.getTotalQueries());
-System.out.println("Avg time: " + metrics.getAvgTimeMs() + "ms");
-System.out.println("Error rate: " + metrics.getErrorRate());
-
-// Global metrics across all connections
-MetricsDriver.Metrics global = MetricsDriver.getGlobalMetrics();
-System.out.println("Active connections: " + global.getActiveConnections());
-```
-
-Parameters:
-- `enabled`: Enable metrics collection (default: true)
-- `slowThreshold`: Threshold in ms for slow query detection (default: 1000)
-- `trackByType`: Track metrics by operation type (default: true)
-
-Metrics include: total operations, queries, updates, errors, slow queries, timing statistics (min/max/avg), rows affected, and per-type breakdowns (SELECT, INSERT, UPDATE, DELETE).
-
 ### DataMaskingDriver (`jdbc:mask:...`)
 
 Masks sensitive data in query results on-the-fly. Useful for data privacy, development/testing with production data, or compliance requirements.
@@ -777,14 +431,25 @@ Parameters:
 - `showFirst`: Characters to show at start for PARTIAL (default: 0)
 - `showLast`: Characters to show at end for PARTIAL (default: 4)
 
+### FederatingDriver (`jdbc:federate:...`)
+
+Routes queries across multiple database connections based on table names or query patterns. Useful for sharding, multi-tenancy, or accessing data spread across multiple databases.
+
+```java
+// Route based on table prefix
+Connection conn = DriverManager.getConnection(
+    "jdbc:federate[routing=prefix]:jdbc:postgresql://db1/mydb;jdbc:postgresql://db2/mydb"
+);
+```
+
 ## Chaining Drivers
 
 Drivers can be composed by nesting URLs:
 
 ```java
-// Pool -> Log -> Actual Database
+// Retry -> Timeout -> Actual Database
 Connection conn = DriverManager.getConnection(
-    "jdbc:pool:jdbc:log:jdbc:postgresql://localhost/mydb"
+    "jdbc:retry:jdbc:timeout:jdbc:postgresql://localhost/mydb"
 );
 ```
 
@@ -798,17 +463,17 @@ The `pjdbc.capabilities.json` manifest describes all drivers in a machine-readab
 
 ```json
 {
-  "version": "1.0",
+  "version": "2.0",
   "drivers": [
     {
-      "name": "CachingDriver",
-      "prefix": "cache",
-      "class": "org.pjdbc.drivers.CachingDriver",
-      "description": "Caches SELECT query results in memory",
-      "capabilities": ["caching"],
+      "name": "RetryDriver",
+      "prefix": "retry",
+      "class": "org.pjdbc.drivers.RetryDriver",
+      "description": "Automatically retries failed queries on transient errors",
+      "capabilities": ["resilience"],
       "parameters": [
-        {"name": "ttl", "type": "integer", "default": 60, "description": "Time-to-live in seconds"},
-        {"name": "maxSize", "type": "integer", "default": 1000, "description": "Maximum cached queries"}
+        {"name": "maxRetries", "type": "integer", "default": 3, "description": "Maximum retry attempts"},
+        {"name": "initialDelay", "type": "integer", "default": 100, "description": "Initial delay in ms"}
       ],
       "sideEffects": {"stateful": true}
     }
@@ -827,27 +492,23 @@ import org.pjdbc.capabilities.DriverCapability;
 // Load capabilities (cached singleton)
 PjdbcCapabilities caps = PjdbcCapabilities.load();
 
-// Find all caching drivers
-List<DriverCapability> cachingDrivers = caps.findByCapability("caching");
-// Returns: [CachingDriver, RedisCachingDriver, MemcachedCachingDriver, HazelcastCachingDriver]
+// Find all resilience drivers
+List<DriverCapability> resilienceDrivers = caps.findByCapability("resilience");
+// Returns: [RetryDriver, TimeoutDriver, CircuitBreakerDriver, ChaosDriver]
 
 // Get a specific driver by prefix
-Optional<DriverCapability> pool = caps.findByPrefix("pool");
-pool.ifPresent(d -> {
-    System.out.println("URL prefix: " + d.getUrlPrefix());  // jdbc:pool:
+Optional<DriverCapability> retry = caps.findByPrefix("retry");
+retry.ifPresent(d -> {
+    System.out.println("URL prefix: " + d.getUrlPrefix());  // jdbc:retry:
     System.out.println("Parameters: " + d.parameters());
 });
-
-// Find drivers with external dependencies
-List<DriverCapability> withDeps = caps.findWithDependencies();
-// Returns: [HikariPoolDriver, RedisCachingDriver, MemcachedCachingDriver, HazelcastCachingDriver]
 
 // Find drivers that make network calls
 List<DriverCapability> networkDrivers = caps.findBySideEffect("network");
 
 // Check available capability tags
 List<String> allTags = caps.getAllCapabilityTags();
-// Returns: [caching, filtering, logging, masking, metrics, passthrough, pooling, ...]
+// Returns: [masking, passthrough, resilience, routing, security, testing, transformation, validation]
 ```
 
 ### Agent URL Construction
@@ -874,18 +535,14 @@ Drivers are tagged with capabilities for easy discovery:
 
 | Tag              | Description           | Drivers                                |
 |------------------|-----------------------|----------------------------------------|
-| `caching`        | Query result caching  | cache, rediscache, memcache, hazelcast |
-| `pooling`        | Connection pooling    | pool, hikaricp                         |
-| `logging`        | SQL statement logging | log                                    |
-| `tracing`        | Distributed tracing   | trace                                  |
-| `metrics`        | Performance metrics   | metrics                                |
-| `audit`          | Compliance auditing   | audit                                  |
-| `validation`     | Schema validation     | schema                                 |
-| `resilience`     | Fault tolerance       | retry, circuitbreaker, timeout, ratelimit, chaos |
+| `resilience`     | Fault tolerance       | retry, circuitbreaker, timeout, chaos  |
 | `security`       | Access control        | readonly, mapuser, mask, schema        |
 | `testing`        | Test utilities        | mock, sink, chaos                      |
+| `validation`     | Schema validation     | schema                                 |
 | `transformation` | SQL modification      | filter                                 |
 | `masking`        | Data masking          | mask                                   |
+| `routing`        | Query routing         | federate, tee                          |
+| `passthrough`    | Identity/passthrough  | cat                                    |
 
 ## Creating Custom Drivers
 
@@ -1009,7 +666,7 @@ This generates the following manifest entry:
 
 | Attribute | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `prefix` | String | Yes | - | URL prefix (e.g., "cache" for `jdbc:cache:...`) |
+| `prefix` | String | Yes | - | URL prefix (e.g., "retry" for `jdbc:retry:...`) |
 | `description` | String | Yes | - | Human-readable description |
 | `capabilities` | String[] | No | `{}` | Capability tags for discovery |
 | `name` | String | No | Class name | Override driver name in manifest |
@@ -1017,8 +674,8 @@ This generates the following manifest entry:
 | `terminal` | boolean | No | `false` | Does not delegate to another driver |
 
 **Validation rules:**
-- Prefix must be lowercase alphanumeric, starting with a letter (e.g., `cache`, `pool2`)
-- Capability tags must be lowercase with optional hyphens (e.g., `caching`, `load-balancing`)
+- Prefix must be lowercase alphanumeric, starting with a letter (e.g., `retry`, `pool2`)
+- Capability tags must be lowercase with optional hyphens (e.g., `resilience`, `load-balancing`)
 - Duplicate prefixes across drivers cause a compilation error
 
 #### @DriverParameter Reference
