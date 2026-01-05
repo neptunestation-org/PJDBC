@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.logging.Logger;
 
 import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverParameter;
@@ -23,6 +24,7 @@ import org.pjdbc.sql.AbstractPreparedStatement;
 import org.pjdbc.sql.AbstractProxyDriver;
 import org.pjdbc.sql.AbstractStatement;
 import org.pjdbc.sql.JdbcUrlParser;
+import org.pjdbc.sql.PjdbcListeners;
 
 /**
  * RetryDriver automatically retries failed queries on transient errors.
@@ -86,6 +88,8 @@ import org.pjdbc.sql.JdbcUrlParser;
 @DriverParameter(name = "retryOnSqlStates", type = ParameterType.STRING,
     description = "Semicolon-separated SQL states to retry on")
 public class RetryDriver extends AbstractProxyDriver {
+
+    private static final Logger LOG = Logger.getLogger(RetryDriver.class.getName());
 
     /** Default SQL states that indicate transient/retryable errors */
     private static final Set<String> DEFAULT_RETRYABLE_STATES = new HashSet<>(Arrays.asList(
@@ -322,16 +326,34 @@ public class RetryDriver extends AbstractProxyDriver {
         SQLException lastException = null;
 
         for (int attempt = 0; attempt <= config.getMaxRetries(); attempt++) {
+            final int attemptNum = attempt;
             try {
-                return operation.execute();
+                T result = operation.execute();
+                if (attemptNum > 0) {
+                    LOG.fine(() -> String.format("RetryDriver: Operation succeeded on attempt %d/%d",
+                        attemptNum + 1, config.getMaxRetries() + 1));
+                }
+                return result;
             } catch (SQLException e) {
                 lastException = e;
 
-                if (!config.isRetryable(e) || attempt >= config.getMaxRetries()) {
+                if (!config.isRetryable(e) || attemptNum >= config.getMaxRetries()) {
+                    if (attemptNum > 0) {
+                        LOG.fine(() -> String.format("RetryDriver: Exhausted retries (%d attempts), " +
+                            "final error: SQLState=%s, message=%s",
+                            attemptNum + 1, e.getSQLState(), e.getMessage()));
+                    }
                     throw e;
                 }
 
-                long delay = config.calculateDelay(attempt);
+                long delay = config.calculateDelay(attemptNum);
+                LOG.fine(() -> String.format("RetryDriver: Retry attempt %d/%d after %dms delay, " +
+                    "SQLState=%s, message=%s",
+                    attemptNum + 1, config.getMaxRetries(), delay, e.getSQLState(), e.getMessage()));
+
+                // Fire event listener notification
+                PjdbcListeners.fireRetry(null, e, attemptNum + 1, delay);
+
                 try {
                     Thread.sleep(delay);
                 } catch (InterruptedException ie) {

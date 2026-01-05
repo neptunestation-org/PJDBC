@@ -12,6 +12,7 @@ import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Logger;
 
 import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverParameter;
@@ -23,6 +24,7 @@ import org.pjdbc.sql.AbstractPreparedStatement;
 import org.pjdbc.sql.AbstractProxyDriver;
 import org.pjdbc.sql.AbstractStatement;
 import org.pjdbc.sql.JdbcUrlParser;
+import org.pjdbc.sql.PjdbcListeners;
 
 /**
  * CircuitBreakerDriver implements the circuit breaker pattern for fault tolerance.
@@ -66,6 +68,8 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Time in ms before open -> half-open", defaultValue = "30000", min = 1)
 @DriverSideEffects(stateful = true)
 public class CircuitBreakerDriver extends AbstractProxyDriver {
+
+    private static final Logger LOG = Logger.getLogger(CircuitBreakerDriver.class.getName());
 
     public enum State {
         CLOSED,
@@ -182,6 +186,9 @@ public class CircuitBreakerDriver extends AbstractProxyDriver {
                     // Transition to half-open and allow a test request
                     if (state.compareAndSet(State.OPEN, State.HALF_OPEN)) {
                         successCount.set(0);
+                        LOG.fine(() -> String.format("CircuitBreaker[%s]: State transition OPEN -> HALF_OPEN " +
+                            "after %dms timeout", name, timeSinceFailure));
+                        PjdbcListeners.fireCircuitBreakerStateChange(name, "OPEN", "HALF_OPEN");
                         return true;
                     }
                 }
@@ -208,6 +215,9 @@ public class CircuitBreakerDriver extends AbstractProxyDriver {
                     if (state.compareAndSet(State.HALF_OPEN, State.CLOSED)) {
                         failureCount.set(0);
                         successCount.set(0);
+                        LOG.fine(() -> String.format("CircuitBreaker[%s]: State transition HALF_OPEN -> CLOSED " +
+                            "after %d successful requests", name, successThreshold));
+                        PjdbcListeners.fireCircuitBreakerStateChange(name, "HALF_OPEN", "CLOSED");
                     }
                 }
             }
@@ -227,11 +237,19 @@ public class CircuitBreakerDriver extends AbstractProxyDriver {
                 int failures = failureCount.incrementAndGet();
                 if (failures >= failureThreshold) {
                     // Too many failures, open the circuit
-                    state.compareAndSet(State.CLOSED, State.OPEN);
+                    if (state.compareAndSet(State.CLOSED, State.OPEN)) {
+                        LOG.fine(() -> String.format("CircuitBreaker[%s]: State transition CLOSED -> OPEN " +
+                            "after %d consecutive failures", name, failureThreshold));
+                        PjdbcListeners.fireCircuitBreakerStateChange(name, "CLOSED", "OPEN");
+                    }
                 }
             } else if (currentState == State.HALF_OPEN) {
                 // Any failure in half-open opens the circuit immediately
-                state.compareAndSet(State.HALF_OPEN, State.OPEN);
+                if (state.compareAndSet(State.HALF_OPEN, State.OPEN)) {
+                    LOG.fine(() -> String.format("CircuitBreaker[%s]: State transition HALF_OPEN -> OPEN " +
+                        "after failure during test request", name));
+                    PjdbcListeners.fireCircuitBreakerStateChange(name, "HALF_OPEN", "OPEN");
+                }
                 successCount.set(0);
             }
         }
@@ -381,6 +399,9 @@ public class CircuitBreakerDriver extends AbstractProxyDriver {
     private static <T> T executeWithCircuitBreaker(CircuitBreaker cb, ProtectedOperation<T> operation) throws SQLException {
         if (!cb.allowRequest()) {
             cb.recordRejection();
+            LOG.fine(() -> String.format("CircuitBreaker[%s]: Request rejected - circuit is OPEN " +
+                "(total rejections: %d)", cb.getName(), cb.getTotalRejections()));
+            PjdbcListeners.fireCircuitBreakerRejection(cb.getName(), cb.getState().name());
             throw new SQLException(
                 String.format("CircuitBreaker '%s' is OPEN - failing fast. State: %s", cb.getName(), cb),
                 "08000"  // Connection exception SQL state

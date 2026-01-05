@@ -36,7 +36,7 @@ import org.pjdbc.validation.ParameterValidator;
  */
 public class PjdbcCli {
 
-    private static final String VERSION = "1.7.0";
+    private static final String VERSION = "2.2.0";
     private static final String USAGE = """
         PJDBC CLI - URL Validation and Driver Discovery Tool
 
@@ -57,7 +57,10 @@ public class PjdbcCli {
           pjdbc validate "jdbc:retry[maxRetries=5]:jdbc:postgresql://localhost/db"
           pjdbc list
           pjdbc show retry
-          pjdbc chain "jdbc:cache:jdbc:retry:jdbc:postgresql://localhost/db"
+          pjdbc chain "jdbc:retry:jdbc:timeout:jdbc:postgresql://localhost/db"
+
+        Debug Logging:
+          Enable with: -Dorg.pjdbc.level=FINE
         """;
 
     private final PrintStream out;
@@ -98,6 +101,9 @@ public class PjdbcCli {
             case "validate" -> {
                 if (args.length < 2) {
                     err.println("Error: validate requires a URL argument");
+                    err.println();
+                    err.println("Usage: pjdbc validate <url>");
+                    err.println("Example: pjdbc validate \"jdbc:retry[maxRetries=5]:jdbc:postgresql://localhost/db\"");
                     yield 1;
                 }
                 yield validate(args[1]);
@@ -106,6 +112,11 @@ public class PjdbcCli {
             case "show" -> {
                 if (args.length < 2) {
                     err.println("Error: show requires a driver prefix argument");
+                    err.println();
+                    err.println("Usage: pjdbc show <prefix>");
+                    err.println("Example: pjdbc show retry");
+                    err.println();
+                    err.println("Run 'pjdbc list' to see available drivers");
                     yield 1;
                 }
                 yield show(args[1]);
@@ -113,6 +124,9 @@ public class PjdbcCli {
             case "chain" -> {
                 if (args.length < 2) {
                     err.println("Error: chain requires a URL argument");
+                    err.println();
+                    err.println("Usage: pjdbc chain <url>");
+                    err.println("Example: pjdbc chain \"jdbc:retry:jdbc:timeout:jdbc:postgresql://localhost/db\"");
                     yield 1;
                 }
                 yield chain(args[1]);
@@ -120,12 +134,22 @@ public class PjdbcCli {
             case "test" -> {
                 if (args.length < 2) {
                     err.println("Error: test requires a URL argument");
+                    err.println();
+                    err.println("Usage: pjdbc test <url>");
+                    err.println("Example: pjdbc test \"jdbc:h2:mem:testdb\"");
                     yield 1;
                 }
                 yield test(args[1]);
             }
             default -> {
                 err.println("Unknown command: " + command);
+                err.println();
+                String suggestion = suggestCommand(command);
+                if (suggestion != null) {
+                    err.println("Did you mean: " + suggestion + "?");
+                    err.println();
+                }
+                err.println("Available commands: validate, list, show, chain, test");
                 err.println("Run 'pjdbc --help' for usage information");
                 yield 1;
             }
@@ -400,6 +424,61 @@ public class PjdbcCli {
             }
             return 1;
         }
+    }
+
+    /**
+     * Suggest a command based on a misspelled input.
+     * Uses simple prefix matching and Levenshtein distance.
+     */
+    private String suggestCommand(String input) {
+        String[] commands = {"validate", "list", "show", "chain", "test", "help", "version"};
+        String lowerInput = input.toLowerCase();
+
+        // Try prefix match first
+        for (String cmd : commands) {
+            if (cmd.startsWith(lowerInput) || lowerInput.startsWith(cmd.substring(0, Math.min(2, cmd.length())))) {
+                return cmd;
+            }
+        }
+
+        // Try finding closest match by edit distance
+        int minDistance = Integer.MAX_VALUE;
+        String closest = null;
+
+        for (String cmd : commands) {
+            int distance = levenshteinDistance(lowerInput, cmd);
+            if (distance < minDistance && distance <= 3) { // Only suggest if reasonably close
+                minDistance = distance;
+                closest = cmd;
+            }
+        }
+
+        return closest;
+    }
+
+    /**
+     * Calculate Levenshtein edit distance between two strings.
+     */
+    private int levenshteinDistance(String a, String b) {
+        int[][] dp = new int[a.length() + 1][b.length() + 1];
+
+        for (int i = 0; i <= a.length(); i++) {
+            for (int j = 0; j <= b.length(); j++) {
+                if (i == 0) {
+                    dp[i][j] = j;
+                } else if (j == 0) {
+                    dp[i][j] = i;
+                } else {
+                    int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                    dp[i][j] = Math.min(
+                        Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1),
+                        dp[i - 1][j - 1] + cost
+                    );
+                }
+            }
+        }
+
+        return dp[a.length()][b.length()];
     }
 
     /**
