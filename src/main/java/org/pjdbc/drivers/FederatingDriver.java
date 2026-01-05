@@ -430,6 +430,7 @@ public class FederatingDriver extends AbstractDriver {
     private static class MergingResultSet extends AbstractResultSet {
         private final List<ResultSet> delegates;
         private int currentIndex = 0;
+        private int currentRow = 0;  // 1-indexed row number, 0 = before first
         private boolean closed = false;
 
         public MergingResultSet(Statement stmt, List<ResultSet> delegates) throws SQLException {
@@ -447,6 +448,7 @@ public class FederatingDriver extends AbstractDriver {
 
             while (currentIndex < delegates.size()) {
                 if (delegates.get(currentIndex).next()) {
+                    currentRow++;
                     return true;
                 }
                 currentIndex++;
@@ -662,9 +664,8 @@ public class FederatingDriver extends AbstractDriver {
 
         @Override
         public int getRow() throws SQLException {
-            // Row number tracking across multiple result sets is complex
-            // For now, return 0 (unknown)
-            return 0;
+            if (closed) throw new SQLException("ResultSet is closed");
+            return currentRow;
         }
 
         @Override
@@ -691,6 +692,7 @@ public class FederatingDriver extends AbstractDriver {
         @Override
         public void beforeFirst() throws SQLException {
             currentIndex = 0;
+            currentRow = 0;
             for (ResultSet rs : delegates) {
                 rs.beforeFirst();
             }
