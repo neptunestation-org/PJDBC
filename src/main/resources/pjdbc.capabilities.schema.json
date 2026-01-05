@@ -48,18 +48,17 @@
             "type": "string",
             "enum": [
               "passthrough",
-              "logging",
-              "caching",
-              "pooling",
               "transformation",
               "filtering",
               "replication",
-              "metrics",
-              "tracing",
               "resilience",
               "security",
               "testing",
-              "masking"
+              "masking",
+              "validation",
+              "federation",
+              "multi-database",
+              "routing"
             ]
           }
         },
