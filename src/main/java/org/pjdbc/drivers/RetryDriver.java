@@ -27,7 +27,31 @@ import org.pjdbc.sql.JdbcUrlParser;
 /**
  * RetryDriver automatically retries failed queries on transient errors.
  *
- * <p>Default retryable SQL states:
+ * <h2>WARNING: Idempotency Required</h2>
+ * <p><strong>This driver should only be used with idempotent operations.</strong>
+ * Retrying non-idempotent operations (INSERT, UPDATE, DELETE) can cause data
+ * corruption, duplicate records, or inconsistent state.</p>
+ *
+ * <h3>Safe to retry:</h3>
+ * <ul>
+ *   <li>SELECT queries (read-only)</li>
+ *   <li>Idempotent writes (e.g., UPDATE with WHERE clause on unique key)</li>
+ *   <li>Operations wrapped in application-level idempotency checks</li>
+ * </ul>
+ *
+ * <h3>NOT safe to retry without additional safeguards:</h3>
+ * <ul>
+ *   <li>INSERT statements (may create duplicates)</li>
+ *   <li>UPDATE without unique key constraint (may apply multiple times)</li>
+ *   <li>DELETE statements (usually safe but verify business logic)</li>
+ *   <li>Statements with side effects (triggers, sequences)</li>
+ * </ul>
+ *
+ * <p>For non-idempotent operations, consider using {@code ReadonlyDriver} in
+ * combination with RetryDriver, or implement application-level idempotency
+ * using idempotency keys or optimistic locking.</p>
+ *
+ * <h2>Default Retryable SQL States</h2>
  * <ul>
  *   <li>08001, 08003, 08004, 08006, 08007 - Connection errors</li>
  *   <li>40001, 40P01 - Deadlock/serialization failures</li>
@@ -35,12 +59,14 @@ import org.pjdbc.sql.JdbcUrlParser;
  *   <li>HYT00, HYT01 - Timeout errors</li>
  * </ul>
  *
- * <p>Example URLs:
+ * <h2>Example URLs</h2>
  * <pre>
  * jdbc:retry:jdbc:postgresql://localhost/mydb
  * jdbc:retry[maxRetries=5,initialDelay=200]:jdbc:postgresql://localhost/mydb
  * jdbc:retry[retryOnSqlStates=40001;08006]:jdbc:mysql://localhost/db
  * </pre>
+ *
+ * @see ReadonlyDriver
  */
 @DriverCapability(
     prefix = "retry",
