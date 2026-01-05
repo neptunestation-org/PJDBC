@@ -408,15 +408,15 @@ class FederatingDriverProperties {
      * Property: log:federate composition preserves federation.
      */
     @Property(tries = 10)
-    void logFederateComposition() throws SQLException {
+    void retryCatFederateComposition() throws SQLException {
         String db1 = createUniqueDbName();
         String db2 = createUniqueDbName();
         String url1 = "jdbc:mock:" + db1;
         String url2 = "jdbc:mock:" + db2;
         String fedUrl = "jdbc:federate:" + url1 + ";" + url2;
-        String logFedUrl = "jdbc:log:" + fedUrl;
+        String retryCatFedUrl = "jdbc:retry:jdbc:cat:" + fedUrl;
 
-        try (Connection conn = DriverManager.getConnection(logFedUrl);
+        try (Connection conn = DriverManager.getConnection(retryCatFedUrl);
              Statement stmt = conn.createStatement()) {
             stmt.executeUpdate("INSERT INTO t VALUES (1)");
         }
@@ -425,9 +425,9 @@ class FederatingDriverProperties {
         String log2 = MockDriver.getLog(url2);
 
         assertTrue(log1.contains("executeUpdate"),
-            "log:federate should broadcast to connection 1");
+            "retry:cat:federate should broadcast to connection 1");
         assertTrue(log2.contains("executeUpdate"),
-            "log:federate should broadcast to connection 2");
+            "retry:cat:federate should broadcast to connection 2");
     }
 
     /**

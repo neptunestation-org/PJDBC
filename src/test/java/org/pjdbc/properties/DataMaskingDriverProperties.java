@@ -500,30 +500,6 @@ class DataMaskingDriverProperties {
             "mask:cat:X should behave like mask:X");
     }
 
-    /**
-     * Property: log:mask:X preserves masking behavior.
-     */
-    @Property(tries = 30)
-    void logMaskComposition(
-            @ForAll("maskableStrings") String value) throws SQLException {
-
-        String dbName = createUniqueDbName();
-        setupTestTable(dbName, value);
-
-        String logMaskUrl = "jdbc:log:jdbc:mask[columns=secret,strategy=REDACT]:jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1";
-
-        try (Connection conn = DriverManager.getConnection(logMaskUrl);
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT secret, public_col FROM data WHERE id = 1")) {
-
-            assertTrue(rs.next());
-            assertEquals("[REDACTED]", rs.getString("secret"),
-                "log:mask should preserve masking");
-            assertEquals(value, rs.getString("public_col"),
-                "log:mask should preserve non-masked columns");
-        }
-    }
-
     // ========== ARBITRARY PROVIDERS ==========
 
     @Provide

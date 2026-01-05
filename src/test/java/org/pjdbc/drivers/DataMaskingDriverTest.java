@@ -302,9 +302,9 @@ public class DataMaskingDriverTest {
 
     @Test
     public void testDriverChaining() throws SQLException, ClassNotFoundException {
-        Class.forName("org.pjdbc.drivers.LogDriver");
+        Class.forName("org.pjdbc.drivers.CatDriver");
         setupTestTable("test_chain");
-        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:log:jdbc:h2:mem:test_chain;DB_CLOSE_DELAY=-1";
+        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:cat:jdbc:h2:mem:test_chain;DB_CLOSE_DELAY=-1";
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT ssn FROM users WHERE id = 1")) {

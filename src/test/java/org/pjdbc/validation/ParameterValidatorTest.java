@@ -505,24 +505,15 @@ class ParameterValidatorTest {
         }
 
         @Test
-        @DisplayName("validates RateLimitDriver mode enum")
-        void validatesRateLimitDriverModeEnum() throws Exception {
-            Class<?> rateLimitDriver = Class.forName("org.pjdbc.drivers.RateLimitDriver");
+        @DisplayName("validates TimeoutDriver timeout parameter")
+        void validatesTimeoutDriverTimeoutParam() throws Exception {
+            Class<?> timeoutDriver = Class.forName("org.pjdbc.drivers.TimeoutDriver");
 
-            // Valid mode
+            // Valid timeout
             Map<String, String> validParams = new HashMap<>();
-            validParams.put("mode", "reject");
+            validParams.put("timeout", "5000");
             assertDoesNotThrow(() ->
-                ParameterValidator.validate(rateLimitDriver, validParams));
-
-            // Invalid mode
-            Map<String, String> invalidParams = new HashMap<>();
-            invalidParams.put("mode", "invalid");
-            SQLException ex = assertThrows(SQLException.class, () ->
-                ParameterValidator.validate(rateLimitDriver, invalidParams));
-
-            assertTrue(ex.getMessage().contains("mode"));
-            assertTrue(ex.getMessage().contains("allowed values"));
+                ParameterValidator.validate(timeoutDriver, validParams));
         }
     }
 }

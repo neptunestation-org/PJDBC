@@ -274,13 +274,12 @@ public final class CompositionValidator {
 
     /**
      * Detects multiple drivers with conflicting capabilities.
+     * (Kept for future use - currently no conflicting driver pairs in PJDBC 2.0)
      */
     static class ConflictingDriverRule implements CompositionRule {
 
-        private static final String[][] CONFLICTING = {
-            {"caching", "Multiple caching drivers will cause redundant caching"},
-            {"pooling", "Multiple pooling drivers will create nested pools"}
-        };
+        // No conflicting capabilities in PJDBC 2.0 - caching/pooling drivers removed
+        private static final String[][] CONFLICTING = {};
 
         @Override
         public String getName() {
@@ -311,16 +310,12 @@ public final class CompositionValidator {
 
     /**
      * Validates that stateful single-target drivers don't appear above multi-target drivers.
+     * (Simplified in PJDBC 2.0 - caching/pooling/loadbalancing drivers removed)
      */
     static class MultiTargetOrderRule implements CompositionRule {
 
         private static final List<String> MULTI_TARGET_PREFIXES = List.of(
-            "tee", "loadbalance", "federate"
-        );
-
-        private static final List<String> SINGLE_TARGET_STATEFUL = List.of(
-            "cache", "rediscache", "memcache", "hazelcast",
-            "pool", "hikaricp"
+            "tee", "federate"
         );
 
         @Override
@@ -330,35 +325,8 @@ public final class CompositionValidator {
 
         @Override
         public Optional<String> validate(List<ChainEntry> chain, String rawUrl) {
-            // Find first multi-target driver
-            int multiTargetIndex = -1;
-            String multiTargetPrefix = null;
-
-            for (int i = 0; i < chain.size(); i++) {
-                if (MULTI_TARGET_PREFIXES.contains(chain.get(i).prefix())) {
-                    multiTargetIndex = i;
-                    multiTargetPrefix = chain.get(i).prefix();
-                    break;
-                }
-            }
-
-            if (multiTargetIndex < 0) {
-                return Optional.empty();
-            }
-
-            // Check for problematic single-target drivers above multi-target
-            for (int i = 0; i < multiTargetIndex; i++) {
-                String prefix = chain.get(i).prefix();
-                if (SINGLE_TARGET_STATEFUL.contains(prefix)) {
-                    return Optional.of(String.format(
-                        "'%s' driver above '%s' may cause unexpected behavior. " +
-                        "Caching/pooling drivers maintain per-connection state that doesn't work " +
-                        "correctly with multi-target drivers.\n" +
-                        "    Suggestion: Move '%s' below '%s' in each target URL, or remove it.",
-                        prefix, multiTargetPrefix, prefix, multiTargetPrefix));
-                }
-            }
-
+            // Currently no stateful single-target drivers that conflict with multi-target
+            // This rule is kept for future extensions
             return Optional.empty();
         }
     }

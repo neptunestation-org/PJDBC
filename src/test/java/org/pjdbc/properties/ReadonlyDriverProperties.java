@@ -345,16 +345,16 @@ class ReadonlyDriverProperties {
      * Property: log:readonly:X preserves readonly enforcement.
      */
     @Property(tries = 20)
-    void logReadonlyComposition(
+    void catReadonlyComposition(
             @ForAll("selectStatements") String selectSql,
             @ForAll("dmlStatements") String dmlSql) throws SQLException {
 
         String dbName = createUniqueDbName();
         setupTestTable(dbName);
 
-        String logReadonlyUrl = "jdbc:log:jdbc:readonly:jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1";
+        String catReadonlyUrl = "jdbc:cat:jdbc:readonly:jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1";
 
-        try (Connection conn = DriverManager.getConnection(logReadonlyUrl);
+        try (Connection conn = DriverManager.getConnection(catReadonlyUrl);
              Statement stmt = conn.createStatement()) {
 
             // SELECT should work
@@ -364,7 +364,7 @@ class ReadonlyDriverProperties {
 
             // DML should be blocked
             assertThrows(SQLException.class, () -> stmt.executeUpdate(dmlSql),
-                "log:readonly should still block DML");
+                "cat:readonly should still block DML");
         }
     }
 

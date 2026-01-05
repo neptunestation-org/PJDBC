@@ -326,8 +326,8 @@ public class CircuitBreakerDriverTest {
 
     @Test
     public void testDriverChaining() throws SQLException {
-        // Chain: circuitbreaker -> log -> h2
-        String url = "jdbc:circuitbreaker:jdbc:log:jdbc:h2:mem:cb_chain;DB_CLOSE_DELAY=-1";
+        // Chain: circuitbreaker -> cat -> h2
+        String url = "jdbc:circuitbreaker:jdbc:cat:jdbc:h2:mem:cb_chain;DB_CLOSE_DELAY=-1";
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement();
                  ResultSet rs = stmt.executeQuery("SELECT 123")) {

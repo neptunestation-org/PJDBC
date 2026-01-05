@@ -108,21 +108,21 @@ class DriverCompositionProperties {
         String directLog = MockDriver.getLog(mockUrl);
 
 
-        // Execute through log driver
-        String logUrl = "jdbc:log:" + mockUrl;
-        try (Connection logConn = DriverManager.getConnection(logUrl)) {
-            logConn.createStatement().executeQuery(sql);
+        // Execute through cat driver
+        String catUrl = "jdbc:cat:" + mockUrl;
+        try (Connection catConn = DriverManager.getConnection(catUrl)) {
+            catConn.createStatement().executeQuery(sql);
         }
-        String loggedLog = MockDriver.getLog(mockUrl);
+        String catLog = MockDriver.getLog(mockUrl);
 
-        assertEquals(directLog, loggedLog,
-            "LogDriver should preserve SQL: " + sql);
+        assertEquals(directLog, catLog,
+            "CatDriver should preserve SQL: " + sql);
     }
 
     /**
      * Passthrough driver chains preserve data.
      *
-     * Any chain of cat and log drivers should not modify the SQL
+     * Any chain of cat drivers should not modify the SQL
      * that reaches the terminal MockDriver.
      */
     @Property(tries = 30)

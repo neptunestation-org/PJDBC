@@ -130,9 +130,9 @@ class PjdbcCliTest {
         @Test
         @DisplayName("validates nested URLs recursively")
         void validatesNestedUrlsRecursively() {
-            int result = cli.run(new String[]{"validate", "jdbc:cache[ttl=300]:jdbc:retry[maxRetries=3]:jdbc:postgresql://localhost/db"});
+            int result = cli.run(new String[]{"validate", "jdbc:readonly:jdbc:retry[maxRetries=3]:jdbc:postgresql://localhost/db"});
             assertEquals(0, result);
-            assertTrue(getOutput().contains("Subprotocol: cache"));
+            assertTrue(getOutput().contains("Subprotocol: readonly"));
             assertTrue(getOutput().contains("Nested URL"));
             assertTrue(getOutput().contains("Subprotocol: retry"));
         }
@@ -149,7 +149,7 @@ class PjdbcCliTest {
             assertEquals(0, result);
             assertTrue(getOutput().contains("Available PJDBC Drivers"));
             assertTrue(getOutput().contains("retry"));
-            assertTrue(getOutput().contains("cache"));
+            assertTrue(getOutput().contains("readonly"));
             assertTrue(getOutput().contains("timeout"));
         }
 
@@ -191,10 +191,10 @@ class PjdbcCliTest {
         @Test
         @DisplayName("shows URL format")
         void showsUrlFormat() {
-            int result = cli.run(new String[]{"show", "cache"});
+            int result = cli.run(new String[]{"show", "readonly"});
             assertEquals(0, result);
             assertTrue(getOutput().contains("URL Format:"));
-            assertTrue(getOutput().contains("jdbc:cache"));
+            assertTrue(getOutput().contains("jdbc:readonly"));
         }
 
         @Test
@@ -231,9 +231,9 @@ class PjdbcCliTest {
         @Test
         @DisplayName("shows complex driver chain")
         void showsComplexDriverChain() {
-            int result = cli.run(new String[]{"chain", "jdbc:cache:jdbc:retry:jdbc:timeout:jdbc:postgresql://localhost/db"});
+            int result = cli.run(new String[]{"chain", "jdbc:readonly:jdbc:retry:jdbc:timeout:jdbc:postgresql://localhost/db"});
             assertEquals(0, result);
-            assertTrue(getOutput().contains("CachingDriver"));
+            assertTrue(getOutput().contains("ReadonlyDriver"));
             assertTrue(getOutput().contains("RetryDriver"));
             assertTrue(getOutput().contains("TimeoutDriver"));
             assertTrue(getOutput().contains("4 layers"));
@@ -242,9 +242,9 @@ class PjdbcCliTest {
         @Test
         @DisplayName("shows parameters in chain")
         void showsParametersInChain() {
-            int result = cli.run(new String[]{"chain", "jdbc:cache[ttl=300]:jdbc:retry[maxRetries=5]:jdbc:postgresql://localhost/db"});
+            int result = cli.run(new String[]{"chain", "jdbc:timeout[queryTimeout=300]:jdbc:retry[maxRetries=5]:jdbc:postgresql://localhost/db"});
             assertEquals(0, result);
-            assertTrue(getOutput().contains("ttl=300"));
+            assertTrue(getOutput().contains("queryTimeout=300"));
             assertTrue(getOutput().contains("maxRetries=5"));
         }
 

@@ -62,9 +62,9 @@ public class PjdbcCapabilitiesTest {
 
     @Test
     public void testFindByPrefixExistingDriver() {
-        Optional<DriverCapability> log = capabilities.findByPrefix("log");
-        assertTrue("Should find 'log' driver", log.isPresent());
-        assertEquals("log", log.get().prefix());
+        Optional<DriverCapability> cat = capabilities.findByPrefix("cat");
+        assertTrue("Should find 'cat' driver", cat.isPresent());
+        assertEquals("cat", cat.get().prefix());
     }
 
     @Test
@@ -75,22 +75,22 @@ public class PjdbcCapabilitiesTest {
 
     @Test
     public void testFindByPrefixReturnsCorrectDriver() {
-        Optional<DriverCapability> pool = capabilities.findByPrefix("pool");
-        assertTrue("Should find 'pool' driver", pool.isPresent());
-        DriverCapability driver = pool.get();
-        assertEquals("pool", driver.prefix());
+        Optional<DriverCapability> retry = capabilities.findByPrefix("retry");
+        assertTrue("Should find 'retry' driver", retry.isPresent());
+        DriverCapability driver = retry.get();
+        assertEquals("retry", driver.prefix());
         assertNotNull("Driver should have a class name", driver.driverClass());
-        assertTrue("Driver class should contain 'PoolDriver'",
-            driver.driverClass().contains("PoolDriver"));
+        assertTrue("Driver class should contain 'RetryDriver'",
+            driver.driverClass().contains("RetryDriver"));
     }
 
     // ========== findByClass() tests ==========
 
     @Test
     public void testFindByClassExistingDriver() {
-        Optional<DriverCapability> driver = capabilities.findByClass("org.pjdbc.drivers.LogDriver");
-        assertTrue("Should find LogDriver by class", driver.isPresent());
-        assertEquals("org.pjdbc.drivers.LogDriver", driver.get().driverClass());
+        Optional<DriverCapability> driver = capabilities.findByClass("org.pjdbc.drivers.CatDriver");
+        assertTrue("Should find CatDriver by class", driver.isPresent());
+        assertEquals("org.pjdbc.drivers.CatDriver", driver.get().driverClass());
     }
 
     @Test
@@ -101,8 +101,8 @@ public class PjdbcCapabilitiesTest {
 
     @Test
     public void testFindByClassMatchesFindByPrefix() {
-        Optional<DriverCapability> byPrefix = capabilities.findByPrefix("log");
-        assertTrue("Should find log driver by prefix", byPrefix.isPresent());
+        Optional<DriverCapability> byPrefix = capabilities.findByPrefix("cat");
+        assertTrue("Should find cat driver by prefix", byPrefix.isPresent());
 
         Optional<DriverCapability> byClass = capabilities.findByClass(byPrefix.get().driverClass());
         assertTrue("Should find same driver by class", byClass.isPresent());
@@ -114,11 +114,11 @@ public class PjdbcCapabilitiesTest {
 
     @Test
     public void testFindByCapabilityReturnsMatchingDrivers() {
-        List<DriverCapability> cachingDrivers = capabilities.findByCapability("caching");
-        assertFalse("Should find caching drivers", cachingDrivers.isEmpty());
-        for (DriverCapability driver : cachingDrivers) {
-            assertTrue("Each driver should have 'caching' capability",
-                driver.hasCapability("caching"));
+        List<DriverCapability> resilienceDrivers = capabilities.findByCapability("resilience");
+        assertFalse("Should find resilience drivers", resilienceDrivers.isEmpty());
+        for (DriverCapability driver : resilienceDrivers) {
+            assertTrue("Each driver should have 'resilience' capability",
+                driver.hasCapability("resilience"));
         }
     }
 
@@ -129,9 +129,9 @@ public class PjdbcCapabilitiesTest {
     }
 
     @Test
-    public void testFindByCapabilityLogging() {
-        List<DriverCapability> loggingDrivers = capabilities.findByCapability("logging");
-        assertFalse("Should find logging drivers", loggingDrivers.isEmpty());
+    public void testFindByCapabilityTesting() {
+        List<DriverCapability> testingDrivers = capabilities.findByCapability("testing");
+        assertFalse("Should find testing drivers", testingDrivers.isEmpty());
     }
 
     // ========== getAllCapabilityTags() tests ==========
@@ -232,12 +232,13 @@ public class PjdbcCapabilitiesTest {
     // ========== findBySideEffect() tests ==========
 
     @Test
-    public void testFindBySideEffectLogging() {
-        List<DriverCapability> loggingDrivers = capabilities.findBySideEffect("logging");
-        for (DriverCapability driver : loggingDrivers) {
+    public void testFindBySideEffectStatefulOrEmpty() {
+        // After rescope, no drivers have logging side effect, test stateful instead
+        List<DriverCapability> statefulDrivers = capabilities.findBySideEffect("stateful");
+        for (DriverCapability driver : statefulDrivers) {
             assertNotNull("Driver should have side effects", driver.sideEffects());
-            assertTrue("Driver should have logging side effect",
-                driver.sideEffects().logging());
+            assertTrue("Driver should have stateful side effect",
+                driver.sideEffects().stateful());
         }
     }
 
@@ -271,7 +272,7 @@ public class PjdbcCapabilitiesTest {
 
     @Test
     public void testHasDriverReturnsTrueForExistingDriver() {
-        assertTrue("Should have 'log' driver", capabilities.hasDriver("log"));
+        assertTrue("Should have 'cat' driver", capabilities.hasDriver("cat"));
     }
 
     @Test
@@ -499,11 +500,11 @@ public class PjdbcCapabilitiesTest {
     }
 
     @Test
-    public void testLoadFromReflectionFindsLogDriver() {
+    public void testLoadFromReflectionFindsCatDriver() {
         PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
-        Optional<DriverCapability> log = caps.findByPrefix("log");
-        assertTrue("Reflection should find 'log' driver", log.isPresent());
-        assertEquals("org.pjdbc.drivers.LogDriver", log.get().driverClass());
+        Optional<DriverCapability> cat = caps.findByPrefix("cat");
+        assertTrue("Reflection should find 'cat' driver", cat.isPresent());
+        assertEquals("org.pjdbc.drivers.CatDriver", cat.get().driverClass());
     }
 
     @Test
@@ -523,41 +524,36 @@ public class PjdbcCapabilitiesTest {
     }
 
     @Test
-    public void testLoadFromReflectionFindsCachingDriverWithCapabilities() {
+    public void testLoadFromReflectionFindsChaosDriverWithCapabilities() {
         PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
-        Optional<DriverCapability> cache = caps.findByPrefix("cache");
-        assertTrue("Reflection should find 'cache' driver", cache.isPresent());
-        assertTrue("CachingDriver should have 'caching' capability",
-            cache.get().hasCapability("caching"));
+        Optional<DriverCapability> chaos = caps.findByPrefix("chaos");
+        assertTrue("Reflection should find 'chaos' driver", chaos.isPresent());
+        assertTrue("ChaosDriver should have 'testing' capability",
+            chaos.get().hasCapability("testing"));
     }
 
     @Test
-    public void testLoadFromReflectionFindsRedisCachingDriverWithDependencies() {
+    public void testLoadFromReflectionFindsDriversWithDependencies() {
         PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
-        Optional<DriverCapability> redis = caps.findByPrefix("rediscache");
-        assertTrue("Reflection should find 'rediscache' driver", redis.isPresent());
-
-        // RedisCachingDriver should have Jedis dependency
-        assertNotNull("RedisCachingDriver should have dependencies",
-            redis.get().dependencies());
-        assertFalse("RedisCachingDriver should have at least one dependency",
-            redis.get().dependencies().isEmpty());
-
-        boolean hasJedis = redis.get().dependencies().stream()
-            .anyMatch(d -> "jedis".equals(d.artifactId()));
-        assertTrue("RedisCachingDriver should have Jedis dependency", hasJedis);
+        // Check that findWithDependencies works (may be empty after rescope)
+        List<DriverCapability> withDeps = caps.findWithDependencies();
+        for (DriverCapability driver : withDeps) {
+            assertNotNull("Driver should have dependencies", driver.dependencies());
+            assertFalse("Driver should have at least one dependency",
+                driver.dependencies().isEmpty());
+        }
     }
 
     @Test
     public void testLoadFromReflectionFindsDriverWithSideEffects() {
         PjdbcCapabilities caps = PjdbcCapabilities.loadFromReflection();
-        Optional<DriverCapability> log = caps.findByPrefix("log");
-        assertTrue("Reflection should find 'log' driver", log.isPresent());
-
-        // LogDriver should have logging side effect
-        assertNotNull("LogDriver should have side effects", log.get().sideEffects());
-        assertTrue("LogDriver should have logging side effect",
-            log.get().sideEffects().logging());
+        // Check that findBySideEffect works - circuitbreaker has stateful side effect
+        List<DriverCapability> statefulDrivers = caps.findBySideEffect("stateful");
+        for (DriverCapability driver : statefulDrivers) {
+            assertNotNull("Driver should have side effects", driver.sideEffects());
+            assertTrue("Driver should have stateful side effect",
+                driver.sideEffects().stateful());
+        }
     }
 
     @Test

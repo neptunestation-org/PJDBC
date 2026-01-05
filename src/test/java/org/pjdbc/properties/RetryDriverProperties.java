@@ -395,26 +395,6 @@ class RetryDriverProperties {
             "retry:cat:X should behave like retry:X");
     }
 
-    /**
-     * Property: log:retry:X preserves retry behavior.
-     */
-    @Property(tries = 30)
-    void logRetryComposition(
-            @ForAll @IntRange(min = 1, max = 100) int value) throws SQLException {
-
-        String dbName = createUniqueDbName();
-        String logRetryUrl = "jdbc:log:jdbc:retry:jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1";
-
-        try (Connection conn = DriverManager.getConnection(logRetryUrl);
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT " + value)) {
-
-            assertTrue(rs.next());
-            assertEquals(value, rs.getInt(1),
-                "log:retry should preserve query results");
-        }
-    }
-
     // ========== CONFIG PARSING ==========
 
     /**

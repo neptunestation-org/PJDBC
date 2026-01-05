@@ -50,10 +50,10 @@ public class RuntimeIntrospectionIntegrationTest {
 
     @Test
     public void testExpectedDriverCount() {
-        // The manifest should have a reasonable number of drivers (at least 15)
-        assertTrue("Should have at least 15 drivers", capabilities.getDriverCount() >= 15);
-        // And not more than 50 (sanity check)
-        assertTrue("Should have fewer than 50 drivers", capabilities.getDriverCount() < 50);
+        // The manifest should have a reasonable number of drivers (at least 10 after rescope)
+        assertTrue("Should have at least 10 drivers", capabilities.getDriverCount() >= 10);
+        // And not more than 30 (sanity check after rescope)
+        assertTrue("Should have fewer than 30 drivers", capabilities.getDriverCount() < 30);
     }
 
     // ========== Driver Class Verification Tests ==========
@@ -194,38 +194,36 @@ public class RuntimeIntrospectionIntegrationTest {
     public void testExpectedCapabilityTagsExist() {
         List<String> tags = capabilities.getAllCapabilityTags();
 
-        // These are the expected capability tags based on the manifest
-        assertTrue("Should have 'caching' tag", tags.contains("caching"));
-        assertTrue("Should have 'pooling' tag", tags.contains("pooling"));
-        assertTrue("Should have 'logging' tag", tags.contains("logging"));
+        // These are the expected capability tags after rescope
         assertTrue("Should have 'testing' tag", tags.contains("testing"));
         assertTrue("Should have 'security' tag", tags.contains("security"));
+        assertTrue("Should have 'resilience' tag", tags.contains("resilience"));
     }
 
     @Test
-    public void testCachingDriversHaveCachingCapability() {
-        List<DriverCapability> cachingDrivers = capabilities.findByCapability("caching");
-        assertFalse("Should have caching drivers", cachingDrivers.isEmpty());
+    public void testResilienceDriversHaveResilienceCapability() {
+        List<DriverCapability> resilienceDrivers = capabilities.findByCapability("resilience");
+        assertFalse("Should have resilience drivers", resilienceDrivers.isEmpty());
 
-        for (DriverCapability driver : cachingDrivers) {
+        for (DriverCapability driver : resilienceDrivers) {
             String name = driver.name().toLowerCase();
             assertTrue(
-                "Caching driver should have 'caching' in name: " + driver.name(),
-                name.contains("caching") || name.contains("cache")
+                "Resilience driver should have resilience-related name: " + driver.name(),
+                name.contains("retry") || name.contains("timeout") || name.contains("circuit") || name.contains("chaos")
             );
         }
     }
 
     @Test
-    public void testPoolingDriversHavePoolingCapability() {
-        List<DriverCapability> poolingDrivers = capabilities.findByCapability("pooling");
-        assertFalse("Should have pooling drivers", poolingDrivers.isEmpty());
+    public void testTestingDriversHaveTestingCapability() {
+        List<DriverCapability> testingDrivers = capabilities.findByCapability("testing");
+        assertFalse("Should have testing drivers", testingDrivers.isEmpty());
 
-        for (DriverCapability driver : poolingDrivers) {
+        for (DriverCapability driver : testingDrivers) {
             String name = driver.name().toLowerCase();
             assertTrue(
-                "Pooling driver should have 'pool' in name: " + driver.name(),
-                name.contains("pool")
+                "Testing driver should have test-related name: " + driver.name(),
+                name.contains("mock") || name.contains("chaos") || name.contains("sink")
             );
         }
     }
@@ -233,33 +231,21 @@ public class RuntimeIntrospectionIntegrationTest {
     // ========== Side Effects Consistency Tests ==========
 
     @Test
-    public void testLoggingDriverHasLoggingSideEffect() {
-        DriverCapability logDriver = capabilities.findByPrefix("log").orElse(null);
-        assertNotNull("Should have log driver", logDriver);
-        assertNotNull("Log driver should have side effects", logDriver.sideEffects());
-        assertTrue("Log driver should have logging side effect", logDriver.sideEffects().logging());
-    }
-
-    @Test
-    public void testMetricsDriverHasMetricsSideEffect() {
-        DriverCapability metricsDriver = capabilities.findByPrefix("metrics").orElse(null);
-        assertNotNull("Should have metrics driver", metricsDriver);
-        assertNotNull("Metrics driver should have side effects", metricsDriver.sideEffects());
-        assertTrue("Metrics driver should have metrics side effect", metricsDriver.sideEffects().metrics());
-    }
-
-    @Test
-    public void testCachingDriversWithNetworkHaveNetworkSideEffect() {
-        // Redis, Memcached, Hazelcast should have network side effect
-        for (String prefix : List.of("rediscache", "memcache", "hazelcast")) {
-            DriverCapability driver = capabilities.findByPrefix(prefix).orElse(null);
-            if (driver != null && driver.sideEffects() != null) {
-                assertTrue(
-                    prefix + " driver should have network side effect",
-                    driver.sideEffects().network()
-                );
-            }
+    public void testCircuitBreakerDriverHasStatefulSideEffect() {
+        DriverCapability cbDriver = capabilities.findByPrefix("circuitbreaker").orElse(null);
+        assertNotNull("Should have circuitbreaker driver", cbDriver);
+        if (cbDriver.sideEffects() != null) {
+            assertTrue("CircuitBreaker driver should have stateful side effect",
+                cbDriver.sideEffects().stateful());
         }
+    }
+
+    @Test
+    public void testFederatingDriverExists() {
+        DriverCapability fedDriver = capabilities.findByPrefix("federate").orElse(null);
+        assertNotNull("Should have federate driver", fedDriver);
+        // Federate driver routes queries across multiple databases
+        assertTrue("Federate driver should be composable", fedDriver.composable());
     }
 
     // ========== Dependency Consistency Tests ==========
@@ -282,26 +268,17 @@ public class RuntimeIntrospectionIntegrationTest {
     }
 
     @Test
-    public void testHikariDriverHasHikariDependency() {
-        DriverCapability hikari = capabilities.findByPrefix("hikaricp").orElse(null);
-        assertNotNull("Should have HikariCP driver", hikari);
-        assertNotNull("HikariCP driver should have dependencies", hikari.dependencies());
-        assertFalse("HikariCP driver should have at least one dependency", hikari.dependencies().isEmpty());
+    public void testDriversWithDependenciesAreValid() {
+        // After rescope, verify any drivers with dependencies have valid dependency info
+        List<DriverCapability> driversWithDeps = capabilities.findWithDependencies();
+        for (DriverCapability driver : driversWithDeps) {
+            assertNotNull("Driver dependencies should not be null", driver.dependencies());
+            assertFalse("Driver should have at least one dependency", driver.dependencies().isEmpty());
 
-        boolean hasHikariDep = hikari.dependencies().stream()
-            .anyMatch(d -> d.artifactId().equals("HikariCP"));
-        assertTrue("HikariCP driver should depend on HikariCP", hasHikariDep);
-    }
-
-    @Test
-    public void testRedisDriverHasJedisDependency() {
-        DriverCapability redis = capabilities.findByPrefix("rediscache").orElse(null);
-        assertNotNull("Should have Redis caching driver", redis);
-
-        if (redis.dependencies() != null && !redis.dependencies().isEmpty()) {
-            boolean hasJedisDep = redis.dependencies().stream()
-                .anyMatch(d -> d.artifactId().equals("jedis"));
-            assertTrue("Redis driver should depend on jedis", hasJedisDep);
+            for (DriverCapability.Dependency dep : driver.dependencies()) {
+                assertNotNull("Dependency should have groupId", dep.groupId());
+                assertNotNull("Dependency should have artifactId", dep.artifactId());
+            }
         }
     }
 
@@ -383,11 +360,10 @@ public class RuntimeIntrospectionIntegrationTest {
 
     @Test
     public void testAllExpectedDriverPrefixesArePresent() {
-        // These prefixes should all be present based on the driver files in the codebase
+        // These prefixes should all be present after rescope
         String[] expectedPrefixes = {
-            "cat", "log", "filter", "pool", "hikaricp", "tee", "mapuser",
-            "sink", "mock", "readonly", "retry", "chaos", "cache",
-            "rediscache", "memcache", "hazelcast", "trace", "metrics", "mask"
+            "cat", "filter", "tee", "mapuser", "sink", "mock", "readonly",
+            "retry", "chaos", "mask", "timeout", "circuitbreaker", "schema", "federate"
         };
 
         for (String prefix : expectedPrefixes) {

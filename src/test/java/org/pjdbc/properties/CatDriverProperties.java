@@ -317,17 +317,17 @@ class CatDriverProperties {
     // ========== DRIVER COMPOSITION ==========
 
     /**
-     * Property: cat:log:X works correctly.
+     * Property: cat:cat:X works correctly.
      */
     @Property(tries = 10)
-    void catLogComposition(
+    void catCatComposition(
             @ForAll @IntRange(min = 1, max = 5) int queryCount) throws SQLException {
 
         String dbName = createUniqueDbName();
         String mockUrl = "jdbc:mock:" + dbName;
-        String catLogUrl = "jdbc:cat:jdbc:log:" + mockUrl;
+        String catCatUrl = "jdbc:cat:jdbc:cat:" + mockUrl;
 
-        try (Connection conn = DriverManager.getConnection(catLogUrl);
+        try (Connection conn = DriverManager.getConnection(catCatUrl);
              Statement stmt = conn.createStatement()) {
             for (int i = 0; i < queryCount; i++) {
                 stmt.executeQuery("SELECT " + i);
@@ -335,26 +335,26 @@ class CatDriverProperties {
         }
 
         String mockLog = MockDriver.getLog(mockUrl);
-        assertNotNull(mockLog, "cat:log should pass through to underlying");
+        assertNotNull(mockLog, "cat:cat should pass through to underlying");
 
         for (int i = 0; i < queryCount; i++) {
             assertTrue(mockLog.contains("SELECT " + i),
-                "Query " + i + " should pass through cat:log");
+                "Query " + i + " should pass through cat:cat");
         }
     }
 
     /**
-     * Property: log:cat:X works correctly.
+     * Property: cat:sink:X works correctly (sink absorbs).
      */
     @Property(tries = 10)
-    void logCatComposition(
+    void catSinkComposition(
             @ForAll @IntRange(min = 1, max = 5) int queryCount) throws SQLException {
 
         String dbName = createUniqueDbName();
         String mockUrl = "jdbc:mock:" + dbName;
-        String logCatUrl = "jdbc:log:jdbc:cat:" + mockUrl;
+        String catSinkUrl = "jdbc:cat:jdbc:sink:" + mockUrl;
 
-        try (Connection conn = DriverManager.getConnection(logCatUrl);
+        try (Connection conn = DriverManager.getConnection(catSinkUrl);
              Statement stmt = conn.createStatement()) {
             for (int i = 0; i < queryCount; i++) {
                 stmt.executeQuery("SELECT " + i);
@@ -362,12 +362,11 @@ class CatDriverProperties {
         }
 
         String mockLog = MockDriver.getLog(mockUrl);
-        assertNotNull(mockLog, "log:cat should pass through to underlying");
-
-        for (int i = 0; i < queryCount; i++) {
-            assertTrue(mockLog.contains("SELECT " + i),
-                "Query " + i + " should pass through log:cat");
-        }
+        // Sink absorbs SQL operations but close[] still propagates
+        assertFalse(mockLog.contains("executeQuery"),
+            "cat:sink should absorb SQL operations");
+        assertFalse(mockLog.contains("SELECT"),
+            "cat:sink should absorb SQL statements");
     }
 
     /**

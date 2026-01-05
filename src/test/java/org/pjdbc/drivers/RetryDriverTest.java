@@ -189,8 +189,8 @@ public class RetryDriverTest {
     @Test
     public void testDriverChaining() throws SQLException, ClassNotFoundException {
         // Test that RetryDriver works in a chain with other drivers
-        Class.forName("org.pjdbc.drivers.LogDriver");
-        String url = "jdbc:retry:jdbc:log:jdbc:h2:mem:test_chain";
+        Class.forName("org.pjdbc.drivers.CatDriver");
+        String url = "jdbc:retry:jdbc:cat:jdbc:h2:mem:test_chain";
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT 'chained'")) {

@@ -19,24 +19,24 @@ public class PjdbcArbitraries {
      * These satisfy identity-like properties when composed.
      */
     public static final List<String> PASSTHROUGH_DRIVERS = List.of(
-        "cat", "log"
+        "cat"
     );
 
     /**
      * Drivers that can be safely chained for composition testing.
-     * Excludes drivers requiring external resources (pool, cache, etc.)
+     * Excludes drivers requiring external resources.
      */
     public static final List<String> COMPOSABLE_DRIVERS = List.of(
-        "cat", "log", "filter", "sink"
+        "cat", "filter", "sink"
     );
 
     /**
      * All available driver subprotocols.
      */
     public static final List<String> ALL_DRIVERS = List.of(
-        "cat", "log", "filter", "sink", "tee",
-        "pool", "readonly", "retry", "chaos",
-        "tracing", "metrics", "datamask"
+        "cat", "filter", "sink", "tee",
+        "readonly", "retry", "chaos", "mask",
+        "timeout", "circuitbreaker", "schema", "federate"
     );
 
     // ============ Basic Arbitraries ============

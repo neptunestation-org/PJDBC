@@ -258,8 +258,8 @@ public class ReadonlyDriverTest {
 
     @Test
     public void testDriverChaining() throws SQLException, ClassNotFoundException {
-        Class.forName("org.pjdbc.drivers.LogDriver");
-        String url = "jdbc:readonly:jdbc:log:jdbc:h2:mem:test_chain";
+        Class.forName("org.pjdbc.drivers.CatDriver");
+        String url = "jdbc:readonly:jdbc:cat:jdbc:h2:mem:test_chain";
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement()) {
                 try (ResultSet rs = stmt.executeQuery("SELECT 'chained'")) {

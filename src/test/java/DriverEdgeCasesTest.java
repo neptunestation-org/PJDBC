@@ -256,119 +256,6 @@ public class DriverEdgeCasesTest {
         assertTrue("Concurrent TeeDriver connections should succeed", errors.isEmpty());
     }
 
-    // ========== PoolDriver Edge Cases ==========
-
-    @Test
-    public void poolDriver_nullURL() {
-        PoolDriver driver = new PoolDriver();
-        assertFalse("PoolDriver should reject null URL", driver.acceptsURL(null));
-        try {
-            Connection conn = driver.connect(null, new Properties());
-            assertNull("Connection should be null for null URL", conn);
-        } catch (SQLException e) {
-            fail("Should not throw SQLException for null URL: " + e.getMessage());
-        }
-    }
-
-    @Test
-    public void poolDriver_emptyURL() {
-        PoolDriver driver = new PoolDriver();
-        assertFalse("PoolDriver should reject empty URL", driver.acceptsURL(""));
-    }
-
-    @Test
-    public void poolDriver_malformedURL_noSubname() {
-        PoolDriver driver = new PoolDriver();
-        assertFalse("PoolDriver should reject URL without subname", driver.acceptsURL("jdbc:pool:"));
-    }
-
-    @Test
-    public void poolDriver_nullProperties() {
-        PoolDriver driver = new PoolDriver();
-        try {
-            Connection conn = driver.connect("jdbc:pool:jdbc:mock:foo", null);
-            assertNotNull("PoolDriver should accept null Properties", conn);
-            conn.close();
-        } catch (SQLException e) {
-            fail("PoolDriver should handle null Properties: " + e.getMessage());
-        }
-    }
-
-    @Test
-    public void poolDriver_emptyProperties() {
-        PoolDriver driver = new PoolDriver();
-        try {
-            Connection conn = driver.connect("jdbc:pool:jdbc:mock:foo", new Properties());
-            assertNotNull("PoolDriver should accept empty Properties", conn);
-            conn.close();
-        } catch (SQLException e) {
-            fail("PoolDriver should handle empty Properties: " + e.getMessage());
-        }
-    }
-
-    @Test
-    public void poolDriver_connectionReuseAfterClose() {
-        try {
-            Connection conn1 = DriverManager.getConnection("jdbc:pool:jdbc:mock:reuse");
-            assertNotNull(conn1);
-            conn1.close();
-
-            // Get another connection - should reuse from pool
-            Connection conn2 = DriverManager.getConnection("jdbc:pool:jdbc:mock:reuse");
-            assertNotNull(conn2);
-
-            // Connections should be the same underlying connection (from pool)
-            // but different proxy instances
-            assertNotNull("Second connection should be retrieved from pool", conn2);
-            conn2.close();
-        } catch (SQLException e) {
-            fail("PoolDriver should support connection reuse: " + e.getMessage());
-        }
-    }
-
-    @Test
-    public void poolDriver_concurrentPoolAccess() throws Exception {
-        final CountDownLatch latch = new CountDownLatch(10);
-        final CopyOnWriteArrayList<Connection> connections = new CopyOnWriteArrayList<>();
-        final CopyOnWriteArrayList<Exception> errors = new CopyOnWriteArrayList<>();
-
-        for (int i = 0; i < 10; i++) {
-            new Thread(() -> {
-                try {
-                    Connection conn = DriverManager.getConnection("jdbc:pool:jdbc:mock:concurrent");
-                    connections.add(conn);
-                    Thread.sleep(10);
-                    conn.close();
-                } catch (Exception e) {
-                    errors.add(e);
-                } finally {
-                    latch.countDown();
-                }
-            }).start();
-        }
-
-        latch.await(10, TimeUnit.SECONDS);
-        assertTrue("Concurrent pool access should succeed", errors.isEmpty());
-        assertEquals("Should create 10 connections", 10, connections.size());
-    }
-
-    @Test
-    public void poolDriver_useClosedConnectionThrowsSQLException() {
-        try {
-            Connection conn = DriverManager.getConnection("jdbc:pool:jdbc:mock:closed");
-            conn.close();
-
-            try {
-                conn.createStatement();
-                fail("Using closed pooled connection should throw SQLException");
-            } catch (SQLException e) {
-                // Expected behavior
-            }
-        } catch (SQLException e) {
-            fail("Initial connection should succeed: " + e.getMessage());
-        }
-    }
-
     // ========== CatDriver Edge Cases ==========
 
     @Test
@@ -534,87 +421,6 @@ public class DriverEdgeCasesTest {
         }
     }
 
-    // ========== LogDriver Edge Cases ==========
-
-    @Test
-    public void logDriver_nullURL() {
-        LogDriver driver = new LogDriver();
-        assertFalse("LogDriver should reject null URL", driver.acceptsURL(null));
-        try {
-            Connection conn = driver.connect(null, new Properties());
-            assertNull("Connection should be null for null URL", conn);
-        } catch (SQLException e) {
-            fail("Should not throw SQLException for null URL: " + e.getMessage());
-        }
-    }
-
-    @Test
-    public void logDriver_emptyURL() {
-        LogDriver driver = new LogDriver();
-        assertFalse("LogDriver should reject empty URL", driver.acceptsURL(""));
-    }
-
-    @Test
-    public void logDriver_malformedURL_noSubname() {
-        LogDriver driver = new LogDriver();
-        assertFalse("LogDriver should reject URL without subname", driver.acceptsURL("jdbc:log:"));
-    }
-
-    @Test
-    public void logDriver_malformedURL_invalidTargetURL() {
-        LogDriver driver = new LogDriver();
-        assertFalse("LogDriver should reject URL with invalid target",
-                    driver.acceptsURL("jdbc:log:jdbc:invalid:foo"));
-    }
-
-    @Test
-    public void logDriver_nullProperties() {
-        LogDriver driver = new LogDriver();
-        try {
-            Connection conn = driver.connect("jdbc:log:jdbc:mock:foo", null);
-            assertNotNull("LogDriver should accept null Properties", conn);
-            conn.close();
-        } catch (SQLException e) {
-            fail("LogDriver should handle null Properties: " + e.getMessage());
-        }
-    }
-
-    @Test
-    public void logDriver_emptyProperties() {
-        LogDriver driver = new LogDriver();
-        try {
-            Connection conn = driver.connect("jdbc:log:jdbc:mock:foo", new Properties());
-            assertNotNull("LogDriver should accept empty Properties", conn);
-            conn.close();
-        } catch (SQLException e) {
-            fail("LogDriver should handle empty Properties: " + e.getMessage());
-        }
-    }
-
-    @Test
-    public void logDriver_concurrentConnections() throws Exception {
-        final CountDownLatch latch = new CountDownLatch(5);
-        final CopyOnWriteArrayList<Exception> errors = new CopyOnWriteArrayList<>();
-
-        for (int i = 0; i < 5; i++) {
-            final int index = i;
-            new Thread(() -> {
-                try {
-                    Connection conn = DriverManager.getConnection("jdbc:log:jdbc:mock:log" + index);
-                    conn.createStatement().executeQuery("SELECT " + index);
-                    conn.close();
-                } catch (Exception e) {
-                    errors.add(e);
-                } finally {
-                    latch.countDown();
-                }
-            }).start();
-        }
-
-        latch.await(5, TimeUnit.SECONDS);
-        assertTrue("Concurrent LogDriver connections should succeed", errors.isEmpty());
-    }
-
     // ========== Cross-Driver Boundary Tests ==========
 
     @Test
@@ -622,9 +428,7 @@ public class DriverEdgeCasesTest {
         Driver[] drivers = {
             new FilterDriver(),
             new TeeDriver(),
-            new PoolDriver(),
-            new CatDriver(),
-            new LogDriver()
+            new CatDriver()
         };
 
         String[] wrongProtocols = {
@@ -646,9 +450,7 @@ public class DriverEdgeCasesTest {
     public void allDrivers_jdbcCompliantReturnsFalse() {
         assertFalse("FilterDriver should not be JDBC compliant", new FilterDriver().jdbcCompliant());
         assertFalse("TeeDriver should not be JDBC compliant", new TeeDriver().jdbcCompliant());
-        assertFalse("PoolDriver should not be JDBC compliant", new PoolDriver().jdbcCompliant());
         assertFalse("CatDriver should not be JDBC compliant", new CatDriver().jdbcCompliant());
-        assertFalse("LogDriver should not be JDBC compliant", new LogDriver().jdbcCompliant());
     }
 
     @Test
@@ -656,9 +458,7 @@ public class DriverEdgeCasesTest {
         Driver[] drivers = {
             new FilterDriver(),
             new TeeDriver(),
-            new PoolDriver(),
-            new CatDriver(),
-            new LogDriver()
+            new CatDriver()
         };
 
         for (Driver driver : drivers) {

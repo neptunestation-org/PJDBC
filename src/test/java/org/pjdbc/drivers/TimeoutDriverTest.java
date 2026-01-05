@@ -193,8 +193,8 @@ public class TimeoutDriverTest {
 
     @Test
     public void testDriverChaining() throws SQLException {
-        // Chain: timeout -> log -> h2
-        String url = "jdbc:timeout[queryTimeout=50]:jdbc:log:jdbc:h2:mem:to_chain;DB_CLOSE_DELAY=-1";
+        // Chain: timeout -> cat -> h2
+        String url = "jdbc:timeout[queryTimeout=50]:jdbc:cat:jdbc:h2:mem:to_chain;DB_CLOSE_DELAY=-1";
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement();
                  ResultSet rs = stmt.executeQuery("SELECT 123")) {
