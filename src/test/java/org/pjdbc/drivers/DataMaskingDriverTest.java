@@ -385,4 +385,243 @@ public class DataMaskingDriverTest {
             }
         }
     }
+
+    // === Tests for comprehensive getter coverage (PJDBC-tylr) ===
+
+    private void setupNumericTable(String dbName) throws SQLException {
+        try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE TABLE IF NOT EXISTS numeric_data (" +
+                    "id INT PRIMARY KEY, " +
+                    "secret_int INT, " +
+                    "secret_long BIGINT, " +
+                    "secret_float FLOAT, " +
+                    "secret_double DOUBLE, " +
+                    "secret_decimal DECIMAL(10,2), " +
+                    "secret_bool BOOLEAN, " +
+                    "secret_bytes VARBINARY(100), " +
+                    "public_int INT)");
+                stmt.execute("INSERT INTO numeric_data VALUES (1, 12345, 9876543210, 3.14, 2.71828, 1234.56, TRUE, X'48454C4C4F', 999)");
+            }
+        }
+    }
+
+    @Test
+    public void testGetIntMasked() throws SQLException {
+        setupNumericTable("test_int");
+        String url = "jdbc:mask[columns=secret_int]:jdbc:h2:mem:test_int;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_int, public_int FROM numeric_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    assertEquals(0, rs.getInt("secret_int")); // masked
+                    assertEquals(999, rs.getInt("public_int")); // not masked
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetLongMasked() throws SQLException {
+        setupNumericTable("test_long");
+        String url = "jdbc:mask[columns=secret_long]:jdbc:h2:mem:test_long;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_long FROM numeric_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    assertEquals(0L, rs.getLong("secret_long"));
+                    assertEquals(0L, rs.getLong(1)); // by index
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetDoubleMasked() throws SQLException {
+        setupNumericTable("test_double");
+        String url = "jdbc:mask[columns=secret_double]:jdbc:h2:mem:test_double;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_double FROM numeric_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    assertEquals(0.0, rs.getDouble("secret_double"), 0.001);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetFloatMasked() throws SQLException {
+        setupNumericTable("test_float");
+        String url = "jdbc:mask[columns=secret_float]:jdbc:h2:mem:test_float;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_float FROM numeric_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    assertEquals(0.0f, rs.getFloat("secret_float"), 0.001);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetBigDecimalMasked() throws SQLException {
+        setupNumericTable("test_bigdecimal");
+        String url = "jdbc:mask[columns=secret_decimal]:jdbc:h2:mem:test_bigdecimal;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_decimal FROM numeric_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    assertEquals(java.math.BigDecimal.ZERO, rs.getBigDecimal("secret_decimal"));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetBooleanMasked() throws SQLException {
+        setupNumericTable("test_boolean");
+        String url = "jdbc:mask[columns=secret_bool]:jdbc:h2:mem:test_boolean;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_bool FROM numeric_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    assertFalse(rs.getBoolean("secret_bool")); // masked to false
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetBytesMasked() throws SQLException {
+        setupTestTable("test_bytes");
+        String url = "jdbc:mask[columns=ssn,strategy=FULL]:jdbc:h2:mem:test_bytes;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT ssn FROM users WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    byte[] masked = rs.getBytes("ssn");
+                    assertNotNull(masked);
+                    // Should be UTF-8 bytes of masked string (11 asterisks)
+                    assertEquals("***********", new String(masked, java.nio.charset.StandardCharsets.UTF_8));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetCharacterStreamMasked() throws SQLException, java.io.IOException {
+        setupTestTable("test_charstream");
+        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:h2:mem:test_charstream;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT ssn FROM users WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    java.io.Reader reader = rs.getCharacterStream("ssn");
+                    assertNotNull(reader);
+                    StringBuilder sb = new StringBuilder();
+                    int c;
+                    while ((c = reader.read()) != -1) {
+                        sb.append((char) c);
+                    }
+                    assertEquals("[REDACTED]", sb.toString());
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetBinaryStreamMasked() throws SQLException, java.io.IOException {
+        setupTestTable("test_binstream");
+        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:h2:mem:test_binstream;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT ssn FROM users WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    java.io.InputStream stream = rs.getBinaryStream("ssn");
+                    assertNotNull(stream);
+                    byte[] bytes = stream.readAllBytes();
+                    assertEquals("[REDACTED]", new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetAsciiStreamMasked() throws SQLException, java.io.IOException {
+        setupTestTable("test_asciistream");
+        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:h2:mem:test_asciistream;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT ssn FROM users WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    java.io.InputStream stream = rs.getAsciiStream("ssn");
+                    assertNotNull(stream);
+                    byte[] bytes = stream.readAllBytes();
+                    assertEquals("[REDACTED]", new String(bytes, java.nio.charset.StandardCharsets.US_ASCII));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetShortMasked() throws SQLException {
+        setupNumericTable("test_short");
+        String url = "jdbc:mask[columns=secret_int]:jdbc:h2:mem:test_short;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_int FROM numeric_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    assertEquals((short) 0, rs.getShort("secret_int"));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetByteMasked() throws SQLException {
+        setupNumericTable("test_byte");
+        String url = "jdbc:mask[columns=secret_int]:jdbc:h2:mem:test_byte;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_int FROM numeric_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    assertEquals((byte) 0, rs.getByte("secret_int"));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testNStringMasked() throws SQLException {
+        setupTestTable("test_nstring");
+        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:h2:mem:test_nstring;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT ssn FROM users WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    assertEquals("[REDACTED]", rs.getNString("ssn"));
+                    assertEquals("[REDACTED]", rs.getNString(1));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testUnmaskedColumnsStillWork() throws SQLException {
+        setupNumericTable("test_unmasked");
+        // Only mask secret_int, leave others alone
+        String url = "jdbc:mask[columns=secret_int]:jdbc:h2:mem:test_unmasked;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_int, secret_long, secret_bool, public_int FROM numeric_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    assertEquals(0, rs.getInt("secret_int")); // masked
+                    assertEquals(9876543210L, rs.getLong("secret_long")); // not masked
+                    assertTrue(rs.getBoolean("secret_bool")); // not masked
+                    assertEquals(999, rs.getInt("public_int")); // not masked
+                }
+            }
+        }
+    }
 }

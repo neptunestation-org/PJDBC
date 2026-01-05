@@ -76,4 +76,51 @@ public class FilterDriverTest {
     @Test
     public void versionInfo () {
 	assertEquals(1, new FilterDriver().getMajorVersion());
-	assertEquals(0, new FilterDriver().getMinorVersion());}}
+	assertEquals(0, new FilterDriver().getMinorVersion());}
+
+    @Test
+    public void urlBasedTransformer () {
+	try {
+	    // Use URL parameter to specify transformer class
+	    Connection conn = DriverManager.getConnection(
+		"jdbc:filter[class=org.pjdbc.test.UpperCaseTransformer]:jdbc:mock:foo");
+	    conn.createStatement().executeQuery("select * from person;");
+	    String log = MockDriver.getLog("jdbc:mock:foo");
+	    assertEquals("executeQuery[SELECT * FROM PERSON;]", log);}
+	catch (Exception e) {fail(e.getMessage());}}
+
+    @Test
+    public void urlBasedTransformerInvalidClass () {
+	try {
+	    // Invalid class should throw SQLException
+	    DriverManager.getConnection(
+		"jdbc:filter[class=com.nonexistent.Transformer]:jdbc:mock:foo");
+	    fail("Should throw SQLException for non-existent class");}
+	catch (SQLException e) {
+	    assertTrue(e.getMessage().contains("not found"));}}
+
+    @Test
+    public void urlBasedTransformerNotImplementingInterface () {
+	try {
+	    // Class not implementing JdbcTransformer should throw SQLException
+	    DriverManager.getConnection(
+		"jdbc:filter[class=java.lang.String]:jdbc:mock:foo");
+	    fail("Should throw SQLException for class not implementing JdbcTransformer");}
+	catch (SQLException e) {
+	    assertTrue(e.getMessage().contains("does not implement JdbcTransformer"));}}
+
+    @Test
+    public void perConnectionTransformerIsolation () {
+	try {
+	    // Two connections with different transformers
+	    Connection conn1 = DriverManager.getConnection(
+		"jdbc:filter[class=org.pjdbc.test.UpperCaseTransformer]:jdbc:mock:foo");
+	    Connection conn2 = DriverManager.getConnection(
+		"jdbc:filter:jdbc:mock:bar"); // default pass-through
+
+	    conn1.createStatement().executeQuery("select * from users;");
+	    conn2.createStatement().executeQuery("select * from orders;");
+
+	    assertEquals("executeQuery[SELECT * FROM USERS;]", MockDriver.getLog("jdbc:mock:foo"));
+	    assertEquals("executeQuery[select * from orders;]", MockDriver.getLog("jdbc:mock:bar"));}
+	catch (Exception e) {fail(e.getMessage());}}}

@@ -409,6 +409,16 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
     /**
      * ResultSet wrapper that masks values from matched columns.
+     *
+     * <p>Masking is applied to all getter methods to prevent bypass attacks:</p>
+     * <ul>
+     *   <li>String methods: return masked string</li>
+     *   <li>Numeric methods: return 0</li>
+     *   <li>Bytes: return masked string as UTF-8 bytes</li>
+     *   <li>Streams: return stream of masked content</li>
+     *   <li>Boolean: return false</li>
+     *   <li>Clob/NClob: not currently wrapped (returns raw)</li>
+     * </ul>
      */
     private static class MaskingResultSet extends AbstractResultSet {
         private final MaskingConfig config;
@@ -432,6 +442,12 @@ public class DataMaskingDriver extends AbstractProxyDriver {
             }
         }
 
+        private boolean shouldMaskColumn(int columnIndex) {
+            return columnIndex > 0 && columnIndex < maskedColumns.length && maskedColumns[columnIndex];
+        }
+
+        // === STRING METHODS ===
+
         @Override
         public String getString(int columnIndex) throws SQLException {
             String value = super.getString(columnIndex);
@@ -451,6 +467,26 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
+        public String getNString(int columnIndex) throws SQLException {
+            String value = super.getNString(columnIndex);
+            if (shouldMaskColumn(columnIndex) && value != null) {
+                return config.maskValue(value);
+            }
+            return value;
+        }
+
+        @Override
+        public String getNString(String columnLabel) throws SQLException {
+            String value = super.getNString(columnLabel);
+            if (config.shouldMask(columnLabel) && value != null) {
+                return config.maskValue(value);
+            }
+            return value;
+        }
+
+        // === OBJECT METHODS ===
+
+        @Override
         public Object getObject(int columnIndex) throws SQLException {
             Object value = super.getObject(columnIndex);
             if (shouldMaskColumn(columnIndex) && value instanceof String s) {
@@ -468,8 +504,252 @@ public class DataMaskingDriver extends AbstractProxyDriver {
             return value;
         }
 
-        private boolean shouldMaskColumn(int columnIndex) {
-            return columnIndex > 0 && columnIndex < maskedColumns.length && maskedColumns[columnIndex];
+        // === NUMERIC METHODS - return 0 for masked columns ===
+
+        @Override
+        public byte getByte(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) return 0;
+            return super.getByte(columnIndex);
+        }
+
+        @Override
+        public byte getByte(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) return 0;
+            return super.getByte(columnLabel);
+        }
+
+        @Override
+        public short getShort(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) return 0;
+            return super.getShort(columnIndex);
+        }
+
+        @Override
+        public short getShort(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) return 0;
+            return super.getShort(columnLabel);
+        }
+
+        @Override
+        public int getInt(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) return 0;
+            return super.getInt(columnIndex);
+        }
+
+        @Override
+        public int getInt(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) return 0;
+            return super.getInt(columnLabel);
+        }
+
+        @Override
+        public long getLong(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) return 0L;
+            return super.getLong(columnIndex);
+        }
+
+        @Override
+        public long getLong(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) return 0L;
+            return super.getLong(columnLabel);
+        }
+
+        @Override
+        public float getFloat(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) return 0.0f;
+            return super.getFloat(columnIndex);
+        }
+
+        @Override
+        public float getFloat(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) return 0.0f;
+            return super.getFloat(columnLabel);
+        }
+
+        @Override
+        public double getDouble(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) return 0.0;
+            return super.getDouble(columnIndex);
+        }
+
+        @Override
+        public double getDouble(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) return 0.0;
+            return super.getDouble(columnLabel);
+        }
+
+        @Override
+        public java.math.BigDecimal getBigDecimal(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) return java.math.BigDecimal.ZERO;
+            return super.getBigDecimal(columnIndex);
+        }
+
+        @Override
+        public java.math.BigDecimal getBigDecimal(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) return java.math.BigDecimal.ZERO;
+            return super.getBigDecimal(columnLabel);
+        }
+
+        @Override
+        @SuppressWarnings("deprecation")
+        public java.math.BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) return java.math.BigDecimal.ZERO.setScale(scale);
+            return super.getBigDecimal(columnIndex, scale);
+        }
+
+        @Override
+        @SuppressWarnings("deprecation")
+        public java.math.BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
+            if (config.shouldMask(columnLabel)) return java.math.BigDecimal.ZERO.setScale(scale);
+            return super.getBigDecimal(columnLabel, scale);
+        }
+
+        // === BYTES - return masked string as bytes ===
+
+        @Override
+        public byte[] getBytes(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) {
+                String value = super.getString(columnIndex);
+                if (value == null) return null;
+                return config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            }
+            return super.getBytes(columnIndex);
+        }
+
+        @Override
+        public byte[] getBytes(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) {
+                String value = super.getString(columnLabel);
+                if (value == null) return null;
+                return config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            }
+            return super.getBytes(columnLabel);
+        }
+
+        // === BOOLEAN - return false for masked columns ===
+
+        @Override
+        public boolean getBoolean(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) return false;
+            return super.getBoolean(columnIndex);
+        }
+
+        @Override
+        public boolean getBoolean(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) return false;
+            return super.getBoolean(columnLabel);
+        }
+
+        // === CHARACTER STREAMS - return stream of masked content ===
+
+        @Override
+        public java.io.Reader getCharacterStream(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) {
+                String value = super.getString(columnIndex);
+                if (value == null) return null;
+                return new java.io.StringReader(config.maskValue(value));
+            }
+            return super.getCharacterStream(columnIndex);
+        }
+
+        @Override
+        public java.io.Reader getCharacterStream(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) {
+                String value = super.getString(columnLabel);
+                if (value == null) return null;
+                return new java.io.StringReader(config.maskValue(value));
+            }
+            return super.getCharacterStream(columnLabel);
+        }
+
+        @Override
+        public java.io.Reader getNCharacterStream(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) {
+                String value = super.getNString(columnIndex);
+                if (value == null) return null;
+                return new java.io.StringReader(config.maskValue(value));
+            }
+            return super.getNCharacterStream(columnIndex);
+        }
+
+        @Override
+        public java.io.Reader getNCharacterStream(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) {
+                String value = super.getNString(columnLabel);
+                if (value == null) return null;
+                return new java.io.StringReader(config.maskValue(value));
+            }
+            return super.getNCharacterStream(columnLabel);
+        }
+
+        // === BINARY STREAMS - return stream of masked bytes ===
+
+        @Override
+        public java.io.InputStream getAsciiStream(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) {
+                String value = super.getString(columnIndex);
+                if (value == null) return null;
+                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+                return new java.io.ByteArrayInputStream(maskedBytes);
+            }
+            return super.getAsciiStream(columnIndex);
+        }
+
+        @Override
+        public java.io.InputStream getAsciiStream(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) {
+                String value = super.getString(columnLabel);
+                if (value == null) return null;
+                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+                return new java.io.ByteArrayInputStream(maskedBytes);
+            }
+            return super.getAsciiStream(columnLabel);
+        }
+
+        @Override
+        public java.io.InputStream getBinaryStream(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) {
+                String value = super.getString(columnIndex);
+                if (value == null) return null;
+                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                return new java.io.ByteArrayInputStream(maskedBytes);
+            }
+            return super.getBinaryStream(columnIndex);
+        }
+
+        @Override
+        public java.io.InputStream getBinaryStream(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) {
+                String value = super.getString(columnLabel);
+                if (value == null) return null;
+                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                return new java.io.ByteArrayInputStream(maskedBytes);
+            }
+            return super.getBinaryStream(columnLabel);
+        }
+
+        @Override
+        @SuppressWarnings("deprecation")
+        public java.io.InputStream getUnicodeStream(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) {
+                String value = super.getString(columnIndex);
+                if (value == null) return null;
+                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_16);
+                return new java.io.ByteArrayInputStream(maskedBytes);
+            }
+            return super.getUnicodeStream(columnIndex);
+        }
+
+        @Override
+        @SuppressWarnings("deprecation")
+        public java.io.InputStream getUnicodeStream(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) {
+                String value = super.getString(columnLabel);
+                if (value == null) return null;
+                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_16);
+                return new java.io.ByteArrayInputStream(maskedBytes);
+            }
+            return super.getUnicodeStream(columnLabel);
         }
     }
 }
