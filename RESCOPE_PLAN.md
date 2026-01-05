@@ -1,370 +1,422 @@
-# PJDBC Re-scope Implementation Plan
+# PJDBC Post-2.0 Improvement Plan
 
-## New Project Identity
+## Executive Summary
 
-**Tagline**: "Transform, route, and federate SQL without changing your code"
+PJDBC 2.0 successfully focused the project by removing redundant drivers (caching, pooling, observability, load balancing) and achieving zero runtime dependencies. This plan addresses technical debt and architectural issues that remain.
 
-**Description**: A JDBC proxy framework for SQL transformation, multi-database routing, and development/testing utilities.
+**What's Good (Keep)**:
+- Zero runtime dependencies
+- URL-based composable drivers
+- Compile-time capability manifest generation
+- Explicit "NOT for" documentation
+- CLI for driver discovery
 
-**Version**: 2.0.0 (breaking change from 1.7.0)
-
----
-
-## Phase 1: Remove Redundant Drivers
-
-Remove drivers that duplicate well-established tools.
-
-### Files to Delete
-
-#### Caching Drivers (transaction semantics issues, better alternatives exist)
-```
-src/main/java/org/pjdbc/drivers/CachingDriver.java
-src/main/java/org/pjdbc/drivers/RedisCachingDriver.java
-src/main/java/org/pjdbc/drivers/MemcachedCachingDriver.java
-src/main/java/org/pjdbc/drivers/HazelcastCachingDriver.java
-src/main/java/org/pjdbc/drivers/CacheKeyBuilder.java
-src/main/java/org/pjdbc/drivers/SafeResultSetSerializer.java
-src/main/java/org/pjdbc/drivers/TableExtractor.java
-src/test/java/org/pjdbc/drivers/CachingDriverTest.java
-src/test/java/org/pjdbc/drivers/CachingDriverSecurityTest.java
-src/test/java/org/pjdbc/drivers/RedisCachingDriverTest.java
-src/test/java/org/pjdbc/drivers/RedisCachingDriverSecurityTest.java
-src/test/java/org/pjdbc/drivers/MemcachedCachingDriverTest.java
-src/test/java/org/pjdbc/drivers/MemcachedCachingDriverSecurityTest.java
-src/test/java/org/pjdbc/drivers/HazelcastCachingDriverTest.java
-src/test/java/org/pjdbc/drivers/HazelcastCachingDriverSecurityTest.java
-src/test/java/org/pjdbc/drivers/CacheKeyBuilderTest.java
-src/test/java/org/pjdbc/drivers/TableExtractorTest.java
-```
-
-#### Connection Pooling (just use HikariCP/etc directly)
-```
-src/main/java/org/pjdbc/drivers/PoolDriver.java
-src/main/java/org/pjdbc/drivers/HikariPoolDriver.java
-src/test/java/org/pjdbc/drivers/HikariPoolDriverTest.java
-```
-
-#### Observability (OpenTelemetry, p6spy, Micrometer are better)
-```
-src/main/java/org/pjdbc/drivers/LogDriver.java
-src/main/java/org/pjdbc/drivers/MetricsDriver.java
-src/main/java/org/pjdbc/drivers/TracingDriver.java
-src/main/java/org/pjdbc/drivers/AuditDriver.java
-src/test/java/org/pjdbc/drivers/MetricsDriverTest.java
-src/test/java/org/pjdbc/drivers/TracingDriverTest.java
-src/test/java/org/pjdbc/drivers/AuditDriverTest.java
-```
-
-#### Infrastructure-level concerns (ProxySQL, HAProxy, app-level libraries)
-```
-src/main/java/org/pjdbc/drivers/LoadBalancingDriver.java
-src/main/java/org/pjdbc/drivers/RateLimitDriver.java
-src/test/java/org/pjdbc/drivers/LoadBalancingDriverTest.java
-src/test/java/org/pjdbc/drivers/RateLimitDriverTest.java
-```
-
-### Dependencies to Remove from pom.xml
-
-```xml
-<!-- Remove: no longer needed -->
-<dependency>
-  <groupId>com.zaxxer</groupId>
-  <artifactId>HikariCP</artifactId>
-</dependency>
-<dependency>
-  <groupId>redis.clients</groupId>
-  <artifactId>jedis</artifactId>
-</dependency>
-<dependency>
-  <groupId>net.spy</groupId>
-  <artifactId>spymemcached</artifactId>
-</dependency>
-<dependency>
-  <groupId>com.hazelcast</groupId>
-  <artifactId>hazelcast</artifactId>
-</dependency>
-```
-
-### Update java.sql.Driver service file
-
-Update `src/main/resources/META-INF/services/java.sql.Driver` to remove deleted drivers.
+**What Needs Work**:
+- Massive code duplication across drivers
+- Several drivers have correctness bugs
+- No observability into driver behavior
+- Inconsistent code formatting
+- Missing JDBC contract compliance
 
 ---
 
-## Phase 2: Evaluate and Decide on Borderline Drivers
+## Phase 1: Architectural Refactoring
 
-### Keep with Enhanced Documentation
+### 1.1 Eliminate Driver Boilerplate Duplication
 
-| Driver | Decision | Rationale |
-|--------|----------|-----------|
-| **RetryDriver** | KEEP | Useful, but add clear idempotency warnings |
-| **CircuitBreakerDriver** | KEEP | Unique at JDBC level, well-implemented |
-| **TimeoutDriver** | KEEP | Complements JDBC's setQueryTimeout |
+**Problem**: Every driver that needs custom Connection/Statement behavior repeats identical `createStatement`/`prepareStatement` overrides. Compare:
+- `RetryDriver.java:251-310`
+- `DataMaskingDriver.java:292-351`
+- `FederatingDriver.java:171-251`
 
-### Action Items
-- Add prominent warnings in RetryDriver javadoc about idempotency
-- Document that RetryDriver should only wrap read-only operations or idempotent writes
-- Consider adding `idempotentOnly=true` parameter that blocks non-SELECT statements
-
----
-
-## Phase 3: Retained Driver Inventory
-
-After cleanup, the project will have **15 drivers** in 4 categories:
-
-### Category 1: SQL Transformation & Routing (Core Value)
-| Driver | Prefix | Purpose |
-|--------|--------|---------|
-| FilterDriver | `filter` | SQL transformation via JdbcTransformer |
-| FederatingDriver | `federating` | Query multiple heterogeneous databases |
-| TeeDriver | `tee` | Replicate writes to multiple targets |
-| UserMapDriver | `usermap` | Map application users to DB credentials |
-
-### Category 2: Access Control & Security
-| Driver | Prefix | Purpose |
-|--------|--------|---------|
-| ReadonlyDriver | `readonly` | Enforce read-only access |
-| SchemaValidationDriver | `schema` | Whitelist/blacklist tables/columns |
-| DataMaskingDriver | `mask` | Mask sensitive data in results |
-
-### Category 3: Development & Testing
-| Driver | Prefix | Purpose |
-|--------|--------|---------|
-| MockDriver | `mock` | In-memory mock for testing |
-| SinkDriver | `sink` | Discard all operations (benchmarking) |
-| ChaosDriver | `chaos` | Fault injection for resilience testing |
-
-### Category 4: Resilience (with caveats)
-| Driver | Prefix | Purpose |
-|--------|--------|---------|
-| RetryDriver | `retry` | Retry transient failures |
-| CircuitBreakerDriver | `circuitbreaker` | Circuit breaker pattern |
-| TimeoutDriver | `timeout` | Query timeout enforcement |
-
-### Category 5: Foundation (minimal overhead)
-| Driver | Prefix | Purpose |
-|--------|--------|---------|
-| CatDriver | `cat` | Pass-through (baseline/testing) |
-
----
-
-## Phase 4: Update Documentation
-
-### README.md - Complete Rewrite
-
-```markdown
-# PJDBC
-
-Transform, route, and federate SQL without changing your code.
-
-PJDBC is a JDBC proxy framework that lets you intercept and modify database
-operations through composable URL-based drivers. Unlike general-purpose
-middleware, PJDBC focuses on capabilities that don't have better alternatives:
-
-- **SQL Transformation**: Rewrite queries on the fly
-- **Multi-Database Routing**: Federate queries across heterogeneous databases
-- **Write Replication**: Mirror writes to multiple targets
-- **Access Control**: Enforce read-only, schema validation, data masking
-- **Testing Utilities**: Mock databases, inject faults, benchmark
-
-## What PJDBC Is NOT
-
-PJDBC intentionally excludes:
-- **Caching** - Use Hibernate L2 cache, Spring Cache, or application-level caching
-- **Connection Pooling** - Use HikariCP, c3p0, or your framework's pooling
-- **Logging/Metrics/Tracing** - Use p6spy, OpenTelemetry, Micrometer
-- **Load Balancing** - Use ProxySQL, PgPool, HAProxy, or database-native solutions
-
-These concerns are better served by purpose-built tools.
-
-## Quick Start
+**Solution**: Extract a `ProxyConnectionTemplate` that accepts lambdas for statement wrapping:
 
 ```java
-// Transform SQL on the fly
-String url = "jdbc:filter[transformer=com.example.MyTransformer]:jdbc:postgresql://localhost/db";
+public abstract class ConfigurableProxyDriver<C extends DriverConfig> extends AbstractProxyDriver {
 
-// Federate across multiple databases
-String url = "jdbc:federating[urls=jdbc:postgresql://a/db|jdbc:mysql://b/db]:";
+    protected abstract C parseConfig(String url);
+    protected abstract Statement wrapStatement(Statement delegate, Connection conn, C config);
+    protected abstract PreparedStatement wrapPreparedStatement(PreparedStatement delegate, Connection conn, C config);
 
-// Replicate writes to multiple targets
-String url = "jdbc:tee[urls=jdbc:postgresql://primary/db|jdbc:postgresql://replica/db]:jdbc:postgresql://primary/db";
-
-// Enforce read-only access
-String url = "jdbc:readonly:jdbc:postgresql://localhost/db";
+    // Single implementation of all createStatement/prepareStatement overloads
+    // that delegates to the wrap* methods
+}
 ```
 
-## Drivers
+**Files to modify**:
+- `src/main/java/org/pjdbc/sql/AbstractProxyDriver.java`
+- All 10+ drivers that extend it
 
-### SQL Transformation & Routing
-- `filter` - Transform SQL via custom JdbcTransformer implementation
-- `federating` - Query multiple databases as one (terminal driver)
-- `tee` - Replicate operations to multiple databases
-- `usermap` - Map application credentials to database credentials
-
-### Access Control
-- `readonly` - Block all DML/DDL operations
-- `schema` - Whitelist/blacklist table and column access
-- `mask` - Mask sensitive columns in result sets
-
-### Testing & Development
-- `mock` - In-memory database mock
-- `sink` - Discard all operations (for benchmarking)
-- `chaos` - Inject failures for resilience testing
-
-### Resilience
-- `retry` - Retry on transient failures (⚠️ use only for idempotent operations)
-- `circuitbreaker` - Circuit breaker pattern
-- `timeout` - Enforce query timeouts
-
-### Foundation
-- `cat` - Pass-through with no modifications
-```
-
-### CLAUDE.md - Update for AI Agents
-
-Focus on:
-- Which drivers to recommend for which use cases
-- Explicit warnings about composition order
-- Clear "don't use PJDBC for X" guidance
+**Estimated reduction**: ~800 lines of duplicated code
 
 ---
 
-## Phase 5: Update pom.xml
+### 1.2 Fix AbstractStatement Formatting
 
-### Version Bump
-```xml
-<version>2.0.0</version>
+**Problem**: `AbstractStatement.java:64-104` is unreadable single-line methods:
+
+```java
+public ResultSet executeQuery (String sql) throws SQLException {ArrayList<ResultSet> rsets = new ArrayList<ResultSet>(); for (Statement s : getStatements()) rsets.add(s.executeQuery(sql)); for (ResultSet r : rsets) return wrap(r); throw new SQLException();}
 ```
 
-### Updated Description
-```xml
-<description>JDBC proxy framework for SQL transformation, routing, and testing</description>
-```
+**Solution**: Reformat to standard Java conventions. This is a readability/maintainability issue, not a feature.
 
-### Simplified Dependencies
-```xml
-<dependencies>
-  <!-- Test dependencies only - no runtime dependencies! -->
-  <dependency>
-    <groupId>junit</groupId>
-    <artifactId>junit</artifactId>
-    <version>4.13.2</version>
-    <scope>test</scope>
-  </dependency>
-  <dependency>
-    <groupId>com.h2database</groupId>
-    <artifactId>h2</artifactId>
-    <version>2.4.240</version>
-    <scope>test</scope>
-  </dependency>
-  <!-- ... other test dependencies ... -->
-</dependencies>
-```
-
-### Remove Fast Profile Exclusions
-The `fast` profile exclusions for Redis/Memcached/Hazelcast tests become unnecessary.
+**Files to modify**:
+- `src/main/java/org/pjdbc/sql/AbstractStatement.java`
+- `src/main/java/org/pjdbc/sql/AbstractPreparedStatement.java`
+- `src/main/java/org/pjdbc/sql/AbstractCallableStatement.java`
+- `src/main/java/org/pjdbc/sql/AbstractConnection.java`
 
 ---
 
-## Phase 6: Update Capability Annotations
+## Phase 2: Bug Fixes
 
-Review remaining drivers and update their `@DriverCapability` annotations:
-- Remove obsolete capability tags (e.g., `caching`)
-- Update descriptions to reflect new positioning
-- Ensure side effects are accurately documented
+### 2.1 RetryDriver: Recreate Statements on Connection Failure
+
+**Problem**: `RetryDriver.java:323-348` retries using the *same* Statement object after connection errors. If the connection died, the statement is invalid and retry will fail.
+
+**Solution**: Detect connection state before retry. If connection is dead:
+1. Close the dead connection
+2. Obtain new connection from DriverManager
+3. Recreate statement on new connection
+4. Retry operation
+
+**Complexity**: High - requires tracking the original SQL and connection parameters.
+
+**Alternative**: Document limitation clearly and add `reconnectOnFailure=false` parameter with warning.
 
 ---
 
-## Phase 7: Consider New Capabilities
+### 2.2 FederatingDriver: Fix Thread Pool Leak
 
-With the reduced scope, consider enhancing the core value drivers:
+**Problem**: `FederatingDriver.java:282-298` creates a new `ExecutorService` per query execution:
 
-### FilterDriver Enhancements
-- Ship example transformers (SQL dialect translation, query rewriting)
-- Add `transformerConfig` parameter for transformer-specific settings
+```java
+ExecutorService executor = Executors.newFixedThreadPool(delegates.size());
+// ... use executor ...
+executor.shutdown();
+```
 
-### FederatingDriver Enhancements
-- Document limitations clearly (no cross-database transactions)
-- Add query routing hints
+Under high query load, this creates/destroys threads constantly.
 
-### Testing Driver Enhancements
-- MockDriver: Add support for schema definition via parameters
-- ChaosDriver: Add more failure modes (latency injection, partial failures)
+**Solution**:
+- Option A: Use a shared, connection-scoped thread pool
+- Option B: Use virtual threads (Java 21+): `Executors.newVirtualThreadPerTaskExecutor()`
+- Option C: Use `CompletableFuture.supplyAsync()` with common pool
+
+**Recommended**: Option B (virtual threads) since we already require Java 21.
+
+---
+
+### 2.3 DataMaskingDriver: Mask All Data Types
+
+**Problem**: `DataMaskingDriver.java:436-469` only masks `getString()` and `getObject()` returning String. Columns retrieved via other methods bypass masking:
+- `getBytes()` - binary data
+- `getLong()` / `getBigDecimal()` - numeric credit cards
+- `getCharacterStream()` - CLOB data
+- `getNString()` - national character sets
+
+**Solution**: Override all getters that could return sensitive data:
+
+```java
+@Override
+public long getLong(int columnIndex) throws SQLException {
+    if (shouldMaskColumn(columnIndex)) {
+        // Return 0 or throw? Masking numbers is semantically different
+        throw new SQLException("Column is masked; use getString() for masked value");
+    }
+    return super.getLong(columnIndex);
+}
+```
+
+**Decision needed**: Should masked numeric columns return 0, throw, or convert to masked string?
+
+---
+
+### 2.4 MergingResultSet: Fix JDBC Contract Violations
+
+**Problem**: `FederatingDriver.java:665-668`:
+
+```java
+@Override
+public int getRow() throws SQLException {
+    // Row number tracking across multiple result sets is complex
+    // For now, return 0 (unknown)
+    return 0;
+}
+```
+
+Returning 0 violates JDBC contract (0 means "not on a valid row").
+
+**Solution**: Track cumulative row count across merged result sets:
+
+```java
+private int cumulativeRow = 0;
+
+@Override
+public boolean next() throws SQLException {
+    // ... existing logic ...
+    if (moved) cumulativeRow++;
+    return moved;
+}
+
+@Override
+public int getRow() throws SQLException {
+    return cumulativeRow;
+}
+```
+
+---
+
+### 2.5 Random Thread Safety in RetryConfig
+
+**Problem**: `RetryDriver.java:172`:
+
+```java
+this.random = new Random();
+```
+
+`Random` is not thread-safe, but `RetryConfig` is shared across threads via the connection.
+
+**Solution**: Use `ThreadLocalRandom.current()` instead:
+
+```java
+public long calculateDelay(int attempt) {
+    // ...
+    if (jitter) {
+        delay = delay + ThreadLocalRandom.current().nextInt((int) Math.max(1, delay / 4));
+    }
+    return delay;
+}
+```
+
+---
+
+## Phase 3: Missing Functionality
+
+### 3.1 Add Observability Hooks
+
+**Problem**: No way to know when:
+- Retry occurred (and how many times)
+- Circuit breaker tripped
+- SQL was transformed
+- Connection was federated
+
+**Solution**: Add a `PjdbcEventListener` interface:
+
+```java
+public interface PjdbcEventListener {
+    default void onRetry(String sql, SQLException cause, int attempt, long delayMs) {}
+    default void onCircuitBreakerStateChange(String name, State oldState, State newState) {}
+    default void onSqlTransformed(String original, String transformed) {}
+    default void onFederatedQuery(String sql, List<String> targetUrls) {}
+}
+```
+
+Registration via:
+- URL parameter: `jdbc:retry[listener=com.example.MyListener]:...`
+- Programmatic: `PjdbcListeners.register(listener)`
+- ServiceLoader: `META-INF/services/org.pjdbc.PjdbcEventListener`
+
+---
+
+### 3.2 FilterDriver: Fix Thread-Local State
+
+**Problem**: `FilterDriver.java:20-21`:
+
+```java
+protected ThreadLocal<JdbcTransformer> transformer =
+    ThreadLocal.withInitial(() -> new AbstractJdbcTransformer() {});
+```
+
+If you share a `FilterDriver` instance (normal JDBC pattern), setting transformer on thread A doesn't affect thread B. This is confusing.
+
+**Solution**: Move transformer to connection scope, not driver scope:
+
+```java
+// In URL: jdbc:filter[class=com.example.MyTransformer]:...
+// Instantiate per-connection, not per-thread
+```
+
+Or document the threading model explicitly and provide `FilterDriver.setTransformer(Connection, JdbcTransformer)`.
+
+---
+
+### 3.3 FederatingDriver: Transaction Warnings
+
+**Problem**: No transaction coordination across federated connections. `commit()` succeeds on some backends, fails on others → split-brain.
+
+**Solution**:
+1. Detect when `setAutoCommit(false)` is called
+2. Log warning or throw if `strictTransactions=true` parameter set
+3. Document limitation prominently
+
+```java
+@Override
+public void setAutoCommit(boolean autoCommit) throws SQLException {
+    if (!autoCommit && config.isStrictTransactions()) {
+        throw new SQLException(
+            "FederatingDriver does not support transactions across multiple databases. " +
+            "Set strictTransactions=false to allow (at your own risk).");
+    }
+    // ... delegate to all connections ...
+}
+```
+
+---
+
+## Phase 4: Developer Experience
+
+### 4.1 Improve CLI Usability
+
+**Current state**:
+```bash
+mvn exec:java -Dexec.args="list"  # Verbose
+java -jar target/PJDBC-2.0.0.jar list  # Requires build
+```
+
+**Improvements**:
+- Add `--help` flag
+- Add shell completion scripts (bash, zsh, fish)
+- Add `pjdbc` wrapper script in repo root
+- Improve error messages with suggestions
+
+**New commands**:
+```bash
+pjdbc suggest "I need to retry failed queries"
+# → Consider: jdbc:retry[maxRetries=3]:...
+# → Warning: Only use with idempotent operations
+
+pjdbc compose retry timeout postgresql
+# → jdbc:retry:jdbc:timeout:jdbc:postgresql://HOST/DB
+```
+
+---
+
+### 4.2 Add Debug Logging
+
+**Problem**: No visibility into driver chain behavior for troubleshooting.
+
+**Solution**: Add optional `java.util.logging` output (no external dependency):
+
+```java
+private static final Logger LOG = Logger.getLogger(RetryDriver.class.getName());
+
+// In retry logic:
+LOG.fine(() -> String.format("Retry attempt %d/%d after %dms for SQL: %s",
+    attempt, maxRetries, delay, sql));
+```
+
+Enable via: `-Dorg.pjdbc.level=FINE`
+
+---
+
+### 4.3 Consider Java 17 LTS Support
+
+**Problem**: Java 21 requirement limits adoption. Many enterprises are still on Java 17 LTS.
+
+**Analysis**:
+- Virtual threads (Java 21) only used in FederatingDriver parallel execution
+- Pattern matching for switch (Java 21) used in a few places
+- No other Java 21 features critical to core functionality
+
+**Solution**:
+- Make Java 17 the minimum
+- Use virtual threads conditionally via reflection when available
+- Or: Keep Java 21, document reasoning (it's 2026, Java 21 is LTS)
+
+**Decision**: TBD based on user feedback
+
+---
+
+## Phase 5: Documentation
+
+### 5.1 Add Composition Best Practices
+
+Document common patterns and anti-patterns:
+
+```markdown
+## Driver Composition
+
+### Recommended Order (outermost → innermost)
+1. retry (catch transient failures from anything below)
+2. timeout (enforce limits before retry exhausts)
+3. circuitbreaker (fail fast if backend is down)
+4. readonly/schema/mask (access control)
+5. filter (SQL transformation)
+6. actual database driver
+
+### Anti-Patterns
+❌ `jdbc:readonly:jdbc:retry:...` - Retrying after readonly check is pointless
+❌ `jdbc:retry:jdbc:federate:...` - Retry won't help if one backend is down
+❌ `jdbc:mask:jdbc:filter:...` - Filter might expose masked data
+```
+
+---
+
+### 5.2 Add Troubleshooting Guide
+
+```markdown
+## Troubleshooting
+
+### "Connection is closed" after retry
+RetryDriver reuses the same Statement after connection failures.
+**Workaround**: Implement retry at application level for connection errors.
+**Status**: Known limitation, fix planned for v2.1.
+
+### Masked column returns wrong type
+DataMaskingDriver only masks String columns.
+**Workaround**: Cast sensitive numeric columns to VARCHAR in your query.
+**Status**: Known limitation, fix planned for v2.1.
+
+### Federated query returns inconsistent row count
+MergingResultSet.getRow() returns 0.
+**Workaround**: Track row count in application code.
+**Status**: Known limitation, fix planned for v2.1.
+```
 
 ---
 
 ## Execution Checklist
 
-### Pre-flight
-- [ ] Create `v1.7.0` tag for last pre-rescope version
-- [ ] Create `rescope` branch
+### v2.1.0 (Bug Fixes)
+- [ ] Fix Random thread safety in RetryConfig
+- [ ] Fix MergingResultSet.getRow()
+- [ ] Fix FederatingDriver thread pool leak (use virtual threads)
+- [ ] Add transaction warnings to FederatingDriver
+- [ ] Reformat AbstractStatement/AbstractPreparedStatement/etc.
 
-### Phase 1: Deletions
-- [ ] Delete caching drivers and tests (8 files)
-- [ ] Delete caching utilities (3 files)
-- [ ] Delete pooling drivers and tests (3 files)
-- [ ] Delete observability drivers and tests (7 files)
-- [ ] Delete infrastructure drivers and tests (4 files)
-- [ ] Update META-INF/services/java.sql.Driver
-- [ ] Remove dependencies from pom.xml
-- [ ] Run `mvn test` - verify build still works
+### v2.2.0 (Observability)
+- [ ] Add PjdbcEventListener interface
+- [ ] Add debug logging with java.util.logging
+- [ ] Add CLI `--help` and improved error messages
 
-### Phase 2: Documentation
-- [ ] Add idempotency warnings to RetryDriver
-- [ ] Update README.md
-- [ ] Update CLAUDE.md
+### v2.3.0 (Architecture)
+- [ ] Extract ConfigurableProxyDriver to reduce boilerplate
+- [ ] Fix FilterDriver thread-local confusion
+- [ ] Expand DataMaskingDriver to cover all getters
 
-### Phase 3: Project Metadata
-- [ ] Bump version to 2.0.0
-- [ ] Update pom.xml description
-- [ ] Update any badges/shields in README
-
-### Phase 4: Verification
-- [ ] Run full test suite
-- [ ] Verify capability manifest generation
-- [ ] Test CLI with new driver set
-- [ ] Review generated javadocs
-
-### Phase 5: Release
-- [ ] Merge to main
-- [ ] Tag v2.0.0
-- [ ] Update release notes with breaking changes
-- [ ] Publish to Maven Central
+### v3.0.0 (Breaking Changes if Needed)
+- [ ] RetryDriver connection recreation (API change)
+- [ ] Java 17 support decision
+- [ ] CLI wrapper scripts and shell completion
 
 ---
 
-## Breaking Changes Summary (for Release Notes)
+## Appendix: Code Quality Metrics
 
-### Removed Drivers
-- `CachingDriver`, `RedisCachingDriver`, `MemcachedCachingDriver`, `HazelcastCachingDriver`
-- `PoolDriver`, `HikariPoolDriver`
-- `LogDriver`, `MetricsDriver`, `TracingDriver`, `AuditDriver`
-- `LoadBalancingDriver`, `RateLimitDriver`
+### Current State (v2.0.0)
+| Metric | Value | Target |
+|--------|-------|--------|
+| Duplicated lines | ~800 | <100 |
+| Known JDBC contract violations | 3 | 0 |
+| Thread-safety issues | 2 | 0 |
+| Uncovered getter methods (DataMaskingDriver) | 15+ | 0 |
 
-### Removed Dependencies
-- HikariCP
-- Jedis (Redis)
-- Spymemcached
-- Hazelcast
-
-### Migration Guide
-| Old Driver | Recommended Alternative |
-|------------|------------------------|
-| CachingDriver | Hibernate L2 cache, Spring Cache |
-| HikariPoolDriver | Use HikariCP directly |
-| LogDriver | p6spy, log4jdbc |
-| MetricsDriver | Micrometer JDBC instrumentation |
-| TracingDriver | OpenTelemetry JDBC instrumentation |
-| LoadBalancingDriver | ProxySQL, PgPool, HAProxy |
-
----
-
-## File Count Summary
-
-| Category | Before | After | Removed |
-|----------|--------|-------|---------|
-| Main drivers | 29 | 14 | 15 |
-| Test files | 24+ | ~10 | 14+ |
-| Dependencies | 4 runtime | 0 runtime | 4 |
-
-The project becomes **zero runtime dependencies** (test-only), which is a significant improvement for library consumers.
+### After v2.3.0
+| Metric | Value | Target |
+|--------|-------|--------|
+| Duplicated lines | <100 | ✓ |
+| Known JDBC contract violations | 0 | ✓ |
+| Thread-safety issues | 0 | ✓ |
+| Uncovered getter methods (DataMaskingDriver) | 0 | ✓ |

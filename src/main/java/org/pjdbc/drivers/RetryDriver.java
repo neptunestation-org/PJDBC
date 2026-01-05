@@ -11,8 +11,8 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Properties;
-import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverParameter;
@@ -159,7 +159,6 @@ public class RetryDriver extends AbstractProxyDriver {
         private final double backoffMultiplier;
         private final boolean jitter;
         private final Set<String> retryableSqlStates;
-        private final Random random;
 
         public RetryConfig(String url) {
             JdbcUrlParser parser = JdbcUrlParser.parse(url);
@@ -169,7 +168,6 @@ public class RetryDriver extends AbstractProxyDriver {
             this.backoffMultiplier = parseDouble(parser.getParameter("backoffMultiplier", "2.0"));
             this.jitter = parseBoolean(parser.getParameter("jitter", "true"));
             this.retryableSqlStates = parseSqlStates(parser.getParameter("retryOnSqlStates", null));
-            this.random = new Random();
         }
 
         private static int parseInt(String s) {
@@ -208,7 +206,6 @@ public class RetryDriver extends AbstractProxyDriver {
         public double getBackoffMultiplier() { return backoffMultiplier; }
         public boolean hasJitter() { return jitter; }
         public Set<String> getRetryableSqlStates() { return retryableSqlStates; }
-        public Random getRandom() { return random; }
 
         /**
          * Check if an exception is retryable based on SQL state.
@@ -221,13 +218,14 @@ public class RetryDriver extends AbstractProxyDriver {
 
         /**
          * Calculate delay for a given retry attempt (0-indexed).
+         * Uses ThreadLocalRandom for thread-safe jitter generation.
          */
         public long calculateDelay(int attempt) {
             long delay = (long) (initialDelay * Math.pow(backoffMultiplier, attempt));
             delay = Math.min(delay, maxDelay);
             if (jitter) {
-                // Add up to 25% jitter
-                delay = delay + random.nextInt((int) Math.max(1, delay / 4));
+                // Add up to 25% jitter using thread-safe random
+                delay = delay + ThreadLocalRandom.current().nextInt((int) Math.max(1, delay / 4));
             }
             return delay;
         }
