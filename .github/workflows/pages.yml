@@ -29,8 +29,8 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build project
-        run: mvn -B compile package -DskipTests
+      - name: Build and install project
+        run: mvn -B install -DskipTests -Dgpg.skip=true
 
       - name: Generate JavaDocs
         run: mvn -B javadoc:javadoc
