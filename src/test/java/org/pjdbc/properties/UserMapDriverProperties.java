@@ -228,17 +228,17 @@ class UserMapDriverProperties {
     }
 
     /**
-     * Property: log:mapuser composition is accepted.
+     * Property: filter:mapuser composition is accepted.
      */
     @Property(tries = 10)
-    void logMapuserCompositionAccepted(
+    void filterMapuserCompositionAccepted(
             @ForAll("mockDbNames") String dbName) {
 
-        LogDriver logDriver = new LogDriver();
-        String url = "jdbc:log:jdbc:mapuser:jdbc:mock:" + dbName;
+        FilterDriver filterDriver = new FilterDriver();
+        String url = "jdbc:filter:jdbc:mapuser:jdbc:mock:" + dbName;
 
-        assertTrue(logDriver.acceptsURL(url),
-            "log should accept mapuser nested URL");
+        assertTrue(filterDriver.acceptsURL(url),
+            "filter should accept mapuser nested URL");
     }
 
     /**
@@ -249,15 +249,15 @@ class UserMapDriverProperties {
             @ForAll("mockDbNames") String dbName) {
 
         CatDriver catDriver = new CatDriver();
-        LogDriver logDriver = new LogDriver();
+        FilterDriver filterDriver = new FilterDriver();
 
-        String catLogMapuser = "jdbc:cat:jdbc:log:jdbc:mapuser:jdbc:mock:" + dbName;
-        String logCatMapuser = "jdbc:log:jdbc:cat:jdbc:mapuser:jdbc:mock:" + dbName;
+        String catFilterMapuser = "jdbc:cat:jdbc:filter:jdbc:mapuser:jdbc:mock:" + dbName;
+        String filterCatMapuser = "jdbc:filter:jdbc:cat:jdbc:mapuser:jdbc:mock:" + dbName;
 
-        assertTrue(catDriver.acceptsURL(catLogMapuser),
-            "cat:log:mapuser should be accepted");
-        assertTrue(logDriver.acceptsURL(logCatMapuser),
-            "log:cat:mapuser should be accepted");
+        assertTrue(catDriver.acceptsURL(catFilterMapuser),
+            "cat:filter:mapuser should be accepted");
+        assertTrue(filterDriver.acceptsURL(filterCatMapuser),
+            "filter:cat:mapuser should be accepted");
     }
 
     // ========== CONNECT RETURNS NULL PROPERTIES ==========
@@ -366,7 +366,7 @@ class UserMapDriverProperties {
     @Provide
     Arbitrary<String> otherProtocols() {
         return Arbitraries.of(
-            "cat", "log", "filter", "sink", "pool",
+            "cat", "filter", "sink",
             "readonly", "retry", "h2", "mock"
         );
     }
@@ -374,7 +374,7 @@ class UserMapDriverProperties {
     @Provide
     Arbitrary<String> composableDrivers() {
         return Arbitraries.of(
-            "cat", "log", "filter"
+            "cat", "filter", "retry"
         );
     }
 }

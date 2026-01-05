@@ -52,7 +52,7 @@ public class PerformanceInvariantConformanceTest extends DriverConformanceTest {
     @DisplayName("Driver count matches expected")
     void driverCountMatchesExpected() {
         int count = capabilities.getDriverCount();
-        assertTrue(count >= 15, "Should have at least 15 drivers, got: " + count);
+        assertTrue(count >= 10, "Should have at least 10 drivers, got: " + count);
         assertTrue(count <= 30, "Should have at most 30 drivers, got: " + count);
     }
 
@@ -91,7 +91,7 @@ public class PerformanceInvariantConformanceTest extends DriverConformanceTest {
     @Timeout(value = 30, unit = TimeUnit.SECONDS)
     void connectionThroughComposableDriversCompletes() throws Exception {
         // Test a few non-network drivers
-        String[] testPrefixes = {"cat", "log"};
+        String[] testPrefixes = {"cat", "retry"};
 
         for (String prefix : testPrefixes) {
             var driverOpt = capabilities.findByPrefix(prefix);
@@ -111,7 +111,7 @@ public class PerformanceInvariantConformanceTest extends DriverConformanceTest {
     @Timeout(value = 30, unit = TimeUnit.SECONDS)
     void chainedDriversCompleteInBoundedTime() throws Exception {
         // Chain two lightweight drivers
-        String url = "jdbc:cat:jdbc:log:" + H2_URL;
+        String url = "jdbc:cat:jdbc:retry:" + H2_URL;
         long time = measureConnectionTime(url);
 
         assertTrue(time < CONNECTION_TIMEOUT_MS,

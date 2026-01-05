@@ -242,31 +242,6 @@ class SinkDriverProperties {
     }
 
     /**
-     * Property: log:sink:X preserves sink absorption.
-     */
-    @Property(tries = 10)
-    void logSinkComposition(
-            @ForAll("sqlStatements") String sql) throws SQLException {
-
-        String dbName = createUniqueDbName();
-        String mockUrl = "jdbc:mock:" + dbName;
-        String logSinkUrl = "jdbc:log:jdbc:sink:" + mockUrl;
-
-        try (Connection conn = DriverManager.getConnection(logSinkUrl);
-             Statement stmt = conn.createStatement()) {
-
-            ResultSet rs = stmt.executeQuery(sql);
-            assertNull(rs, "log:sink should still return null");
-        }
-
-        String mockLog = MockDriver.getLog(mockUrl);
-        assertFalse(mockLog.contains("executeQuery"),
-            "log:sink should still absorb SQL operations");
-        assertFalse(mockLog.contains(sql),
-            "log:sink should not pass SQL to underlying");
-    }
-
-    /**
      * Property: sink:cat:X absorbs operations (sink wraps cat).
      */
     @Property(tries = 10)

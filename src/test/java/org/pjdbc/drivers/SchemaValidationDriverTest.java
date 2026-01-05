@@ -644,10 +644,10 @@ class SchemaValidationDriverTest {
     class DriverChaining {
 
         @Test
-        @DisplayName("works with log driver")
-        void worksWithLogDriver() throws SQLException {
+        @DisplayName("works with cat driver")
+        void worksWithCatDriver() throws SQLException {
             conn = DriverManager.getConnection(
-                "jdbc:schema[allowedTables=test]:jdbc:log:jdbc:h2:mem:chain1;DB_CLOSE_DELAY=-1"
+                "jdbc:schema[allowedTables=test]:jdbc:cat:jdbc:h2:mem:chain1;DB_CLOSE_DELAY=-1"
             );
 
             try (Statement stmt = conn.createStatement()) {

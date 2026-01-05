@@ -203,8 +203,8 @@ public class ChaosDriverTest {
     @Test
     public void testDriverChaining() throws SQLException, ClassNotFoundException {
         // Test that ChaosDriver works in a driver chain
-        Class.forName("org.pjdbc.drivers.LogDriver");
-        String url = "jdbc:chaos[latency=50]:jdbc:log:jdbc:h2:mem:test_chain";
+        Class.forName("org.pjdbc.drivers.CatDriver");
+        String url = "jdbc:chaos[latency=50]:jdbc:cat:jdbc:h2:mem:test_chain";
         long start = System.currentTimeMillis();
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement()) {

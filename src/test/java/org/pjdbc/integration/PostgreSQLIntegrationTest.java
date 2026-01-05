@@ -27,19 +27,13 @@ public class PostgreSQLIntegrationTest {
     @BeforeAll
     static void loadDrivers() throws ClassNotFoundException {
         Class.forName("org.pjdbc.drivers.CatDriver");
-        Class.forName("org.pjdbc.drivers.LogDriver");
         Class.forName("org.pjdbc.drivers.FilterDriver");
-        Class.forName("org.pjdbc.drivers.PoolDriver");
         Class.forName("org.pjdbc.drivers.TeeDriver");
         Class.forName("org.pjdbc.drivers.SinkDriver");
         Class.forName("org.pjdbc.drivers.ReadonlyDriver");
         Class.forName("org.pjdbc.drivers.RetryDriver");
-        Class.forName("org.pjdbc.drivers.CachingDriver");
-        Class.forName("org.pjdbc.drivers.MetricsDriver");
-        Class.forName("org.pjdbc.drivers.TracingDriver");
         Class.forName("org.pjdbc.drivers.DataMaskingDriver");
         Class.forName("org.pjdbc.drivers.ChaosDriver");
-        Class.forName("org.pjdbc.drivers.HikariPoolDriver");
     }
 
     private Properties getConnectionProps() {
@@ -78,61 +72,6 @@ public class PostgreSQLIntegrationTest {
                  ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM users")) {
                 assertTrue(rs.next());
                 assertEquals(3, rs.getInt(1));
-            }
-        }
-    }
-
-    // === LogDriver Tests ===
-
-    @Test
-    @Order(2)
-    void logDriverLogsQueries() throws SQLException {
-        String url = "jdbc:log:" + getJdbcUrlWithCredentials();
-        try (Connection conn = DriverManager.getConnection(url)) {
-            try (Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery("SELECT name FROM users WHERE id = 1")) {
-                assertTrue(rs.next());
-                assertEquals("Alice", rs.getString(1));
-            }
-        }
-    }
-
-    // === PoolDriver Tests ===
-
-    @Test
-    @Order(3)
-    void poolDriverMaintainsConnections() throws SQLException {
-        String url = "jdbc:pool[min=1,max=3]:" + getJdbcUrlWithCredentials();
-        Connection conn1 = DriverManager.getConnection(url);
-        Connection conn2 = DriverManager.getConnection(url);
-
-        assertNotNull(conn1);
-        assertNotNull(conn2);
-        assertFalse(conn1.isClosed());
-        assertFalse(conn2.isClosed());
-
-        try (Statement stmt = conn1.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT 1")) {
-            assertTrue(rs.next());
-            assertEquals(1, rs.getInt(1));
-        }
-
-        conn1.close();
-        conn2.close();
-    }
-
-    // === HikariPoolDriver Tests ===
-
-    @Test
-    @Order(4)
-    void hikariPoolDriverWorks() throws SQLException {
-        String url = "jdbc:hikaricp:" + getJdbcUrlWithCredentials() + "&maximumPoolSize=2";
-        try (Connection conn = DriverManager.getConnection(url)) {
-            assertNotNull(conn);
-            try (Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery("SELECT 42 AS answer")) {
-                assertTrue(rs.next());
-                assertEquals(42, rs.getInt("answer"));
             }
         }
     }
@@ -184,68 +123,6 @@ public class PostgreSQLIntegrationTest {
                 assertEquals("Alice", rs.getString(1));
             }
         }
-    }
-
-    // === CachingDriver Tests ===
-
-    @Test
-    @Order(8)
-    void cachingDriverCachesResults() throws SQLException {
-        String url = "jdbc:cache[ttl=60]:" + getJdbcUrlWithCredentials();
-        try (Connection conn = DriverManager.getConnection(url)) {
-            // First query - cache miss
-            try (Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM users")) {
-                assertTrue(rs.next());
-                assertEquals(3, rs.getInt(1));
-            }
-
-            // Second identical query - should hit cache
-            try (Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM users")) {
-                assertTrue(rs.next());
-                assertEquals(3, rs.getInt(1));
-            }
-        }
-    }
-
-    // === MetricsDriver Tests ===
-
-    @Test
-    @Order(9)
-    void metricsDriverCollectsStats() throws SQLException {
-        String url = "jdbc:metrics:" + getJdbcUrlWithCredentials();
-        try (Connection conn = DriverManager.getConnection(url)) {
-            try (Statement stmt = conn.createStatement()) {
-                stmt.executeQuery("SELECT 1").close();
-                stmt.executeQuery("SELECT 2").close();
-                stmt.executeUpdate("UPDATE users SET name = 'Alice' WHERE id = 1");
-            }
-
-            var metrics = org.pjdbc.drivers.MetricsDriver.getMetrics(conn);
-            assertNotNull(metrics);
-            assertTrue(metrics.getTotalQueries() >= 2);
-            assertTrue(metrics.getTotalUpdates() >= 1);
-        }
-    }
-
-    // === TracingDriver Tests ===
-
-    @Test
-    @Order(10)
-    void tracingDriverCreatesSpans() throws SQLException {
-        String url = "jdbc:trace:" + getJdbcUrlWithCredentials();
-        org.pjdbc.drivers.TracingDriver.getDefaultTracer().clear();
-
-        try (Connection conn = DriverManager.getConnection(url)) {
-            try (Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery("SELECT name FROM users LIMIT 1")) {
-                assertTrue(rs.next());
-            }
-        }
-
-        var spans = org.pjdbc.drivers.TracingDriver.getDefaultTracer().getSpans();
-        assertFalse(spans.isEmpty());
     }
 
     // === DataMaskingDriver Tests ===
@@ -301,8 +178,8 @@ public class PostgreSQLIntegrationTest {
     @Test
     @Order(13)
     void driverChainingWorks() throws SQLException {
-        // Chain: log -> cache -> pool -> postgres
-        String url = "jdbc:log:jdbc:cache:jdbc:pool:" + getJdbcUrlWithCredentials();
+        // Chain: cat -> retry -> postgres
+        String url = "jdbc:cat:jdbc:retry:" + getJdbcUrlWithCredentials();
         try (Connection conn = DriverManager.getConnection(url)) {
             try (Statement stmt = conn.createStatement();
                  ResultSet rs = stmt.executeQuery("SELECT name FROM users ORDER BY id LIMIT 1")) {
@@ -334,7 +211,7 @@ public class PostgreSQLIntegrationTest {
     @Test
     @Order(15)
     void transactionsWorkThroughProxy() throws SQLException {
-        String url = "jdbc:log:" + getJdbcUrlWithCredentials();
+        String url = "jdbc:cat:" + getJdbcUrlWithCredentials();
         try (Connection conn = DriverManager.getConnection(url)) {
             conn.setAutoCommit(false);
             try (Statement stmt = conn.createStatement()) {

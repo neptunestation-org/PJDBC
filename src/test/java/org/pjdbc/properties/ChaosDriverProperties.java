@@ -517,26 +517,6 @@ class ChaosDriverProperties {
         }
     }
 
-    /**
-     * Property: log:chaos:X preserves chaos behavior.
-     */
-    @Property(tries = 10)
-    void logChaosComposition() throws SQLException {
-        String dbName = createUniqueDbName();
-        setupTestTable(dbName);
-
-        String logChaosUrl = "jdbc:log:jdbc:chaos[failureRate=1.0]:jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1";
-
-        try (Connection conn = DriverManager.getConnection(logChaosUrl);
-             Statement stmt = conn.createStatement()) {
-            SQLException ex = assertThrows(SQLException.class,
-                () -> stmt.executeQuery("SELECT * FROM users"),
-                "log:chaos should preserve failure behavior");
-            assertTrue(ex.getMessage().contains("ChaosDriver"),
-                "Exception should be from ChaosDriver");
-        }
-    }
-
     // ========== ARBITRARY PROVIDERS ==========
 
     @Provide

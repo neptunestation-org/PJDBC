@@ -324,15 +324,15 @@ class FilterDriverProperties {
         String filterLog = MockDriver.getLog(mockUrl);
 
 
-        // log:filter:X
-        String logFilterUrl = "jdbc:log:jdbc:filter:" + mockUrl;
-        try (Connection conn = DriverManager.getConnection(logFilterUrl)) {
+        // cat:filter:X
+        String catFilterUrl = "jdbc:cat:jdbc:filter:" + mockUrl;
+        try (Connection conn = DriverManager.getConnection(catFilterUrl)) {
             conn.createStatement().executeQuery(sql);
         }
-        String logFilterLog = MockDriver.getLog(mockUrl);
+        String catFilterLog = MockDriver.getLog(mockUrl);
 
-        assertEquals(filterLog, logFilterLog,
-            "log:filter:X should preserve filter behavior");
+        assertEquals(filterLog, catFilterLog,
+            "cat:filter:X should preserve filter behavior");
     }
 
     /**

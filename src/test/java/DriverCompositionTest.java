@@ -10,11 +10,11 @@ public class DriverCompositionTest {
 	    assertNotNull(DriverManager.getConnection("jdbc:cat:jdbc:mock:foo"));
 	    assertNotNull(DriverManager.getConnection("jdbc:cat:jdbc:sink:jdbc:mock:foo"));
 	    assertNotNull(DriverManager.getConnection("jdbc:cat:jdbc:sink:jdbc:cat:jdbc:sink:jdbc:mock:foo"));
-	    assertNotNull(DriverManager.getConnection("jdbc:log:jdbc:mock:foo"));
+	    assertNotNull(DriverManager.getConnection("jdbc:cat:jdbc:mock:foo"));
 	    assertNotNull(DriverManager.getConnection("jdbc:filter:jdbc:mock:foo"));
-	    assertNotNull(DriverManager.getConnection("jdbc:log:jdbc:filter:jdbc:mock:foo"));
-	    assertNotNull(DriverManager.getConnection("jdbc:log:jdbc:filter:jdbc:cat:jdbc:sink:jdbc:mock:foo"));
-	    assertNotNull(DriverManager.getConnection("jdbc:log:jdbc:filter:jdbc:cat:jdbc:tee:jdbc:sink:jdbc:mock:foo;jdbc:mock:bar"));}
+	    assertNotNull(DriverManager.getConnection("jdbc:cat:jdbc:filter:jdbc:mock:foo"));
+	    assertNotNull(DriverManager.getConnection("jdbc:cat:jdbc:filter:jdbc:cat:jdbc:sink:jdbc:mock:foo"));
+	    assertNotNull(DriverManager.getConnection("jdbc:cat:jdbc:filter:jdbc:cat:jdbc:tee:jdbc:sink:jdbc:mock:foo;jdbc:mock:bar"));}
 	catch (Exception e) {fail(e.getMessage());}}
 
     @Test
@@ -59,7 +59,7 @@ public class DriverCompositionTest {
 	    int i = 0;
 	    try{DriverManager.getConnection("jdbc: cat:jdbc:\nmock:foo");} catch (Exception e) {i++;}
 	    try{DriverManager.getConnection("jdbc: cat:jdbc:\nsink:jdbc:mock:foo");} catch (Exception e) {i++;}
-	    try{DriverManager.getConnection("jdbc: log:jdbc:\nfilter:jdbc:cat:jdbc:sink:jdbc:mock:foo");} catch (Exception e) {i++;}
-	    try{DriverManager.getConnection("jdbc: log:jdbc:\nfilter:jdbc\n:cat :  jdbc:\ntee:jdbc:sink :jdbc:mock:foo ;\njdbc:mock:bar");} catch (Exception e) {i++;}
+	    try{DriverManager.getConnection("jdbc: cat:jdbc:\nfilter:jdbc:cat:jdbc:sink:jdbc:mock:foo");} catch (Exception e) {i++;}
+	    try{DriverManager.getConnection("jdbc: cat:jdbc:\nfilter:jdbc\n:cat :  jdbc:\ntee:jdbc:sink :jdbc:mock:foo ;\njdbc:mock:bar");} catch (Exception e) {i++;}
 	    assertEquals(4, i);}
 	catch (Exception e) {fail(e.getMessage());}}}

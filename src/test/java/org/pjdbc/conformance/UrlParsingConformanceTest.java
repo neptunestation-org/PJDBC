@@ -30,10 +30,7 @@ public class UrlParsingConformanceTest extends DriverConformanceTest {
     static void loadDrivers() throws Exception {
         // Force load all PJDBC drivers
         Class.forName("org.pjdbc.drivers.CatDriver");
-        Class.forName("org.pjdbc.drivers.LogDriver");
         Class.forName("org.pjdbc.drivers.FilterDriver");
-        Class.forName("org.pjdbc.drivers.PoolDriver");
-        Class.forName("org.pjdbc.drivers.HikariPoolDriver");
         Class.forName("org.pjdbc.drivers.TeeDriver");
         Class.forName("org.pjdbc.drivers.UserMapDriver");
         Class.forName("org.pjdbc.drivers.SinkDriver");
@@ -41,13 +38,11 @@ public class UrlParsingConformanceTest extends DriverConformanceTest {
         Class.forName("org.pjdbc.drivers.ReadonlyDriver");
         Class.forName("org.pjdbc.drivers.RetryDriver");
         Class.forName("org.pjdbc.drivers.ChaosDriver");
-        Class.forName("org.pjdbc.drivers.CachingDriver");
-        Class.forName("org.pjdbc.drivers.RedisCachingDriver");
-        Class.forName("org.pjdbc.drivers.MemcachedCachingDriver");
-        Class.forName("org.pjdbc.drivers.HazelcastCachingDriver");
-        Class.forName("org.pjdbc.drivers.TracingDriver");
-        Class.forName("org.pjdbc.drivers.MetricsDriver");
         Class.forName("org.pjdbc.drivers.DataMaskingDriver");
+        Class.forName("org.pjdbc.drivers.TimeoutDriver");
+        Class.forName("org.pjdbc.drivers.CircuitBreakerDriver");
+        Class.forName("org.pjdbc.drivers.SchemaValidationDriver");
+        Class.forName("org.pjdbc.drivers.FederatingDriver");
     }
 
     @Test
@@ -140,8 +135,8 @@ public class UrlParsingConformanceTest extends DriverConformanceTest {
     void composableDriversAcceptChainedUrls() throws SQLException {
         // Test a few known-good chaining combinations
         String[] chainedUrls = {
-            "jdbc:cat:jdbc:log:" + MOCK_URL,
-            "jdbc:log:jdbc:cat:" + MOCK_URL,
+            "jdbc:cat:jdbc:retry:" + MOCK_URL,
+            "jdbc:retry:jdbc:cat:" + MOCK_URL,
             "jdbc:cat:jdbc:cat:" + MOCK_URL
         };
 

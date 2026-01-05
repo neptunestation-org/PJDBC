@@ -194,9 +194,10 @@ public class ManifestValidationTest {
     @Test
     @DisplayName("Expected core drivers are present")
     void expectedCoreDriversArePresent() {
+        // Core drivers after PJDBC 2.0 rescope
         String[] coreDrivers = {
-            "log", "cat", "pool", "cache", "retry", "timeout",
-            "tee", "sink", "filter", "readonly", "audit"
+            "cat", "retry", "timeout", "tee", "sink", "filter",
+            "readonly", "chaos", "mask", "circuitbreaker"
         };
 
         for (String prefix : coreDrivers) {

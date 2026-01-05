@@ -302,7 +302,7 @@ class TeeDriverProperties {
      * Note: LogDriver logs using the underlying URL as logger name.
      */
     @Property(tries = 10)
-    void logTeeComposition(
+    void catTeeComposition(
             @ForAll("sqlStatements") String sql) throws SQLException {
 
 
@@ -311,9 +311,9 @@ class TeeDriverProperties {
         String url1 = "jdbc:mock:" + dbName1;
         String url2 = "jdbc:mock:" + dbName2;
         String teeUrl = "jdbc:tee:" + url1 + ";" + url2;
-        String logTeeUrl = "jdbc:log:" + teeUrl;
+        String catTeeUrl = "jdbc:cat:" + teeUrl;
 
-        try (Connection conn = DriverManager.getConnection(logTeeUrl);
+        try (Connection conn = DriverManager.getConnection(catTeeUrl);
              Statement stmt = conn.createStatement()) {
             stmt.executeQuery(sql);
         }
@@ -323,9 +323,9 @@ class TeeDriverProperties {
         String log2 = MockDriver.getLog(url2);
 
         assertTrue(log1.contains(sql),
-            "log:tee should broadcast SQL to target 1");
+            "cat:tee should broadcast SQL to target 1");
         assertTrue(log2.contains(sql),
-            "log:tee should broadcast SQL to target 2");
+            "cat:tee should broadcast SQL to target 2");
     }
 
     // ========== TEE WITH REAL DATABASES ==========
