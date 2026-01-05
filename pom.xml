@@ -199,6 +199,7 @@
           <parallel>classes</parallel>
           <threadCount>4</threadCount>
           <perCoreThreadCount>true</perCoreThreadCount>
+          <argLine>-Djava.util.logging.config.file=${project.basedir}/src/test/resources/logging.properties</argLine>
         </configuration>
       </plugin>
       <plugin>
@@ -272,6 +273,7 @@
               <parallel>classes</parallel>
               <threadCount>4</threadCount>
               <perCoreThreadCount>true</perCoreThreadCount>
+              <argLine>-Djava.util.logging.config.file=${project.basedir}/src/test/resources/logging.properties</argLine>
             </configuration>
           </plugin>
         </plugins>
