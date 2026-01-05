@@ -883,6 +883,7 @@ To configure:
 
 ## Documentation
 
+- [Composition Guide](docs/COMPOSITION_GUIDE.md) - How to combine drivers effectively
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [User Guide](docs/USER_GUIDE.md) - Driver usage examples
 - [Driver Writers Guide](docs/DRIVER_WRITERS_GUIDE.md) - Creating custom drivers
