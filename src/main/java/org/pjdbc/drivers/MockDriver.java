@@ -81,7 +81,7 @@ public class MockDriver extends AbstractDriver {
     public Connection connect (final String url, Properties info) throws SQLException {
 	if (!acceptsURL(url)) return null;
 	logs.put(url, new MyPrintWriter(new ByteArrayOutputStream()));
-    infos.put(url, info);
+	if (info != null) infos.put(url, info);
 	final PrintWriter l = logs.get(url);
 	return (Connection)Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{Connection.class}, new InvocationHandler() {
 		public Object invoke (Object proxy, Method method, Object[] args) throws SQLException {

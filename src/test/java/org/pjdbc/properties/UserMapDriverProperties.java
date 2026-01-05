@@ -96,8 +96,7 @@ class UserMapDriverProperties {
 
     /**
      * Property: Connect with unmapped user throws SQLException.
-     * Note: The driver looks up users in a properties file. Without configuration,
-     * all users should be unmapped and trigger an error.
+     * Note: The driver uses a generic error message to prevent user enumeration.
      */
     @Property(tries = 20)
     void connectWithUnmappedUserThrows(
@@ -113,16 +112,15 @@ class UserMapDriverProperties {
             DriverManager.getConnection(url, props);
         });
 
-        assertTrue(exception.getMessage().contains("No mapping found") ||
-                   exception.getMessage().contains("mapping"),
-            "Should mention missing mapping: " + exception.getMessage());
+        // Security fix: error message is now generic to prevent user enumeration
+        assertEquals("PJDBC: Authentication failed", exception.getMessage());
     }
 
     /**
-     * Property: Error message includes the unmapped username.
+     * Property: Error message does NOT include the username (security fix for user enumeration).
      */
     @Property(tries = 10)
-    void errorMessageIncludesUsername(
+    void errorMessageDoesNotIncludeUsername(
             @ForAll("userNames") String username,
             @ForAll("mockDbNames") String dbName) {
 
@@ -134,8 +132,10 @@ class UserMapDriverProperties {
             DriverManager.getConnection(url, props);
         });
 
-        assertTrue(exception.getMessage().contains(username),
-            "Error should include username '" + username + "': " + exception.getMessage());
+        // Security fix: error message should be generic and not leak the username
+        assertFalse(exception.getMessage().contains(username),
+            "Error should NOT include username '" + username + "' to prevent user enumeration");
+        assertEquals("PJDBC: Authentication failed", exception.getMessage());
     }
 
     // ========== NULL/MISSING USER PROPERTIES ==========

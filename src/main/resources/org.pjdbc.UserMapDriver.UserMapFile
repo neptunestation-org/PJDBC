@@ -3,4 +3,5 @@
 alice=alice_db/secret123
 bob=bob_database/password456
 testuser=mapped_user/mapped_pass
-admin=root/adminpass
+admin=admin_db/admin_secret
+whitespace_user=db_user_ws/db_pass_ws
