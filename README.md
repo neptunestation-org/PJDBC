@@ -1,18 +1,28 @@
-# PJDBC - Proxying JDBC Driver
+# PJDBC
+
+**Transform, route, and federate SQL without changing your code.**
 
 [![CI](https://github.com/neptunestation-org/PJDBC/actions/workflows/ci.yml/badge.svg)](https://github.com/neptunestation-org/PJDBC/actions/workflows/ci.yml)
 [![JavaDoc](https://img.shields.io/badge/JavaDoc-API-blue)](https://neptunestation-org.github.io/PJDBC/)
 
-PJDBC is a pluggable JDBC driver framework that enables intercepting, transforming, and extending database operations through composable proxy drivers.
+PJDBC is a JDBC proxy framework that lets you intercept and modify database operations through composable URL-based drivers. Unlike general-purpose middleware, PJDBC focuses on capabilities that don't have better alternatives:
 
-## Features
+- **SQL Transformation**: Rewrite queries on the fly
+- **Multi-Database Routing**: Federate queries across heterogeneous databases
+- **Write Replication**: Mirror writes to multiple targets
+- **Access Control**: Enforce read-only, schema validation, data masking
+- **Testing Utilities**: Mock databases, inject faults, benchmark
 
-- **Chainable Drivers**: Stack multiple proxy drivers to build complex pipelines
-- **SQL Transformation**: Modify SQL statements before execution
-- **Resilience**: Built-in retry, timeout, and circuit breaker patterns
-- **Security**: Read-only enforcement, user mapping, and data masking
-- **Testing**: Mock drivers and chaos engineering for resilience testing
-- **Extensible**: Create custom drivers by extending base classes
+## What PJDBC Is NOT
+
+PJDBC intentionally excludes:
+
+- **Caching** — Use Hibernate L2 cache, Spring Cache, or application-level caching
+- **Connection Pooling** — Use HikariCP, c3p0, or your framework's built-in pooling
+- **Logging/Metrics/Tracing** — Use p6spy, OpenTelemetry, or Micrometer
+- **Load Balancing** — Use ProxySQL, PgPool, HAProxy, or database-native solutions
+
+These concerns are better served by purpose-built tools with established ecosystems.
 
 ## Requirements
 
@@ -130,24 +140,46 @@ $ java -jar target/PJDBC-2.0.0.jar validate "jdbc:retry[maxRetries=-5]:jdbc:post
 
 ## Available Drivers
 
-PJDBC 2.0 includes 14 drivers organized by capability:
+PJDBC 2.0 includes 14 drivers in 5 categories:
 
-| Driver | Prefix | Description | Capabilities |
-|--------|--------|-------------|--------------|
-| CatDriver | `cat` | Pass-through driver (identity) | passthrough |
-| ChaosDriver | `chaos` | Injects failures and latency for testing | testing, resilience |
-| CircuitBreakerDriver | `circuitbreaker` | Circuit breaker pattern for fault tolerance | resilience |
-| DataMaskingDriver | `mask` | Masks sensitive data in query results | masking, security |
-| FederatingDriver | `federate` | Queries multiple databases and merges results | federation, multi-database |
-| FilterDriver | `filter` | Transforms SQL using JdbcTransformer | transformation, filtering |
-| MockDriver | `mock` | In-memory mock driver for testing | testing |
-| ReadonlyDriver | `readonly` | Enforces read-only database access | security, filtering |
-| RetryDriver | `retry` | Automatic retry with exponential backoff | resilience |
-| SchemaValidationDriver | `schema` | Validates SQL against table/column rules | security, validation |
-| SinkDriver | `sink` | Discards all SQL operations | testing |
-| TeeDriver | `tee` | Replicates operations across connections | replication |
-| TimeoutDriver | `timeout` | Enforces query timeout limits | resilience |
-| UserMapDriver | `mapuser` | Maps app usernames to DB credentials | security, transformation |
+### SQL Transformation & Routing (Core Value)
+
+| Driver | Prefix | Purpose |
+|--------|--------|---------|
+| FilterDriver | `filter` | SQL transformation via JdbcTransformer |
+| FederatingDriver | `federate` | Query multiple heterogeneous databases |
+| TeeDriver | `tee` | Replicate writes to multiple targets |
+| UserMapDriver | `mapuser` | Map application users to DB credentials |
+
+### Access Control & Security
+
+| Driver | Prefix | Purpose |
+|--------|--------|---------|
+| ReadonlyDriver | `readonly` | Enforce read-only access |
+| SchemaValidationDriver | `schema` | Whitelist/blacklist tables and columns |
+| DataMaskingDriver | `mask` | Mask sensitive data in results |
+
+### Development & Testing
+
+| Driver | Prefix | Purpose |
+|--------|--------|---------|
+| MockDriver | `mock` | In-memory mock for testing |
+| SinkDriver | `sink` | Discard all operations (benchmarking) |
+| ChaosDriver | `chaos` | Fault injection for resilience testing |
+
+### Resilience
+
+| Driver | Prefix | Purpose |
+|--------|--------|---------|
+| RetryDriver | `retry` | Retry transient failures (⚠️ idempotent ops only) |
+| CircuitBreakerDriver | `circuitbreaker` | Circuit breaker pattern |
+| TimeoutDriver | `timeout` | Query timeout enforcement |
+
+### Foundation
+
+| Driver | Prefix | Purpose |
+|--------|--------|---------|
+| CatDriver | `cat` | Pass-through (baseline/testing) |
 
 ---
 
