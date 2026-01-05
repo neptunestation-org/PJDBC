@@ -129,6 +129,27 @@ $ pjdbc validate "jdbc:retry[maxRetries=-5]:jdbc:postgresql://localhost/db"
 
 ## Available Drivers
 
+PJDBC 2.0 includes 14 drivers organized by capability:
+
+| Driver | Prefix | Description | Capabilities |
+|--------|--------|-------------|--------------|
+| CatDriver | `cat` | Pass-through driver (identity) | passthrough |
+| ChaosDriver | `chaos` | Injects failures and latency for testing | testing, resilience |
+| CircuitBreakerDriver | `circuitbreaker` | Circuit breaker pattern for fault tolerance | resilience |
+| DataMaskingDriver | `mask` | Masks sensitive data in query results | masking, security |
+| FederatingDriver | `federate` | Queries multiple databases and merges results | federation, multi-database |
+| FilterDriver | `filter` | Transforms SQL using JdbcTransformer | transformation, filtering |
+| MockDriver | `mock` | In-memory mock driver for testing | testing |
+| ReadonlyDriver | `readonly` | Enforces read-only database access | security, filtering |
+| RetryDriver | `retry` | Automatic retry with exponential backoff | resilience |
+| SchemaValidationDriver | `schema` | Validates SQL against table/column rules | security, validation |
+| SinkDriver | `sink` | Discards all SQL operations | testing |
+| TeeDriver | `tee` | Replicates operations across connections | replication |
+| TimeoutDriver | `timeout` | Enforces query timeout limits | resilience |
+| UserMapDriver | `mapuser` | Maps app usernames to DB credentials | security, transformation |
+
+---
+
 ### CatDriver (`jdbc:cat:...`)
 
 Pass-through driver that forwards all calls unchanged. Useful as a base for custom drivers or as an identity element in driver chains.
