@@ -788,6 +788,33 @@ testcontainers.reuse.enable=true
 
 This significantly reduces test time when running integration tests repeatedly during development.
 
+### Generating Documentation
+
+PJDBC uses two mechanisms to generate documentation from driver annotations:
+
+**1. Capabilities Manifest** (compile-time)
+
+The `CapabilityProcessor` annotation processor generates `pjdbc.capabilities.json` automatically during compilation. This JSON manifest contains machine-readable metadata for all drivers and is used by the runtime introspection API.
+
+```bash
+mvn compile  # Generates target/classes/pjdbc.capabilities.json
+```
+
+**2. Enhanced JavaDocs** (javadoc phase)
+
+The `CapabilityDoclet` custom doclet enhances standard JavaDocs by injecting parameter tables into driver class documentation. It reads `@DriverParameter` annotations and generates HTML tables showing each parameter's name, type, default value, constraints, and description.
+
+```bash
+mvn javadoc:javadoc  # Generates target/reports/apidocs/ with enhanced docs
+mvn javadoc:jar      # Packages enhanced JavaDocs into JAR for deployment
+```
+
+The enhanced JavaDoc for each driver class includes a "Driver Parameters" section with:
+- URL format example
+- Parameter table with type, default, constraints, and description
+
+Both mechanisms read from the same annotations (`@DriverCapability`, `@DriverParameter`, etc.), ensuring documentation stays in sync with the code.
+
 ### CI Configuration
 
 The project uses GitHub Actions for CI with the following workflows:
