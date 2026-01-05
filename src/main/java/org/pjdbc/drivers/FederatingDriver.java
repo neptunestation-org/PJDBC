@@ -39,8 +39,13 @@ import org.pjdbc.sql.*;
     description = "Execute queries in parallel", defaultValue = "false")
 @DriverParameter(name = "timeout", type = ParameterType.INTEGER,
     description = "Timeout in milliseconds for parallel execution", defaultValue = "30000", min = 0)
+@DriverParameter(name = "strictTransactions", type = ParameterType.BOOLEAN,
+    description = "Throw exception when transactions are used (no cross-DB coordination)", defaultValue = "false")
 @DriverSideEffects(stateful = true)
 public class FederatingDriver extends AbstractDriver {
+    private static final java.util.logging.Logger LOG =
+        java.util.logging.Logger.getLogger(FederatingDriver.class.getName());
+
     static {try {DriverManager.registerDriver(new FederatingDriver());} catch (Exception e) {throw new RuntimeException(e);}}
 
     /**
@@ -62,21 +67,26 @@ public class FederatingDriver extends AbstractDriver {
         private final MergeStrategy mergeStrategy;
         private final boolean parallelExecution;
         private final long timeout;
+        private final boolean strictTransactions;
 
-        public FederateConfig(MergeStrategy mergeStrategy, boolean parallelExecution, long timeout) {
+        public FederateConfig(MergeStrategy mergeStrategy, boolean parallelExecution,
+                              long timeout, boolean strictTransactions) {
             this.mergeStrategy = mergeStrategy;
             this.parallelExecution = parallelExecution;
             this.timeout = timeout;
+            this.strictTransactions = strictTransactions;
         }
 
         public MergeStrategy getMergeStrategy() { return mergeStrategy; }
         public boolean isParallelExecution() { return parallelExecution; }
         public long getTimeout() { return timeout; }
+        public boolean isStrictTransactions() { return strictTransactions; }
 
         public static FederateConfig fromUrl(String url) {
             MergeStrategy strategy = MergeStrategy.CONCAT;
             boolean parallel = false;
             long timeout = 30000;
+            boolean strict = false;
 
             try {
                 JdbcUrlParser parser = JdbcUrlParser.parse(url);
@@ -89,11 +99,12 @@ public class FederatingDriver extends AbstractDriver {
                 parallel = "true".equalsIgnoreCase(parser.getParameter("parallelExecution", "false"));
                 String timeoutParam = parser.getParameter("timeout", "30000");
                 timeout = Long.parseLong(timeoutParam);
+                strict = "true".equalsIgnoreCase(parser.getParameter("strictTransactions", "false"));
             } catch (Exception e) {
                 // Use defaults on parse error
             }
 
-            return new FederateConfig(strategy, parallel, timeout);
+            return new FederateConfig(strategy, parallel, timeout, strict);
         }
     }
 
@@ -166,6 +177,31 @@ public class FederatingDriver extends AbstractDriver {
             super(delegates.toArray(new Connection[0]), driver, url, info);
             this.config = config;
             this.driver = driver;
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * <p><strong>Warning:</strong> FederatingDriver does not coordinate transactions
+         * across multiple databases. Each database commits/rolls back independently,
+         * which can lead to inconsistent state if one commit succeeds and another fails.
+         *
+         * @throws SQLException if strictTransactions=true and autoCommit is set to false
+         */
+        @Override
+        public void setAutoCommit(boolean autoCommit) throws SQLException {
+            if (!autoCommit) {
+                String msg = "FederatingDriver does not support coordinated transactions across " +
+                    "multiple databases. Each database will commit/rollback independently, " +
+                    "which may result in inconsistent state if failures occur.";
+                if (config.isStrictTransactions()) {
+                    throw new SQLException(msg + " Set strictTransactions=false to allow " +
+                        "uncoordinated transactions (at your own risk).");
+                } else {
+                    LOG.warning(msg);
+                }
+            }
+            super.setAutoCommit(autoCommit);
         }
 
         @Override
