@@ -26,7 +26,7 @@ These concerns are better served by purpose-built tools with established ecosyst
 
 ## Requirements
 
-- Java 21 or higher
+- Java 17 or higher (uses virtual threads on Java 21+ when available)
 - Maven 3.6+
 
 ## Installation

@@ -6,7 +6,7 @@ This guide covers the steps to publish PJDBC to Maven Central via Sonatype OSSRH
 
 - GPG installed (`gpg --version`)
 - Maven 3.6+ installed
-- Java 21+ installed
+- Java 17+ installed
 
 ## Step 1: Create a Sonatype OSSRH Account
 

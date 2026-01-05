@@ -46,7 +46,39 @@ public class FederatingDriver extends AbstractDriver {
     private static final java.util.logging.Logger LOG =
         java.util.logging.Logger.getLogger(FederatingDriver.class.getName());
 
-    static {try {DriverManager.registerDriver(new FederatingDriver());} catch (Exception e) {throw new RuntimeException(e);}}
+    /** Whether virtual threads are available (Java 21+) */
+    private static final boolean VIRTUAL_THREADS_AVAILABLE;
+
+    static {
+        boolean virtualThreads = false;
+        try {
+            // Check if virtual threads are available (Java 21+)
+            Executors.class.getMethod("newVirtualThreadPerTaskExecutor");
+            virtualThreads = true;
+        } catch (NoSuchMethodException e) {
+            // Java 17-20: virtual threads not available
+        }
+        VIRTUAL_THREADS_AVAILABLE = virtualThreads;
+
+        try {DriverManager.registerDriver(new FederatingDriver());} catch (Exception e) {throw new RuntimeException(e);}
+    }
+
+    /**
+     * Create an ExecutorService for parallel query execution.
+     * Uses virtual threads on Java 21+, falls back to cached thread pool on Java 17.
+     */
+    private static ExecutorService createParallelExecutor() {
+        if (VIRTUAL_THREADS_AVAILABLE) {
+            return Executors.newVirtualThreadPerTaskExecutor();
+        } else {
+            // Fallback for Java 17: cached thread pool with daemon threads
+            return Executors.newCachedThreadPool(r -> {
+                Thread t = new Thread(r);
+                t.setDaemon(true);
+                return t;
+            });
+        }
+    }
 
     /**
      * Strategy for merging ResultSets from multiple sources.
@@ -315,8 +347,8 @@ public class FederatingDriver extends AbstractDriver {
         }
 
         private List<ResultSet> executeQueryParallel(String sql) throws SQLException {
-            // Use virtual threads (Java 21+) to avoid thread pool overhead
-            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            // Use virtual threads on Java 21+, cached thread pool on Java 17
+            try (ExecutorService executor = createParallelExecutor()) {
                 List<Future<ResultSet>> futures = new ArrayList<>();
 
                 for (Statement s : delegates) {
@@ -409,8 +441,8 @@ public class FederatingDriver extends AbstractDriver {
             List<ResultSet> results = new ArrayList<>();
 
             if (config.isParallelExecution()) {
-                // Use virtual threads (Java 21+) to avoid thread pool overhead
-                try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                // Use virtual threads on Java 21+, cached thread pool on Java 17
+                try (ExecutorService executor = createParallelExecutor()) {
                     List<Future<ResultSet>> futures = new ArrayList<>();
 
                     for (PreparedStatement s : getPreparedStatements()) {
