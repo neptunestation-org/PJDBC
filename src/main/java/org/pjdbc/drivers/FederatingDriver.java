@@ -20,31 +20,31 @@ import static org.pjdbc.sql.PjdbcListeners.fireFederatedQuery;
  * <p>Unlike TeeDriver (write replication) or LoadBalancingDriver (read scaling),
  * FederatingDriver merges query results from all data sources into a unified view.
  *
- * <h2>IMPORTANT: This is Broadcast-Style, Not True Federation</h2>
+ * <h2>Operating Modes</h2>
  *
- * <p>This driver executes <strong>the same query on all configured databases</strong>
- * and concatenates the results. It does NOT provide:</p>
+ * <p><strong>Broadcast Mode (default):</strong> Executes the same query on all configured
+ * databases and concatenates the results. Use for identical schemas across regions/tenants.</p>
+ *
+ * <p><strong>Table-Based Routing Mode:</strong> Routes queries to specific databases based on
+ * the table name. Enable with the {@code tableRouting} parameter:</p>
+ * <pre>
+ * jdbc:federate[tableRouting=users:0;orders:1]:jdbc:h2:mem:db1;jdbc:h2:mem:db2
+ * </pre>
+ * <p>This routes {@code users} queries to db1 (index 0) and {@code orders} queries to db2 (index 1).
+ * Tables not in the routing map fall back to broadcast behavior.</p>
+ *
+ * <h2>Limitations</h2>
+ *
+ * <p>This driver does NOT provide:</p>
  * <ul>
- *   <li>Table-to-database routing (e.g., query {@code users} from db1, {@code orders} from db2)</li>
  *   <li>Query rewriting for heterogeneous schemas</li>
  *   <li>Cross-database JOINs</li>
- *   <li>Shard key routing</li>
+ *   <li>Shard key routing (use table-based routing for simple cases)</li>
  *   <li>Distributed query planning</li>
  * </ul>
  *
- * <p><strong>Use cases where this driver IS appropriate:</strong></p>
- * <ul>
- *   <li>Querying identical schemas across multiple regions/tenants</li>
- *   <li>Aggregating results from replicas with the same structure</li>
- *   <li>Fan-out queries where all backends should receive the same query</li>
- * </ul>
- *
- * <p><strong>Use cases where you need a different solution:</strong></p>
- * <ul>
- *   <li>Sharded databases with routing logic → Use application-level routing or a shard-aware proxy</li>
- *   <li>Cross-database JOINs → Use a federated query engine (Trino, Presto, Dremio)</li>
- *   <li>Heterogeneous schemas → Write custom routing logic</li>
- * </ul>
+ * <p><strong>For cross-database JOINs or complex federation:</strong> Use a federated query
+ * engine (Trino, Presto, Dremio) instead.</p>
  *
  * <h2>Transaction Limitations</h2>
  *
@@ -61,7 +61,13 @@ import static org.pjdbc.sql.PjdbcListeners.fireFederatedQuery;
  *
  * <p>Example URLs:
  * <pre>
+ * // Broadcast to all databases
  * jdbc:federate:jdbc:h2:mem:db1;jdbc:h2:mem:db2
+ *
+ * // Table-based routing: users→db1, orders→db2
+ * jdbc:federate[tableRouting=users:0;orders:1]:jdbc:h2:mem:db1;jdbc:h2:mem:db2
+ *
+ * // First non-empty result wins
  * jdbc:federate[mergeStrategy=first_non_empty]:jdbc:postgresql://db1/sales;jdbc:mysql://db2/inventory
  * </pre>
  */
@@ -80,6 +86,9 @@ import static org.pjdbc.sql.PjdbcListeners.fireFederatedQuery;
 @DriverParameter(name = "strictTransactions", type = ParameterType.BOOLEAN,
     description = "Throw exception when transactions are used (no cross-DB coordination). " +
         "Set to false to allow uncoordinated transactions at your own risk.", defaultValue = "true")
+@DriverParameter(name = "tableRouting", type = ParameterType.STRING,
+    description = "Optional table-to-database routing. Format: table1:idx1;table2:idx2 " +
+        "where idx is 0-based database index. Unrouted tables broadcast to all.", defaultValue = "")
 @DriverSideEffects(stateful = true)
 public class FederatingDriver extends AbstractDriver {
     private static final java.util.logging.Logger LOG =
@@ -87,6 +96,15 @@ public class FederatingDriver extends AbstractDriver {
 
     /** Whether virtual threads are available (Java 21+) */
     private static final boolean VIRTUAL_THREADS_AVAILABLE;
+
+    /**
+     * Pattern to extract table names from SQL.
+     * Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
+     */
+    private static final java.util.regex.Pattern TABLE_PATTERN = java.util.regex.Pattern.compile(
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        java.util.regex.Pattern.CASE_INSENSITIVE
+    );
 
     static {
         boolean virtualThreads = false;
@@ -100,6 +118,26 @@ public class FederatingDriver extends AbstractDriver {
         VIRTUAL_THREADS_AVAILABLE = virtualThreads;
 
         try {DriverManager.registerDriver(new FederatingDriver());} catch (Exception e) {throw new RuntimeException(e);}
+    }
+
+    /**
+     * Extract the first table name from a SQL statement.
+     *
+     * @param sql the SQL statement
+     * @return the first table name found (lowercase), or null if none found
+     */
+    static String extractFirstTable(String sql) {
+        if (sql == null) return null;
+        java.util.regex.Matcher m = TABLE_PATTERN.matcher(sql);
+        if (m.find()) {
+            String table = m.group(1);
+            // Handle schema.table format - extract just table name
+            if (table.contains(".")) {
+                table = table.substring(table.lastIndexOf('.') + 1);
+            }
+            return table.toLowerCase();
+        }
+        return null;
     }
 
     /**
@@ -140,14 +178,17 @@ public class FederatingDriver extends AbstractDriver {
         private final long timeout;
         private final boolean strictTransactions;
         private final List<String> targetUrls;
+        private final Map<String, Integer> tableRouting;
 
         public FederateConfig(MergeStrategy mergeStrategy, boolean parallelExecution,
-                              long timeout, boolean strictTransactions, List<String> targetUrls) {
+                              long timeout, boolean strictTransactions, List<String> targetUrls,
+                              Map<String, Integer> tableRouting) {
             this.mergeStrategy = mergeStrategy;
             this.parallelExecution = parallelExecution;
             this.timeout = timeout;
             this.strictTransactions = strictTransactions;
             this.targetUrls = targetUrls != null ? List.copyOf(targetUrls) : List.of();
+            this.tableRouting = tableRouting != null ? Map.copyOf(tableRouting) : Map.of();
         }
 
         public MergeStrategy getMergeStrategy() { return mergeStrategy; }
@@ -156,11 +197,34 @@ public class FederatingDriver extends AbstractDriver {
         public boolean isStrictTransactions() { return strictTransactions; }
         public List<String> getTargetUrls() { return targetUrls; }
 
+        /**
+         * Get table-to-database routing map.
+         * Keys are lowercase table names, values are 0-based database indices.
+         */
+        public Map<String, Integer> getTableRouting() { return tableRouting; }
+
+        /**
+         * Check if table-based routing is enabled.
+         */
+        public boolean hasTableRouting() { return !tableRouting.isEmpty(); }
+
+        /**
+         * Get the database index for a table, or -1 if not routed.
+         */
+        public int getRouteForTable(String tableName) {
+            if (tableName == null) return -1;
+            // Handle schema.table format - extract just table name
+            String table = tableName.contains(".") ?
+                tableName.substring(tableName.lastIndexOf('.') + 1) : tableName;
+            return tableRouting.getOrDefault(table.toLowerCase(), -1);
+        }
+
         public static FederateConfig fromUrl(String url, List<String> targetUrls) {
             MergeStrategy strategy = MergeStrategy.CONCAT;
             boolean parallel = false;
             long timeout = 30000;
             boolean strict = true;
+            Map<String, Integer> routing = new HashMap<>();
 
             try {
                 JdbcUrlParser parser = JdbcUrlParser.parse(url);
@@ -174,11 +238,26 @@ public class FederatingDriver extends AbstractDriver {
                 String timeoutParam = parser.getParameter("timeout", "30000");
                 timeout = Long.parseLong(timeoutParam);
                 strict = !"false".equalsIgnoreCase(parser.getParameter("strictTransactions", "true"));
+
+                // Parse tableRouting parameter (format: table1:0;table2:1)
+                String routingParam = parser.getParameter("tableRouting", "");
+                if (!routingParam.isEmpty()) {
+                    for (String mapping : routingParam.split(";")) {
+                        String[] parts = mapping.split(":");
+                        if (parts.length == 2) {
+                            String table = parts[0].trim().toLowerCase();
+                            int idx = Integer.parseInt(parts[1].trim());
+                            if (idx >= 0 && idx < targetUrls.size()) {
+                                routing.put(table, idx);
+                            }
+                        }
+                    }
+                }
             } catch (Exception e) {
                 // Use defaults on parse error
             }
 
-            return new FederateConfig(strategy, parallel, timeout, strict, targetUrls);
+            return new FederateConfig(strategy, parallel, timeout, strict, targetUrls, routing);
         }
     }
 
@@ -379,6 +458,17 @@ public class FederatingDriver extends AbstractDriver {
         public ResultSet executeQuery(String sql) throws SQLException {
             fireFederatedQuery(sql, config.getTargetUrls());
 
+            // Check for table-based routing
+            if (config.hasTableRouting()) {
+                String table = extractFirstTable(sql);
+                int routeIdx = config.getRouteForTable(table);
+                if (routeIdx >= 0 && routeIdx < delegates.size()) {
+                    // Route to specific database
+                    return delegates.get(routeIdx).executeQuery(sql);
+                }
+            }
+
+            // Fall back to broadcast behavior
             List<ResultSet> results = new ArrayList<>();
 
             if (config.isParallelExecution()) {
@@ -444,6 +534,16 @@ public class FederatingDriver extends AbstractDriver {
 
         @Override
         public int executeUpdate(String sql) throws SQLException {
+            // Check for table-based routing
+            if (config.hasTableRouting()) {
+                String table = extractFirstTable(sql);
+                int routeIdx = config.getRouteForTable(table);
+                if (routeIdx >= 0 && routeIdx < delegates.size()) {
+                    // Route to specific database
+                    return delegates.get(routeIdx).executeUpdate(sql);
+                }
+            }
+
             // Broadcast update to all and sum counts
             int total = 0;
             for (Statement s : delegates) {
@@ -454,6 +554,16 @@ public class FederatingDriver extends AbstractDriver {
 
         @Override
         public boolean execute(String sql) throws SQLException {
+            // Check for table-based routing
+            if (config.hasTableRouting()) {
+                String table = extractFirstTable(sql);
+                int routeIdx = config.getRouteForTable(table);
+                if (routeIdx >= 0 && routeIdx < delegates.size()) {
+                    // Route to specific database
+                    return delegates.get(routeIdx).execute(sql);
+                }
+            }
+
             // Execute on all, return first result
             Boolean first = null;
             for (Statement s : delegates) {
@@ -488,6 +598,18 @@ public class FederatingDriver extends AbstractDriver {
         public ResultSet executeQuery() throws SQLException {
             fireFederatedQuery(sql, config.getTargetUrls());
 
+            // Check for table-based routing
+            if (config.hasTableRouting()) {
+                String table = extractFirstTable(sql);
+                int routeIdx = config.getRouteForTable(table);
+                List<PreparedStatement> stmts = getPreparedStatements();
+                if (routeIdx >= 0 && routeIdx < stmts.size()) {
+                    // Route to specific database
+                    return stmts.get(routeIdx).executeQuery();
+                }
+            }
+
+            // Fall back to broadcast behavior
             List<ResultSet> results = new ArrayList<>();
 
             if (config.isParallelExecution()) {

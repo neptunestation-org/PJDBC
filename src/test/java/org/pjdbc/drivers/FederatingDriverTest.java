@@ -283,4 +283,196 @@ public class FederatingDriverTest {
             assertEquals("COL2", meta.getColumnName(2).toUpperCase());
         }
     }
+
+    // ========== Table-based routing tests ==========
+
+    @Test
+    public void tableRoutingConfigParsing() {
+        FederatingDriver.FederateConfig config;
+
+        // No routing
+        config = FederatingDriver.FederateConfig.fromUrl(
+            "jdbc:federate:jdbc:mock:a;jdbc:mock:b", List.of("jdbc:mock:a", "jdbc:mock:b"));
+        assertFalse(config.hasTableRouting());
+        assertEquals(-1, config.getRouteForTable("users"));
+
+        // With routing
+        config = FederatingDriver.FederateConfig.fromUrl(
+            "jdbc:federate[tableRouting=users:0;orders:1]:jdbc:mock:a;jdbc:mock:b",
+            List.of("jdbc:mock:a", "jdbc:mock:b"));
+        assertTrue(config.hasTableRouting());
+        assertEquals(0, config.getRouteForTable("users"));
+        assertEquals(0, config.getRouteForTable("USERS")); // case-insensitive
+        assertEquals(1, config.getRouteForTable("orders"));
+        assertEquals(-1, config.getRouteForTable("products")); // not routed
+    }
+
+    @Test
+    public void tableRoutingSelectsCorrectDatabase() throws SQLException {
+        String url1 = "jdbc:h2:mem:federate_route1_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
+        String url2 = "jdbc:h2:mem:federate_route2_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
+        // Route 'users' to db1 (index 0), 'orders' to db2 (index 1)
+        String federateUrl = "jdbc:federate[tableRouting=users:0;orders:1]:" + url1 + ";" + url2;
+
+        // Setup: Put different data in each database
+        try (Connection c1 = DriverManager.getConnection(url1);
+             Connection c2 = DriverManager.getConnection(url2)) {
+
+            // db1: users table only
+            c1.createStatement().execute("CREATE TABLE users (id INT, name VARCHAR(100))");
+            c1.createStatement().execute("INSERT INTO users VALUES (1, 'Alice')");
+
+            // db2: orders table only
+            c2.createStatement().execute("CREATE TABLE orders (id INT, product VARCHAR(100))");
+            c2.createStatement().execute("INSERT INTO orders VALUES (100, 'Widget')");
+        }
+
+        try (Connection conn = DriverManager.getConnection(federateUrl);
+             Statement stmt = conn.createStatement()) {
+
+            // Query users - should route to db1 only
+            ResultSet rs1 = stmt.executeQuery("SELECT * FROM users");
+            assertTrue(rs1.next());
+            assertEquals("Alice", rs1.getString("name"));
+            assertFalse(rs1.next()); // Only 1 row from db1
+
+            // Query orders - should route to db2 only
+            ResultSet rs2 = stmt.executeQuery("SELECT * FROM orders");
+            assertTrue(rs2.next());
+            assertEquals("Widget", rs2.getString("product"));
+            assertFalse(rs2.next()); // Only 1 row from db2
+        }
+    }
+
+    @Test
+    public void tableRoutingUpdateSelectsCorrectDatabase() throws SQLException {
+        String url1 = "jdbc:h2:mem:federate_route_upd1_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
+        String url2 = "jdbc:h2:mem:federate_route_upd2_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
+        String federateUrl = "jdbc:federate[tableRouting=users:0;orders:1]:" + url1 + ";" + url2;
+
+        // Setup
+        try (Connection c1 = DriverManager.getConnection(url1);
+             Connection c2 = DriverManager.getConnection(url2)) {
+
+            c1.createStatement().execute("CREATE TABLE users (id INT, name VARCHAR(100))");
+            c2.createStatement().execute("CREATE TABLE orders (id INT, product VARCHAR(100))");
+        }
+
+        try (Connection conn = DriverManager.getConnection(federateUrl);
+             Statement stmt = conn.createStatement()) {
+
+            // Insert into users - should route to db1 only
+            int count1 = stmt.executeUpdate("INSERT INTO users VALUES (1, 'Bob')");
+            assertEquals(1, count1); // Only 1 row affected (not 2)
+
+            // Insert into orders - should route to db2 only
+            int count2 = stmt.executeUpdate("INSERT INTO orders VALUES (100, 'Gadget')");
+            assertEquals(1, count2); // Only 1 row affected (not 2)
+        }
+
+        // Verify data is in correct databases
+        try (Connection c1 = DriverManager.getConnection(url1);
+             Connection c2 = DriverManager.getConnection(url2)) {
+
+            ResultSet rs1 = c1.createStatement().executeQuery("SELECT * FROM users");
+            assertTrue(rs1.next());
+            assertEquals("Bob", rs1.getString("name"));
+
+            ResultSet rs2 = c2.createStatement().executeQuery("SELECT * FROM orders");
+            assertTrue(rs2.next());
+            assertEquals("Gadget", rs2.getString("product"));
+        }
+    }
+
+    @Test
+    public void tableRoutingFallsBackToBroadcast() throws SQLException {
+        String url1 = "jdbc:h2:mem:federate_route_fb1_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
+        String url2 = "jdbc:h2:mem:federate_route_fb2_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
+        // Only 'users' is routed; 'products' should broadcast
+        String federateUrl = "jdbc:federate[tableRouting=users:0]:" + url1 + ";" + url2;
+
+        // Setup: Create 'products' table in both databases
+        try (Connection c1 = DriverManager.getConnection(url1);
+             Connection c2 = DriverManager.getConnection(url2)) {
+
+            c1.createStatement().execute("CREATE TABLE products (id INT)");
+            c1.createStatement().execute("INSERT INTO products VALUES (1)");
+
+            c2.createStatement().execute("CREATE TABLE products (id INT)");
+            c2.createStatement().execute("INSERT INTO products VALUES (2)");
+        }
+
+        try (Connection conn = DriverManager.getConnection(federateUrl);
+             Statement stmt = conn.createStatement()) {
+
+            // Query products - not in routing map, should broadcast and get both rows
+            ResultSet rs = stmt.executeQuery("SELECT * FROM products");
+            List<Integer> ids = new ArrayList<>();
+            while (rs.next()) {
+                ids.add(rs.getInt("id"));
+            }
+            assertEquals(2, ids.size());
+            assertTrue(ids.contains(1));
+            assertTrue(ids.contains(2));
+        }
+    }
+
+    @Test
+    public void tableRoutingWithPreparedStatement() throws SQLException {
+        String url1 = "jdbc:h2:mem:federate_route_ps1_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
+        String url2 = "jdbc:h2:mem:federate_route_ps2_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
+        String federateUrl = "jdbc:federate[tableRouting=users:0;orders:1]:" + url1 + ";" + url2;
+
+        // Setup: Create tables on both databases (prepareStatement requires table to exist)
+        // but only populate data on the routed database
+        try (Connection c1 = DriverManager.getConnection(url1);
+             Connection c2 = DriverManager.getConnection(url2)) {
+
+            // db1: users table with data
+            c1.createStatement().execute("CREATE TABLE users (id INT, name VARCHAR(100))");
+            c1.createStatement().execute("INSERT INTO users VALUES (1, 'Charlie')");
+            c1.createStatement().execute("INSERT INTO users VALUES (2, 'Diana')");
+            c1.createStatement().execute("CREATE TABLE orders (id INT, total DECIMAL(10,2))");
+
+            // db2: orders table with data
+            c2.createStatement().execute("CREATE TABLE users (id INT, name VARCHAR(100))");
+            c2.createStatement().execute("CREATE TABLE orders (id INT, total DECIMAL(10,2))");
+            c2.createStatement().execute("INSERT INTO orders VALUES (100, 50.00)");
+        }
+
+        try (Connection conn = DriverManager.getConnection(federateUrl)) {
+
+            // PreparedStatement for users - should route to db1 only (gets Charlie, not empty)
+            try (PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM users WHERE id = ?")) {
+                pstmt.setInt(1, 1);
+                ResultSet rs = pstmt.executeQuery();
+                assertTrue(rs.next());
+                assertEquals("Charlie", rs.getString("name"));
+                assertFalse(rs.next()); // Only 1 row from db1, not 2 from both
+            }
+
+            // PreparedStatement for orders - should route to db2 only
+            try (PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM orders WHERE id = ?")) {
+                pstmt.setInt(1, 100);
+                ResultSet rs = pstmt.executeQuery();
+                assertTrue(rs.next());
+                assertEquals(new java.math.BigDecimal("50.00"), rs.getBigDecimal("total"));
+                assertFalse(rs.next());
+            }
+        }
+    }
+
+    @Test
+    public void extractFirstTableTest() {
+        // Test the static helper method
+        assertEquals("users", FederatingDriver.extractFirstTable("SELECT * FROM users"));
+        assertEquals("users", FederatingDriver.extractFirstTable("SELECT * FROM USERS")); // case-insensitive
+        assertEquals("orders", FederatingDriver.extractFirstTable("INSERT INTO orders VALUES (1)"));
+        assertEquals("products", FederatingDriver.extractFirstTable("UPDATE products SET price = 10"));
+        assertEquals("items", FederatingDriver.extractFirstTable("DELETE FROM items WHERE id = 1"));
+        assertEquals("data", FederatingDriver.extractFirstTable("SELECT * FROM schema.data")); // schema.table
+        assertEquals("t1", FederatingDriver.extractFirstTable("SELECT * FROM t1 JOIN t2 ON t1.id = t2.id"));
+        assertNull(FederatingDriver.extractFirstTable("SELECT 1")); // no table
+        assertNull(FederatingDriver.extractFirstTable(null));
+    }
 }
