@@ -359,7 +359,7 @@ Focus: Make existing features reliable or fail clearly.
 - [x] **P1.2**: Add "Limitations" section to FederatingDriver docs clarifying it's broadcast, not federation
 - [x] **P2.5**: Reformat AbstractStatement/AbstractPreparedStatement/AbstractCallableStatement (already done)
 
-### v2.2.0 - Observability Release ✅ IN PROGRESS
+### v2.2.0 - Observability Release ✅ COMPLETE
 Focus: Make behavior visible.
 
 - [x] **P2.1**: Expand PjdbcEventListener with retry/circuit breaker/transform events (already existed)
@@ -367,7 +367,7 @@ Focus: Make behavior visible.
 - [x] Wire FederatingDriver to fire federated query events
 - [x] Wire ChaosDriver to fire chaos injection events
 - [x] CLI `--verbose` flag for detailed output
-- [ ] Add JMX MBeans for CircuitBreakerDriver state (optional, flag-enabled)
+- [x] Add JMX MBeans for CircuitBreakerDriver state (optional, flag-enabled) - v3.0.1
 
 ### v2.3.0 - Usability Release
 Focus: Make common tasks easier.
