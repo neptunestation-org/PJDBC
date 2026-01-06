@@ -2,6 +2,8 @@ package org.pjdbc.drivers;
 
 import java.sql.*;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverSideEffects;
@@ -22,7 +24,9 @@ public class UserMapDriver extends AbstractProxyDriver {
 	    java.io.InputStream is = cl.getResourceAsStream("org.pjdbc.UserMapDriver.UserMapFile");
 	    if (is != null) {p.load(is); is.close();}
 	    DriverManager.registerDriver(new UserMapDriver());
-	} catch (Exception e) {throw new RuntimeException(e);}}
+	} catch (Exception e) {
+	    Logger.getLogger(UserMapDriver.class.getName()).log(Level.SEVERE, "PJDBC: Driver initialization failed.", e);
+	    throw new RuntimeException("PJDBC: Driver initialization failed.");}}
 
     protected boolean acceptsSubProtocol (String subprotocol) {
 	return "mapuser".equals(subprotocol);}
