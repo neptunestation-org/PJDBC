@@ -1,15 +1,36 @@
 package org.pjdbc.drivers;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
+import java.io.StringReader;
+import java.math.BigDecimal;
+import java.net.URL;
+import java.sql.Array;
+import java.sql.Blob;
 import java.sql.CallableStatement;
+import java.sql.Clob;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.Driver;
 import java.sql.DriverManager;
+import java.sql.NClob;
 import java.sql.PreparedStatement;
+import java.sql.Ref;
 import java.sql.ResultSet;
+import java.sql.RowId;
 import java.sql.SQLException;
+import java.sql.SQLXML;
 import java.sql.Statement;
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -54,32 +75,18 @@ import org.pjdbc.sql.ProxyConnection;
  * combination with RetryDriver, or implement application-level idempotency
  * using idempotency keys or optimistic locking.</p>
  *
- * <h2>LIMITATION: PreparedStatement and Connection Failures</h2>
- * <p><strong>PreparedStatement and CallableStatement cannot be retried after
- * connection failures.</strong> When the database connection is lost (SQL states
- * starting with "08"), this driver throws SQLException instead of retrying because
- * parameter bindings cannot be preserved across reconnection.</p>
+ * <h2>PreparedStatement Parameter Tracking</h2>
+ * <p>This driver tracks all parameter bindings (setXxx calls) on PreparedStatements.
+ * When a connection failure occurs (SQL states starting with "08"), the driver
+ * automatically reconnects, recreates the PreparedStatement, and replays all
+ * parameter bindings before retrying the operation.</p>
  *
- * <p>Attempting to silently retry would execute queries with NULL/default parameters,
- * causing silent data corruption. For PreparedStatements that need retry on connection
- * failure, implement application-level retry that can re-bind parameters:</p>
+ * <p><strong>Stream parameters</strong> (InputStream, Reader) are buffered into
+ * memory when set, enabling replay after reconnection. This adds memory overhead
+ * proportional to stream size.</p>
  *
- * <pre>{@code
- * // Application-level retry for PreparedStatement
- * for (int attempt = 0; attempt < maxRetries; attempt++) {
- *     try (Connection conn = dataSource.getConnection();
- *          PreparedStatement ps = conn.prepareStatement(sql)) {
- *         ps.setInt(1, id);  // Re-bind parameters each attempt
- *         return ps.executeQuery();
- *     } catch (SQLException e) {
- *         if (!isRetryable(e) || attempt == maxRetries - 1) throw e;
- *         Thread.sleep(calculateBackoff(attempt));
- *     }
- * }
- * }</pre>
- *
- * <p>Plain {@link Statement} operations (without parameters) can be retried after
- * connection failures because the SQL string is preserved.</p>
+ * <p><strong>Note:</strong> CallableStatement retry after connection failure is not
+ * yet supported due to the additional complexity of OUT parameter handling.</p>
  *
  * <h2>Default Retryable SQL States</h2>
  * <ul>
@@ -521,16 +528,31 @@ public class RetryDriver extends AbstractProxyDriver {
 
     /**
      * PreparedStatement wrapper that retries on transient errors.
-     * Automatically reconnects and recreates the statement on connection failures
-     * if SQL was provided at construction time.
+     * Automatically reconnects, recreates the statement, and replays parameter
+     * bindings on connection failures if SQL was provided at construction time.
      *
-     * <p><strong>Warning:</strong> On connection failure, parameter bindings are lost
-     * and must be re-applied by the caller. Consider using idempotent operations
-     * or application-level retry logic for PreparedStatements with parameters.
+     * <p>Parameter bindings are tracked via a functional interface that captures
+     * the parameter values at set time. Stream parameters (InputStream, Reader)
+     * are buffered into memory to enable replay. This adds memory overhead but
+     * enables transparent retry across connection failures.</p>
      */
     private static class RetryPreparedStatement extends AbstractPreparedStatement {
         private final RetryConfig config;
         private final String sql;
+
+        /**
+         * Functional interface for replaying a parameter binding.
+         */
+        @FunctionalInterface
+        private interface ParameterSetter {
+            void apply(PreparedStatement ps) throws SQLException;
+        }
+
+        /**
+         * Tracks parameter bindings for replay after statement recreation.
+         * Uses LinkedHashMap to preserve insertion order (useful for debugging).
+         */
+        private final Map<Integer, ParameterSetter> parameterBindings = new LinkedHashMap<>();
 
         public RetryPreparedStatement(PreparedStatement delegate, Connection conn, RetryConfig config, String sql) throws SQLException {
             super(delegate, conn);
@@ -538,15 +560,46 @@ public class RetryDriver extends AbstractProxyDriver {
             this.sql = sql;
         }
 
+        // ========== Stream Buffering Helpers ==========
+
+        private byte[] bufferInputStream(InputStream x) throws SQLException {
+            if (x == null) return null;
+            try {
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = x.read(buf)) != -1) {
+                    baos.write(buf, 0, n);
+                }
+                return baos.toByteArray();
+            } catch (IOException e) {
+                throw new SQLException("RetryDriver: Failed to buffer InputStream for retry", e);
+            }
+        }
+
+        private String bufferReader(Reader r) throws SQLException {
+            if (r == null) return null;
+            try {
+                StringBuilder sb = new StringBuilder();
+                char[] buf = new char[8192];
+                int n;
+                while ((n = r.read(buf)) != -1) {
+                    sb.append(buf, 0, n);
+                }
+                return sb.toString();
+            } catch (IOException e) {
+                throw new SQLException("RetryDriver: Failed to buffer Reader for retry", e);
+            }
+        }
+
+        // ========== Statement Recreation ==========
+
         /**
          * Recreate this statement after a connection failure.
+         * Reconnects the connection, creates a fresh PreparedStatement,
+         * and replays all parameter bindings.
          *
-         * <p><strong>This method always throws SQLException.</strong> PreparedStatement
-         * retry after connection failure is not supported because parameter bindings
-         * cannot be preserved across reconnection. Silently proceeding would cause
-         * queries to execute with NULL/default parameters, risking data corruption.</p>
-         *
-         * @throws SQLException always, explaining that retry is not possible
+         * @throws SQLException if SQL is not available or recreation fails
          */
         private void recreateStatement() throws SQLException {
             if (sql == null) {
@@ -554,19 +607,375 @@ public class RetryDriver extends AbstractProxyDriver {
                     "RetryDriver: Cannot retry PreparedStatement after connection failure. " +
                     "SQL was not available for statement recreation. " +
                     "Use application-level retry or plain Statement for retryable operations.",
-                    "08006"); // Connection failure SQL state
+                    "08006");
             }
 
-            // Even with SQL available, we cannot preserve parameter bindings.
-            // Proceeding would execute the query with NULL/default parameters,
-            // which could cause silent data corruption.
-            throw new SQLException(
-                "RetryDriver: Cannot retry PreparedStatement after connection failure. " +
-                "Parameter bindings cannot be preserved across reconnection. " +
-                "Use application-level retry that re-binds parameters, " +
-                "or use plain Statement for retryable read-only operations.",
-                "08006"); // Connection failure SQL state
+            RetryConnection conn = (RetryConnection) getConnection();
+            conn.reconnect();
+
+            // Create new PreparedStatement from reconnected connection
+            PreparedStatement newStmt = conn.getDelegateConnection().prepareStatement(sql);
+
+            // Replace our delegate
+            getPreparedStatements().clear();
+            getPreparedStatements().add(newStmt);
+
+            // Replay all parameter bindings
+            replayBindings(newStmt);
+
+            LOG.fine(() -> String.format("RetryDriver: Recreated PreparedStatement with %d parameter bindings",
+                parameterBindings.size()));
         }
+
+        /**
+         * Replay all tracked parameter bindings to a new statement.
+         */
+        private void replayBindings(PreparedStatement ps) throws SQLException {
+            for (ParameterSetter setter : parameterBindings.values()) {
+                setter.apply(ps);
+            }
+        }
+
+        // ========== Parameter Tracking Overrides ==========
+
+        @Override
+        public void clearParameters() throws SQLException {
+            parameterBindings.clear();
+            super.clearParameters();
+        }
+
+        @Override
+        public void setNull(int parameterIndex, int sqlType) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setNull(parameterIndex, sqlType));
+            super.setNull(parameterIndex, sqlType);
+        }
+
+        @Override
+        public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setNull(parameterIndex, sqlType, typeName));
+            super.setNull(parameterIndex, sqlType, typeName);
+        }
+
+        @Override
+        public void setBoolean(int parameterIndex, boolean x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setBoolean(parameterIndex, x));
+            super.setBoolean(parameterIndex, x);
+        }
+
+        @Override
+        public void setByte(int parameterIndex, byte x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setByte(parameterIndex, x));
+            super.setByte(parameterIndex, x);
+        }
+
+        @Override
+        public void setShort(int parameterIndex, short x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setShort(parameterIndex, x));
+            super.setShort(parameterIndex, x);
+        }
+
+        @Override
+        public void setInt(int parameterIndex, int x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setInt(parameterIndex, x));
+            super.setInt(parameterIndex, x);
+        }
+
+        @Override
+        public void setLong(int parameterIndex, long x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setLong(parameterIndex, x));
+            super.setLong(parameterIndex, x);
+        }
+
+        @Override
+        public void setFloat(int parameterIndex, float x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setFloat(parameterIndex, x));
+            super.setFloat(parameterIndex, x);
+        }
+
+        @Override
+        public void setDouble(int parameterIndex, double x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setDouble(parameterIndex, x));
+            super.setDouble(parameterIndex, x);
+        }
+
+        @Override
+        public void setBigDecimal(int parameterIndex, BigDecimal x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setBigDecimal(parameterIndex, x));
+            super.setBigDecimal(parameterIndex, x);
+        }
+
+        @Override
+        public void setString(int parameterIndex, String x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setString(parameterIndex, x));
+            super.setString(parameterIndex, x);
+        }
+
+        @Override
+        public void setNString(int parameterIndex, String value) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setNString(parameterIndex, value));
+            super.setNString(parameterIndex, value);
+        }
+
+        @Override
+        public void setBytes(int parameterIndex, byte[] x) throws SQLException {
+            byte[] copy = x != null ? x.clone() : null;
+            parameterBindings.put(parameterIndex, ps -> ps.setBytes(parameterIndex, copy));
+            super.setBytes(parameterIndex, x);
+        }
+
+        @Override
+        public void setDate(int parameterIndex, Date x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setDate(parameterIndex, x));
+            super.setDate(parameterIndex, x);
+        }
+
+        @Override
+        public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException {
+            Calendar calCopy = cal != null ? (Calendar) cal.clone() : null;
+            parameterBindings.put(parameterIndex, ps -> ps.setDate(parameterIndex, x, calCopy));
+            super.setDate(parameterIndex, x, cal);
+        }
+
+        @Override
+        public void setTime(int parameterIndex, Time x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setTime(parameterIndex, x));
+            super.setTime(parameterIndex, x);
+        }
+
+        @Override
+        public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException {
+            Calendar calCopy = cal != null ? (Calendar) cal.clone() : null;
+            parameterBindings.put(parameterIndex, ps -> ps.setTime(parameterIndex, x, calCopy));
+            super.setTime(parameterIndex, x, cal);
+        }
+
+        @Override
+        public void setTimestamp(int parameterIndex, Timestamp x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setTimestamp(parameterIndex, x));
+            super.setTimestamp(parameterIndex, x);
+        }
+
+        @Override
+        public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException {
+            Calendar calCopy = cal != null ? (Calendar) cal.clone() : null;
+            parameterBindings.put(parameterIndex, ps -> ps.setTimestamp(parameterIndex, x, calCopy));
+            super.setTimestamp(parameterIndex, x, cal);
+        }
+
+        @Override
+        public void setObject(int parameterIndex, Object x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setObject(parameterIndex, x));
+            super.setObject(parameterIndex, x);
+        }
+
+        @Override
+        public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setObject(parameterIndex, x, targetSqlType));
+            super.setObject(parameterIndex, x, targetSqlType);
+        }
+
+        @Override
+        public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setObject(parameterIndex, x, targetSqlType, scaleOrLength));
+            super.setObject(parameterIndex, x, targetSqlType, scaleOrLength);
+        }
+
+        @Override
+        public void setRef(int parameterIndex, Ref x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setRef(parameterIndex, x));
+            super.setRef(parameterIndex, x);
+        }
+
+        @Override
+        public void setBlob(int parameterIndex, Blob x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setBlob(parameterIndex, x));
+            super.setBlob(parameterIndex, x);
+        }
+
+        @Override
+        public void setClob(int parameterIndex, Clob x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setClob(parameterIndex, x));
+            super.setClob(parameterIndex, x);
+        }
+
+        @Override
+        public void setNClob(int parameterIndex, NClob value) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setNClob(parameterIndex, value));
+            super.setNClob(parameterIndex, value);
+        }
+
+        @Override
+        public void setArray(int parameterIndex, Array x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setArray(parameterIndex, x));
+            super.setArray(parameterIndex, x);
+        }
+
+        @Override
+        public void setURL(int parameterIndex, URL x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setURL(parameterIndex, x));
+            super.setURL(parameterIndex, x);
+        }
+
+        @Override
+        public void setRowId(int parameterIndex, RowId x) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setRowId(parameterIndex, x));
+            super.setRowId(parameterIndex, x);
+        }
+
+        @Override
+        public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException {
+            parameterBindings.put(parameterIndex, ps -> ps.setSQLXML(parameterIndex, xmlObject));
+            super.setSQLXML(parameterIndex, xmlObject);
+        }
+
+        // ========== Stream-based Parameters (buffered for replay) ==========
+
+        @Override
+        public void setAsciiStream(int parameterIndex, InputStream x) throws SQLException {
+            byte[] data = bufferInputStream(x);
+            parameterBindings.put(parameterIndex, ps -> ps.setAsciiStream(parameterIndex,
+                data != null ? new ByteArrayInputStream(data) : null));
+            super.setAsciiStream(parameterIndex, data != null ? new ByteArrayInputStream(data) : null);
+        }
+
+        @Override
+        public void setAsciiStream(int parameterIndex, InputStream x, int length) throws SQLException {
+            byte[] data = bufferInputStream(x);
+            parameterBindings.put(parameterIndex, ps -> ps.setAsciiStream(parameterIndex,
+                data != null ? new ByteArrayInputStream(data) : null, length));
+            super.setAsciiStream(parameterIndex, data != null ? new ByteArrayInputStream(data) : null, length);
+        }
+
+        @Override
+        public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException {
+            byte[] data = bufferInputStream(x);
+            parameterBindings.put(parameterIndex, ps -> ps.setAsciiStream(parameterIndex,
+                data != null ? new ByteArrayInputStream(data) : null, length));
+            super.setAsciiStream(parameterIndex, data != null ? new ByteArrayInputStream(data) : null, length);
+        }
+
+        @Override
+        @SuppressWarnings("deprecation")
+        public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException {
+            byte[] data = bufferInputStream(x);
+            parameterBindings.put(parameterIndex, ps -> ps.setUnicodeStream(parameterIndex,
+                data != null ? new ByteArrayInputStream(data) : null, length));
+            super.setUnicodeStream(parameterIndex, data != null ? new ByteArrayInputStream(data) : null, length);
+        }
+
+        @Override
+        public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException {
+            byte[] data = bufferInputStream(x);
+            parameterBindings.put(parameterIndex, ps -> ps.setBinaryStream(parameterIndex,
+                data != null ? new ByteArrayInputStream(data) : null));
+            super.setBinaryStream(parameterIndex, data != null ? new ByteArrayInputStream(data) : null);
+        }
+
+        @Override
+        public void setBinaryStream(int parameterIndex, InputStream x, int length) throws SQLException {
+            byte[] data = bufferInputStream(x);
+            parameterBindings.put(parameterIndex, ps -> ps.setBinaryStream(parameterIndex,
+                data != null ? new ByteArrayInputStream(data) : null, length));
+            super.setBinaryStream(parameterIndex, data != null ? new ByteArrayInputStream(data) : null, length);
+        }
+
+        @Override
+        public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException {
+            byte[] data = bufferInputStream(x);
+            parameterBindings.put(parameterIndex, ps -> ps.setBinaryStream(parameterIndex,
+                data != null ? new ByteArrayInputStream(data) : null, length));
+            super.setBinaryStream(parameterIndex, data != null ? new ByteArrayInputStream(data) : null, length);
+        }
+
+        @Override
+        public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException {
+            String data = bufferReader(reader);
+            parameterBindings.put(parameterIndex, ps -> ps.setCharacterStream(parameterIndex,
+                data != null ? new StringReader(data) : null));
+            super.setCharacterStream(parameterIndex, data != null ? new StringReader(data) : null);
+        }
+
+        @Override
+        public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException {
+            String data = bufferReader(reader);
+            parameterBindings.put(parameterIndex, ps -> ps.setCharacterStream(parameterIndex,
+                data != null ? new StringReader(data) : null, length));
+            super.setCharacterStream(parameterIndex, data != null ? new StringReader(data) : null, length);
+        }
+
+        @Override
+        public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException {
+            String data = bufferReader(reader);
+            parameterBindings.put(parameterIndex, ps -> ps.setCharacterStream(parameterIndex,
+                data != null ? new StringReader(data) : null, length));
+            super.setCharacterStream(parameterIndex, data != null ? new StringReader(data) : null, length);
+        }
+
+        @Override
+        public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException {
+            String data = bufferReader(value);
+            parameterBindings.put(parameterIndex, ps -> ps.setNCharacterStream(parameterIndex,
+                data != null ? new StringReader(data) : null));
+            super.setNCharacterStream(parameterIndex, data != null ? new StringReader(data) : null);
+        }
+
+        @Override
+        public void setNCharacterStream(int parameterIndex, Reader value, long length) throws SQLException {
+            String data = bufferReader(value);
+            parameterBindings.put(parameterIndex, ps -> ps.setNCharacterStream(parameterIndex,
+                data != null ? new StringReader(data) : null, length));
+            super.setNCharacterStream(parameterIndex, data != null ? new StringReader(data) : null, length);
+        }
+
+        @Override
+        public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException {
+            byte[] data = bufferInputStream(inputStream);
+            parameterBindings.put(parameterIndex, ps -> ps.setBlob(parameterIndex,
+                data != null ? new ByteArrayInputStream(data) : null));
+            super.setBlob(parameterIndex, data != null ? new ByteArrayInputStream(data) : null);
+        }
+
+        @Override
+        public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
+            byte[] data = bufferInputStream(inputStream);
+            parameterBindings.put(parameterIndex, ps -> ps.setBlob(parameterIndex,
+                data != null ? new ByteArrayInputStream(data) : null, length));
+            super.setBlob(parameterIndex, data != null ? new ByteArrayInputStream(data) : null, length);
+        }
+
+        @Override
+        public void setClob(int parameterIndex, Reader reader) throws SQLException {
+            String data = bufferReader(reader);
+            parameterBindings.put(parameterIndex, ps -> ps.setClob(parameterIndex,
+                data != null ? new StringReader(data) : null));
+            super.setClob(parameterIndex, data != null ? new StringReader(data) : null);
+        }
+
+        @Override
+        public void setClob(int parameterIndex, Reader reader, long length) throws SQLException {
+            String data = bufferReader(reader);
+            parameterBindings.put(parameterIndex, ps -> ps.setClob(parameterIndex,
+                data != null ? new StringReader(data) : null, length));
+            super.setClob(parameterIndex, data != null ? new StringReader(data) : null, length);
+        }
+
+        @Override
+        public void setNClob(int parameterIndex, Reader reader) throws SQLException {
+            String data = bufferReader(reader);
+            parameterBindings.put(parameterIndex, ps -> ps.setNClob(parameterIndex,
+                data != null ? new StringReader(data) : null));
+            super.setNClob(parameterIndex, data != null ? new StringReader(data) : null);
+        }
+
+        @Override
+        public void setNClob(int parameterIndex, Reader reader, long length) throws SQLException {
+            String data = bufferReader(reader);
+            parameterBindings.put(parameterIndex, ps -> ps.setNClob(parameterIndex,
+                data != null ? new StringReader(data) : null, length));
+            super.setNClob(parameterIndex, data != null ? new StringReader(data) : null, length);
+        }
+
+        // ========== Execution with Retry ==========
 
         /**
          * Execute with retry, recreating statement on connection errors.

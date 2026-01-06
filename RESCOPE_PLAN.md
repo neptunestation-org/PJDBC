@@ -380,7 +380,7 @@ Focus: Make common tasks easier.
 ### v3.0.0 - Breaking Changes (if needed)
 Focus: Fix things that require API changes.
 
-- [ ] **P0.1**: RetryDriver parameter tracking and replay (proper fix)
+- [x] **P0.1**: RetryDriver parameter tracking and replay (proper fix) ✅ v3.0.2
 - [ ] **P0.2**: Full scrollable ResultSet support or explicit feature rejection
 - [ ] **P1.2**: Optional table-based routing for FederatingDriver
 - [ ] **P3.2**: Agent usage examples and prompt templates
@@ -389,14 +389,14 @@ Focus: Fix things that require API changes.
 
 ## Appendix: Current State Metrics
 
-### After v2.1.0 (Current)
+### After v3.0.2 (Current)
 
 | Category | Issue Count | Status |
 |----------|-------------|--------|
-| Silent data corruption | 0 | ✅ Fixed (PreparedStatement throws, strictTransactions=true) |
+| Silent data corruption | 0 | ✅ Fixed (PreparedStatement tracks & replays params, strictTransactions=true) |
 | Security bypassable | 3 (regex-based drivers) | ⚠️ Documented in README |
-| JDBC contract violations | 2 (MergingResultSet) | Deferred to v3.0 |
-| Missing functionality | 4 (observability, mocking, etc.) | Planned for v2.2-v2.3 |
+| JDBC contract violations | 2 (MergingResultSet) | Deferred to v3.x |
+| Missing functionality | 3 (mocking, routing, etc.) | Planned for v2.3+ |
 | Documentation gaps | 3 (integration, interop, agent) | Planned for v2.3 |
 | Code quality | 0 | ✅ Already formatted |
 
