@@ -18,6 +18,7 @@ import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverParameter;
 import org.pjdbc.annotations.DriverParameter.ParameterType;
 import org.pjdbc.annotations.DriverSideEffects;
+import org.pjdbc.jmx.CircuitBreakerRegistry;
 import org.pjdbc.sql.AbstractCallableStatement;
 import org.pjdbc.sql.AbstractConnection;
 import org.pjdbc.sql.AbstractPreparedStatement;
@@ -52,6 +53,21 @@ import org.pjdbc.sql.PjdbcListeners;
  * jdbc:circuitbreaker[failureThreshold=3,resetTimeout=60000]:jdbc:postgresql://localhost/mydb
  * jdbc:circuitbreaker[name=primary-db,failureThreshold=10]:jdbc:mysql://localhost/db
  * </pre>
+ *
+ * <h2>JMX Monitoring</h2>
+ *
+ * <p>Circuit breakers can be monitored via JMX. Enable with:
+ * <ul>
+ *   <li>System property: {@code -Dpjdbc.jmx.enabled=true}</li>
+ *   <li>Programmatic: {@code CircuitBreakerRegistry.enableJmx()}</li>
+ * </ul>
+ *
+ * <p>When enabled, MBeans are registered under:
+ * {@code org.pjdbc:type=CircuitBreaker,name=<name>}
+ *
+ * <p>Exposed attributes: state, failureCount, successCount, totalRequests,
+ * totalFailures, totalRejections, failureRatePercent.
+ * Operations: reset(), forceOpen(), forceClosed().
  */
 @DriverCapability(
     prefix = "circuitbreaker",
@@ -318,6 +334,8 @@ public class CircuitBreakerDriver extends AbstractProxyDriver {
         public CircuitBreakerConnection(Connection conn, Driver driver, String url, Properties info) throws SQLException {
             super(conn, driver, url, info);
             this.circuitBreaker = new CircuitBreaker(url);
+            // Register with the global registry (for JMX if enabled)
+            CircuitBreakerRegistry.getInstance().register(circuitBreaker);
         }
 
         public CircuitBreaker getCircuitBreaker() {
