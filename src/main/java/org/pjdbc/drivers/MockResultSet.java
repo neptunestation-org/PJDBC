@@ -133,6 +133,10 @@ public class MockResultSet implements ResultSet {
             currentRow++;
             return true;
         }
+        // Move to "after last" position
+        if (currentRow < rows.size()) {
+            currentRow = rows.size();
+        }
         return false;
     }
 

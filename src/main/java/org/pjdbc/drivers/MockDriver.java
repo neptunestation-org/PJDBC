@@ -263,15 +263,8 @@ public class MockDriver extends AbstractDriver {
                 if (exp != null && (exp.hasResult() || exp.hasException())) {
                     return exp.getResultSet(lastSql);
                 }
-                // Default: empty result set
-                return (ResultSet)Proxy.newProxyInstance(cl, new Class<?>[]{ResultSet.class},
-                    new InvocationHandler() {
-                        public Object invoke(Object p, Method m, Object[] a) {
-                            if ("close".equals(m.getName())) return null;
-                            if ("isClosed".equals(m.getName())) return false;
-                            if ("next".equals(m.getName())) return false;
-                            if ("getMetaData".equals(m.getName())) return null;
-                            return null;}});
+                // Default: empty result set with full JDBC compliance
+                return MockResultSet.empty();
             }
 
             if ("execute".equals(method.getName())) {

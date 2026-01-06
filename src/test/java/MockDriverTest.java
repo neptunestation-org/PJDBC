@@ -454,4 +454,103 @@ public class MockDriverTest {
         ResultSet rs = stmt.executeQuery("SELECT * FROM unmatched");
         assertFalse(rs.next()); // Empty result set
     }
+
+    // ========== Scrollable ResultSet compliance tests ==========
+
+    @Test
+    public void testDefaultResultSetScrollableMethods() throws SQLException {
+        // No expectations configured - uses default empty ResultSet
+        Connection conn = DriverManager.getConnection("jdbc:mock:test");
+        Statement stmt = conn.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT * FROM anything");
+
+        // Scrollable methods should work on empty result set
+        assertFalse(rs.next());
+        assertFalse(rs.first());
+        assertFalse(rs.last());
+        assertFalse(rs.previous());
+        assertFalse(rs.absolute(1));
+        assertFalse(rs.relative(1));
+
+        // Position methods
+        assertTrue(rs.isBeforeFirst() || rs.isAfterLast() || rs.getRow() == 0);
+
+        // Navigation methods should not throw
+        rs.beforeFirst();
+        rs.afterLast();
+
+        // Metadata should work
+        assertNotNull(rs.getMetaData());
+        assertEquals(ResultSet.TYPE_SCROLL_INSENSITIVE, rs.getType());
+        assertEquals(ResultSet.CONCUR_READ_ONLY, rs.getConcurrency());
+
+        rs.close();
+        assertTrue(rs.isClosed());
+    }
+
+    @Test
+    public void testConfiguredResultSetScrollable() throws SQLException {
+        MockDriver.when("SELECT * FROM users")
+            .thenReturn(MockResultSet.create()
+                .columns("id", "name")
+                .row(1, "Alice")
+                .row(2, "Bob")
+                .row(3, "Charlie")
+                .build());
+
+        Connection conn = DriverManager.getConnection("jdbc:mock:test");
+        Statement stmt = conn.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT * FROM users");
+
+        // Forward navigation
+        assertTrue(rs.next());
+        assertEquals(1, rs.getInt("id"));
+
+        assertTrue(rs.next());
+        assertEquals(2, rs.getInt("id"));
+
+        // Backward navigation
+        assertTrue(rs.previous());
+        assertEquals(1, rs.getInt("id"));
+
+        // Absolute positioning
+        assertTrue(rs.absolute(3));
+        assertEquals(3, rs.getInt("id"));
+        assertEquals("Charlie", rs.getString("name"));
+
+        // Relative positioning
+        assertTrue(rs.relative(-2));
+        assertEquals(1, rs.getInt("id"));
+
+        // First and last
+        assertTrue(rs.last());
+        assertEquals(3, rs.getInt("id"));
+        assertTrue(rs.isLast());
+
+        assertTrue(rs.first());
+        assertEquals(1, rs.getInt("id"));
+        assertTrue(rs.isFirst());
+    }
+
+    @Test
+    public void testResultSetGetRow() throws SQLException {
+        MockDriver.when("SELECT * FROM items")
+            .thenReturn(MockResultSet.create()
+                .columns("id")
+                .row(10)
+                .row(20)
+                .build());
+
+        Connection conn = DriverManager.getConnection("jdbc:mock:test");
+        Statement stmt = conn.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT * FROM items");
+
+        assertEquals(0, rs.getRow()); // Before first
+        assertTrue(rs.next());
+        assertEquals(1, rs.getRow());
+        assertTrue(rs.next());
+        assertEquals(2, rs.getRow());
+        assertFalse(rs.next());
+        assertEquals(0, rs.getRow()); // After last
+    }
 }
