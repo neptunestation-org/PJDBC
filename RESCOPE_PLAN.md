@@ -369,21 +369,21 @@ Focus: Make behavior visible.
 - [x] CLI `--verbose` flag for detailed output
 - [x] Add JMX MBeans for CircuitBreakerDriver state (optional, flag-enabled) - v3.0.1
 
-### v2.3.0 - Usability Release
+### v2.3.0 - Usability Release ✅ COMPLETE
 Focus: Make common tasks easier.
 
 - [x] **P1.3**: Add built-in FilterDriver transformers (rename, prefix, append) ✅ v3.0.2
-- [ ] **P2.2**: MockDriver result configuration API
-- [ ] **P2.3**: Add docs/INTEGRATION.md with Spring/Hibernate/HikariCP examples
-- [ ] **P3.1**: Add docs/INTEROP.md for p6spy/etc. coexistence
+- [x] **P2.2**: MockDriver result configuration API ✅ v3.0.3
+- [x] **P2.3**: Add docs/INTEGRATION.md with Spring/Hibernate/HikariCP examples ✅ v3.0.3
+- [x] **P3.1**: Add docs/INTEROP.md for p6spy/etc. coexistence ✅ v3.0.3
 
-### v3.0.0 - Breaking Changes (if needed)
+### v3.0.0 - Breaking Changes ✅ COMPLETE
 Focus: Fix things that require API changes.
 
 - [x] **P0.1**: RetryDriver parameter tracking and replay (proper fix) ✅ v3.0.2
-- [ ] **P0.2**: Full scrollable ResultSet support or explicit feature rejection
-- [ ] **P1.2**: Optional table-based routing for FederatingDriver
-- [ ] **P3.2**: Agent usage examples and prompt templates
+- [x] **P0.2**: Full scrollable ResultSet support (MockDriver default uses MockResultSet.empty()) ✅ v3.0.3
+- [x] **P1.2**: Optional table-based routing for FederatingDriver ✅ v3.0.3
+- [x] **P3.2**: Agent usage examples and prompt templates (AGENTS.md expanded) ✅ v3.0.3
 
 ---
 
