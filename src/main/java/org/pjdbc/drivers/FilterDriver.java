@@ -1,6 +1,11 @@
 package org.pjdbc.drivers;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Logger;
@@ -89,7 +94,13 @@ import org.pjdbc.sql.WhereTransformer;
 public class FilterDriver extends AbstractProxyDriver {
     private static final Logger LOG = Logger.getLogger(FilterDriver.class.getName());
 
-    static {try {DriverManager.registerDriver(new FilterDriver());} catch (Exception e) {throw new RuntimeException(e);}}
+    static {
+        try {
+            DriverManager.registerDriver(new FilterDriver());
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     /**
      * ThreadLocal for backward compatibility with setTransformer() API.

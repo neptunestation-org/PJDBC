@@ -1,7 +1,10 @@
 package org.pjdbc.sql;
 
-import java.util.*;
-import java.util.regex.*;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Parser for PJDBC URLs with optional parameter support.
@@ -127,6 +130,81 @@ public class JdbcUrlParser {
      */
     public String getParameter(String key, String defaultValue) {
         return parameters.getOrDefault(key, defaultValue);
+    }
+
+    // ========== Typed Parameter Getters ==========
+
+    /**
+     * Get a parameter value as an integer.
+     *
+     * @param key the parameter key
+     * @param defaultValue the default value if the parameter is not found or invalid
+     * @return the parameter value as an integer
+     */
+    public int getInt(String key, int defaultValue) {
+        String value = parameters.get(key);
+        if (value == null || value.isEmpty()) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    /**
+     * Get a parameter value as a long.
+     *
+     * @param key the parameter key
+     * @param defaultValue the default value if the parameter is not found or invalid
+     * @return the parameter value as a long
+     */
+    public long getLong(String key, long defaultValue) {
+        String value = parameters.get(key);
+        if (value == null || value.isEmpty()) {
+            return defaultValue;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    /**
+     * Get a parameter value as a double.
+     *
+     * @param key the parameter key
+     * @param defaultValue the default value if the parameter is not found or invalid
+     * @return the parameter value as a double
+     */
+    public double getDouble(String key, double defaultValue) {
+        String value = parameters.get(key);
+        if (value == null || value.isEmpty()) {
+            return defaultValue;
+        }
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    /**
+     * Get a parameter value as a boolean.
+     * Accepts "true" (case-insensitive) as true, anything else as false.
+     *
+     * @param key the parameter key
+     * @param defaultValue the default value if the parameter is not found
+     * @return the parameter value as a boolean
+     */
+    public boolean getBoolean(String key, boolean defaultValue) {
+        String value = parameters.get(key);
+        if (value == null || value.isEmpty()) {
+            return defaultValue;
+        }
+        return "true".equalsIgnoreCase(value);
     }
 
     @Override

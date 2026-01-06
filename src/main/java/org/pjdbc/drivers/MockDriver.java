@@ -1,16 +1,32 @@
 package org.pjdbc.drivers;
 
-import java.io.*;
-import java.lang.reflect.*;
-import java.sql.*;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.regex.*;
-import java.util.function.*;
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Function;
+import java.util.regex.Pattern;
 
 import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverSideEffects;
-import org.pjdbc.sql.*;
+import org.pjdbc.sql.AbstractDriver;
 
 /**
  * In-memory mock driver for testing JDBC code without a real database.
@@ -75,8 +91,18 @@ import org.pjdbc.sql.*;
 )
 @DriverSideEffects(stateful = true)
 public class MockDriver extends AbstractDriver {
-    static {try {DriverManager.registerDriver(new MockDriver());} catch (Exception e) {throw new RuntimeException(e);}}
-    static {System.setProperty("java.util.logging.SimpleFormatter.format", "%5$s\n");}
+
+    static {
+        try {
+            DriverManager.registerDriver(new MockDriver());
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static {
+        System.setProperty("java.util.logging.SimpleFormatter.format", "%5$s\n");
+    }
 
     // ========== Result Configuration API ==========
 
@@ -89,8 +115,8 @@ public class MockDriver extends AbstractDriver {
         private ResultSet resultSet;
         private Integer updateCount;
         private SQLException exception;
-        private java.util.function.Function<String, ResultSet> resultFunction;
-        private java.util.function.Function<String, Integer> updateFunction;
+        private Function<String, ResultSet> resultFunction;
+        private Function<String, Integer> updateFunction;
 
         Expectation(String sqlPattern, boolean isRegex) {
             this.sqlPattern = sqlPattern;
@@ -131,7 +157,7 @@ public class MockDriver extends AbstractDriver {
         /**
          * Configure this expectation to compute results dynamically from the SQL.
          */
-        public Expectation thenAnswer(java.util.function.Function<String, ResultSet> fn) {
+        public Expectation thenAnswer(Function<String, ResultSet> fn) {
             this.resultFunction = fn;
             return this;
         }
@@ -139,7 +165,7 @@ public class MockDriver extends AbstractDriver {
         /**
          * Configure this expectation to compute update count dynamically from the SQL.
          */
-        public Expectation thenAnswerUpdate(java.util.function.Function<String, Integer> fn) {
+        public Expectation thenAnswerUpdate(Function<String, Integer> fn) {
             this.updateFunction = fn;
             return this;
         }
@@ -158,7 +184,11 @@ public class MockDriver extends AbstractDriver {
             if (resultFunction != null) return resultFunction.apply(sql);
             if (resultSet != null) {
                 // Reset the result set position if possible
-                try { resultSet.beforeFirst(); } catch (SQLException e) { /* ignore */ }
+                try {
+                    resultSet.beforeFirst();
+                } catch (SQLException e) {
+                    // ignore
+                }
                 return resultSet;
             }
             return null;
@@ -233,23 +263,35 @@ public class MockDriver extends AbstractDriver {
 
     // ========== Original MockDriver implementation ==========
 
+    /**
+     * PrintWriter that exposes its underlying output stream.
+     */
     public static class MyPrintWriter extends PrintWriter {
-        private OutputStream out;
-        public MyPrintWriter (OutputStream out) {super(out); this.out = out;}
-        public OutputStream getStream () {return this.out;}}
+        private final OutputStream out;
+
+        public MyPrintWriter(OutputStream out) {
+            super(out);
+            this.out = out;
+        }
+
+        public OutputStream getStream() {
+            return this.out;
+        }
+    }
 
     private static class LoggingInvocationHandler implements InvocationHandler {
-        private PrintWriter l;
-        private ClassLoader cl;
+        private final PrintWriter l;
+        private final ClassLoader cl;
         private String lastSql;
 
-        public LoggingInvocationHandler (PrintWriter log, ClassLoader classLoader) {
+        public LoggingInvocationHandler(PrintWriter log, ClassLoader classLoader) {
             this.l = log;
             this.cl = classLoader;
         }
 
-        public Object invoke (Object proxy, Method method, Object[] args) throws SQLException {
-            l.println(method.getName() + (args!=null && args.length>0 ? Arrays.asList(args) : new ArrayList<Object>()));
+        @Override
+        public Object invoke(Object proxy, Method method, Object[] args) throws SQLException {
+            l.println(method.getName() + (args != null && args.length > 0 ? Arrays.asList(args) : new ArrayList<Object>()));
 
             // Track SQL for pattern matching
             if (args != null && args.length > 0 && args[0] instanceof String) {
@@ -308,73 +350,97 @@ public class MockDriver extends AbstractDriver {
         }
     }
 
-    private static Map<String, MyPrintWriter> logs = new ConcurrentHashMap<String, MyPrintWriter>();
-    private static Map<String, Properties> infos = new ConcurrentHashMap<String, Properties>();
+    private static final Map<String, MyPrintWriter> logs = new ConcurrentHashMap<>();
+    private static final Map<String, Properties> infos = new ConcurrentHashMap<>();
 
-    public static Properties getLastConnectionInfo (String url) {
+    public static Properties getLastConnectionInfo(String url) {
         return infos.get(url);
     }
 
-    public static String getLog (String url) {
+    public static String getLog(String url) {
         if (logs.containsKey(url)) {
             logs.get(url).flush();
-            return logs.get(url).getStream().toString().trim();}
-        return "";}
+            return logs.get(url).getStream().toString().trim();
+        }
+        return "";
+    }
 
-    public static void clearLogs () {
-        logs.clear();}
+    public static void clearLogs() {
+        logs.clear();
+    }
 
-    public static void clearLog (String url) {
-        logs.remove(url);}
+    public static void clearLog(String url) {
+        logs.remove(url);
+    }
 
-    protected boolean acceptsSubProtocol (String subprotocol) {
-        return "mock".equals(subprotocol);}
+    @Override
+    protected boolean acceptsSubProtocol(String subprotocol) {
+        return "mock".equals(subprotocol);
+    }
 
-    protected boolean acceptsSubName (String subname) {
-        return true;}
+    @Override
+    protected boolean acceptsSubName(String subname) {
+        return true;
+    }
 
-    public Connection connect (final String url, Properties info) throws SQLException {
+    @Override
+    public Connection connect(final String url, Properties info) throws SQLException {
         if (!acceptsURL(url)) return null;
         logs.put(url, new MyPrintWriter(new ByteArrayOutputStream()));
         if (info != null) infos.put(url, info);
         final PrintWriter l = logs.get(url);
-        return (Connection)Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{Connection.class}, new InvocationHandler() {
-                public Object invoke (Object proxy, Method method, Object[] args) throws SQLException {
-                    if ("createStatement".equals(method.getName()))
-                        return (Statement)
-                            Proxy.newProxyInstance(getClass().getClassLoader(),
-                                                   new Class<?>[]{Statement.class},
-                                                   new LoggingInvocationHandler(l, getClass().getClassLoader()));
-                    if ("prepareCall".equals(method.getName()))
-                        return (CallableStatement)
-                            Proxy.newProxyInstance(getClass().getClassLoader(),
-                                                   new Class<?>[]{CallableStatement.class},
-                                                   new LoggingInvocationHandler(l, getClass().getClassLoader()));
+
+        return (Connection) Proxy.newProxyInstance(
+            getClass().getClassLoader(),
+            new Class<?>[] { Connection.class },
+            new InvocationHandler() {
+                @Override
+                public Object invoke(Object proxy, Method method, Object[] args) throws SQLException {
+                    if ("createStatement".equals(method.getName())) {
+                        return Proxy.newProxyInstance(
+                            getClass().getClassLoader(),
+                            new Class<?>[] { Statement.class },
+                            new LoggingInvocationHandler(l, getClass().getClassLoader()));
+                    }
+                    if ("prepareCall".equals(method.getName())) {
+                        return Proxy.newProxyInstance(
+                            getClass().getClassLoader(),
+                            new Class<?>[] { CallableStatement.class },
+                            new LoggingInvocationHandler(l, getClass().getClassLoader()));
+                    }
                     if ("prepareStatement".equals(method.getName())) {
                         // Track the SQL from prepareStatement
                         String sql = args != null && args.length > 0 ? (String) args[0] : null;
                         LoggingInvocationHandler handler = new LoggingInvocationHandler(l, getClass().getClassLoader());
                         handler.lastSql = sql;
-                        return (PreparedStatement)
-                            Proxy.newProxyInstance(getClass().getClassLoader(),
-                                                   new Class<?>[]{PreparedStatement.class},
-                                                   handler);
+                        return Proxy.newProxyInstance(
+                            getClass().getClassLoader(),
+                            new Class<?>[] { PreparedStatement.class },
+                            handler);
                     }
-                    if ("getMetaData".equals(method.getName()))
-                        return (DatabaseMetaData)
-                            Proxy.newProxyInstance(getClass().getClassLoader(),
-                                                   new Class<?>[]{DatabaseMetaData.class},
-                                                   new InvocationHandler() {
-                                                       public Object invoke (Object proxy, Method method, Object[] args) {
-                                                           return ("getURL".equals(method.getName())) ? url : null;}});
+                    if ("getMetaData".equals(method.getName())) {
+                        return Proxy.newProxyInstance(
+                            getClass().getClassLoader(),
+                            new Class<?>[] { DatabaseMetaData.class },
+                            new InvocationHandler() {
+                                @Override
+                                public Object invoke(Object proxy, Method method, Object[] args) {
+                                    return ("getURL".equals(method.getName())) ? url : null;
+                                }
+                            });
+                    }
                     if ("toString".equals(method.getName())) return "MockDriver[" + url + "]";
-                    if ("equals".equals(method.getName())) return proxy==args[0];
+                    if ("equals".equals(method.getName())) return proxy == args[0];
                     if ("isWrapperFor".equals(method.getName())) return false;
-                    if ("unwrap".equals(method.getName()) && args.length==1 && Connection.class.isInstance(args[0])) return this;
+                    if ("unwrap".equals(method.getName()) && args.length == 1 && Connection.class.isInstance(args[0])) return this;
                     if ("close".equals(method.getName())) return null;
                     if ("isClosed".equals(method.getName())) return false;
                     if ("getAutoCommit".equals(method.getName())) return true;
                     if ("setAutoCommit".equals(method.getName())) return null;
                     if ("commit".equals(method.getName())) return null;
                     if ("rollback".equals(method.getName())) return null;
-                    throw new SQLException(String.format("%s unimplemented by MockDriver", method.getName()));}});}}
+                    throw new SQLException(String.format("%s unimplemented by MockDriver", method.getName()));
+                }
+            });
+    }
+}

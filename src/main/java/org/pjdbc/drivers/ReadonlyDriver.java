@@ -110,14 +110,12 @@ public class ReadonlyDriver extends AbstractProxyDriver {
 
     @Override
     protected PreparedStatement proxyPreparedStatement(PreparedStatement delegate, Connection conn) throws SQLException {
-        ReadonlyConnection readonlyConn = (ReadonlyConnection) conn;
-        return new ReadonlyPreparedStatement(delegate, conn, readonlyConn.getConfig());
+        return new ReadonlyPreparedStatement(delegate, conn);
     }
 
     @Override
     protected CallableStatement proxyCallableStatement(CallableStatement delegate, Connection conn) throws SQLException {
-        ReadonlyConnection readonlyConn = (ReadonlyConnection) conn;
-        return new ReadonlyCallableStatement(delegate, conn, readonlyConn.getConfig());
+        return new ReadonlyCallableStatement(delegate, conn);
     }
 
     /**
@@ -311,31 +309,23 @@ public class ReadonlyDriver extends AbstractProxyDriver {
 
     /**
      * PreparedStatement wrapper (SQL already checked at prepare time).
+     * No additional validation needed - SQL was already checked at prepareStatement() time.
      */
     private static class ReadonlyPreparedStatement extends AbstractPreparedStatement {
-        private final ReadonlyConfig config;
 
-        public ReadonlyPreparedStatement(PreparedStatement delegate, Connection conn, ReadonlyConfig config) throws SQLException {
+        public ReadonlyPreparedStatement(PreparedStatement delegate, Connection conn) throws SQLException {
             super(delegate, conn);
-            this.config = config;
         }
-
-        // SQL was already validated at prepareStatement() time
-        // No additional checks needed for execute methods
     }
 
     /**
      * CallableStatement wrapper (SQL already checked at prepare time).
+     * No additional validation needed - SQL was already checked at prepareCall() time.
      */
     private static class ReadonlyCallableStatement extends AbstractCallableStatement {
-        private final ReadonlyConfig config;
 
-        public ReadonlyCallableStatement(CallableStatement delegate, Connection conn, ReadonlyConfig config) throws SQLException {
+        public ReadonlyCallableStatement(CallableStatement delegate, Connection conn) throws SQLException {
             super(delegate, conn);
-            this.config = config;
         }
-
-        // SQL was already validated at prepareCall() time
-        // No additional checks needed for execute methods
     }
 }
