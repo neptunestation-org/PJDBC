@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.pjdbc</groupId>
   <artifactId>PJDBC</artifactId>
-  <version>3.0.3</version>
+  <version>3.0.4-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>PJDBC</name>
   <description>JDBC proxy framework for SQL transformation, routing, and testing</description>
