@@ -964,6 +964,7 @@ To configure:
 ## Documentation
 
 - [Integration Guide](docs/INTEGRATION.md) - Spring, Hibernate, HikariCP, and other frameworks
+- [Interoperability Guide](docs/INTEROP.md) - Using PJDBC with p6spy, OpenTelemetry, and other tools
 - [Composition Guide](docs/COMPOSITION_GUIDE.md) - How to combine drivers effectively
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [User Guide](docs/USER_GUIDE.md) - Driver usage examples
