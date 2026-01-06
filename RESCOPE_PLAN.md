@@ -372,7 +372,7 @@ Focus: Make behavior visible.
 ### v2.3.0 - Usability Release
 Focus: Make common tasks easier.
 
-- [ ] **P1.3**: Add built-in FilterDriver transformers (rename, prefix, append)
+- [x] **P1.3**: Add built-in FilterDriver transformers (rename, prefix, append) ✅ v3.0.2
 - [ ] **P2.2**: MockDriver result configuration API
 - [ ] **P2.3**: Add docs/INTEGRATION.md with Spring/Hibernate/HikariCP examples
 - [ ] **P3.1**: Add docs/INTEROP.md for p6spy/etc. coexistence

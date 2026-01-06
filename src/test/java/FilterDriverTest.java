@@ -123,4 +123,180 @@ public class FilterDriverTest {
 
 	    assertEquals("executeQuery[SELECT * FROM USERS;]", MockDriver.getLog("jdbc:mock:foo"));
 	    assertEquals("executeQuery[select * from orders;]", MockDriver.getLog("jdbc:mock:bar"));}
-	catch (Exception e) {fail(e.getMessage());}}}
+	catch (Exception e) {fail(e.getMessage());}}
+
+    // ========== Built-in Transformer Tests ==========
+
+    @Test
+    public void schemaTransformer() {
+        try {
+            Connection conn = DriverManager.getConnection(
+                "jdbc:filter[schema=tenant_123]:jdbc:mock:schema_test");
+            conn.createStatement().executeQuery("SELECT * FROM users");
+            String log = MockDriver.getLog("jdbc:mock:schema_test");
+            assertEquals("executeQuery[SELECT * FROM tenant_123.users]", log);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void schemaTransformerAlreadyQualified() {
+        try {
+            Connection conn = DriverManager.getConnection(
+                "jdbc:filter[schema=tenant_123]:jdbc:mock:schema_qualified");
+            conn.createStatement().executeQuery("SELECT * FROM public.users");
+            String log = MockDriver.getLog("jdbc:mock:schema_qualified");
+            // Already qualified names should not be modified
+            assertEquals("executeQuery[SELECT * FROM public.users]", log);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void schemaTransformerJoin() {
+        try {
+            Connection conn = DriverManager.getConnection(
+                "jdbc:filter[schema=acme]:jdbc:mock:schema_join");
+            conn.createStatement().executeQuery("SELECT * FROM users JOIN orders ON users.id = orders.user_id");
+            String log = MockDriver.getLog("jdbc:mock:schema_join");
+            assertEquals("executeQuery[SELECT * FROM acme.users JOIN acme.orders ON users.id = orders.user_id]", log);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void whereTransformerAddsNewWhere() {
+        try {
+            Connection conn = DriverManager.getConnection(
+                "jdbc:filter[where=deleted=false]:jdbc:mock:where_new");
+            conn.createStatement().executeQuery("SELECT * FROM users");
+            String log = MockDriver.getLog("jdbc:mock:where_new");
+            assertEquals("executeQuery[SELECT * FROM users WHERE deleted=false]", log);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void whereTransformerAppendsToExisting() {
+        try {
+            Connection conn = DriverManager.getConnection(
+                "jdbc:filter[where=deleted=false]:jdbc:mock:where_append");
+            conn.createStatement().executeQuery("SELECT * FROM users WHERE active=true");
+            String log = MockDriver.getLog("jdbc:mock:where_append");
+            assertEquals("executeQuery[SELECT * FROM users WHERE active=true AND deleted=false]", log);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void whereTransformerWithOrderBy() {
+        try {
+            Connection conn = DriverManager.getConnection(
+                "jdbc:filter[where=tenant_id=42]:jdbc:mock:where_order");
+            conn.createStatement().executeQuery("SELECT * FROM users ORDER BY name");
+            String log = MockDriver.getLog("jdbc:mock:where_order");
+            assertEquals("executeQuery[SELECT * FROM users WHERE tenant_id=42 ORDER BY name]", log);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void whereTransformerIgnoresInsert() {
+        try {
+            Connection conn = DriverManager.getConnection(
+                "jdbc:filter[where=deleted=false]:jdbc:mock:where_insert");
+            conn.createStatement().executeUpdate("INSERT INTO users VALUES (1, 'test')");
+            String log = MockDriver.getLog("jdbc:mock:where_insert");
+            // INSERT should not be modified
+            assertEquals("executeUpdate[INSERT INTO users VALUES (1, 'test')]", log);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void renameTransformerBasic() {
+        try {
+            Connection conn = DriverManager.getConnection(
+                "jdbc:filter[rename.users=customers]:jdbc:mock:rename_basic");
+            conn.createStatement().executeQuery("SELECT * FROM users");
+            String log = MockDriver.getLog("jdbc:mock:rename_basic");
+            assertEquals("executeQuery[SELECT * FROM customers]", log);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void renameTransformerCaseInsensitive() {
+        try {
+            Connection conn = DriverManager.getConnection(
+                "jdbc:filter[rename.USERS=customers]:jdbc:mock:rename_case");
+            conn.createStatement().executeQuery("SELECT * FROM users WHERE Users.id = 1");
+            String log = MockDriver.getLog("jdbc:mock:rename_case");
+            assertEquals("executeQuery[SELECT * FROM customers WHERE customers.id = 1]", log);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void renameTransformerMultiple() {
+        try {
+            Connection conn = DriverManager.getConnection(
+                "jdbc:filter[rename.users=customers,rename.orders=purchases]:jdbc:mock:rename_multi");
+            conn.createStatement().executeQuery("SELECT * FROM users JOIN orders");
+            String log = MockDriver.getLog("jdbc:mock:rename_multi");
+            assertEquals("executeQuery[SELECT * FROM customers JOIN purchases]", log);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void compositeTransformers() {
+        try {
+            // Combine schema, where, and rename transformers
+            Connection conn = DriverManager.getConnection(
+                "jdbc:filter[schema=acme,where=active=true,rename.users=people]:jdbc:mock:composite");
+            conn.createStatement().executeQuery("SELECT * FROM users");
+            String log = MockDriver.getLog("jdbc:mock:composite");
+            // Order: schema first, then where, then rename
+            assertEquals("executeQuery[SELECT * FROM acme.people WHERE active=true]", log);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void builtInTransformerWithUpdate() {
+        try {
+            Connection conn = DriverManager.getConnection(
+                "jdbc:filter[schema=tenant,where=deleted=false]:jdbc:mock:update_test");
+            conn.createStatement().executeUpdate("UPDATE users SET name='test'");
+            String log = MockDriver.getLog("jdbc:mock:update_test");
+            assertEquals("executeUpdate[UPDATE tenant.users SET name='test' WHERE deleted=false]", log);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    @Test
+    public void builtInTransformerWithDelete() {
+        try {
+            Connection conn = DriverManager.getConnection(
+                "jdbc:filter[where=org_id=123]:jdbc:mock:delete_test");
+            conn.createStatement().executeUpdate("DELETE FROM users");
+            String log = MockDriver.getLog("jdbc:mock:delete_test");
+            assertEquals("executeUpdate[DELETE FROM users WHERE org_id=123]", log);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+}
