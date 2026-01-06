@@ -374,6 +374,56 @@ State transitions:
 - HALF_OPEN → CLOSED: After `successThreshold` consecutive successes
 - HALF_OPEN → OPEN: On any failure
 
+#### JMX Monitoring
+
+Circuit breakers can be monitored and controlled via JMX. JMX is disabled by default for zero overhead.
+
+**Enabling JMX:**
+```java
+// Via system property
+java -Dpjdbc.jmx.enabled=true -jar myapp.jar
+
+// Programmatically
+import org.pjdbc.jmx.CircuitBreakerRegistry;
+CircuitBreakerRegistry.enableJmx();
+```
+
+**MBean ObjectName:** `org.pjdbc:type=CircuitBreaker,name=<name>`
+
+**Exposed Attributes:**
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `State` | String | Current state: CLOSED, OPEN, or HALF_OPEN |
+| `Name` | String | Circuit breaker name |
+| `FailureThreshold` | int | Configured failure threshold |
+| `SuccessThreshold` | int | Configured success threshold |
+| `ResetTimeout` | long | Reset timeout in milliseconds |
+| `FailureCount` | int | Current consecutive failure count |
+| `SuccessCount` | int | Current consecutive success count |
+| `TotalRequests` | long | Total requests processed |
+| `TotalFailures` | long | Total failed requests |
+| `TotalRejections` | long | Requests rejected (circuit open) |
+| `FailureRatePercent` | double | Failure rate as percentage |
+
+**Operations:**
+
+| Operation | Description |
+|-----------|-------------|
+| `reset()` | Reset to CLOSED state, clear all counters |
+| `forceOpen()` | Force circuit to OPEN state |
+| `forceClosed()` | Force circuit to CLOSED state |
+
+**Example with JConsole:**
+```bash
+# Start app with JMX enabled
+java -Dpjdbc.jmx.enabled=true -jar myapp.jar
+
+# Connect with JConsole
+jconsole
+# Navigate to: MBeans → org.pjdbc → CircuitBreaker → <name>
+```
+
 ### TimeoutDriver (`jdbc:timeout:...`)
 
 Enforces query timeout limits on all statements. Uses JDBC's `Statement.setQueryTimeout()` to limit query execution time.
