@@ -6,6 +6,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverSideEffects;
@@ -53,6 +55,7 @@ import org.pjdbc.sql.AbstractProxyDriver;
 @DriverSideEffects(filesystem = true)
 public class UserMapDriver extends AbstractProxyDriver {
 
+    private static final Logger LOGGER = Logger.getLogger(UserMapDriver.class.getName());
     private static final Properties p = new Properties();
 
     static {
@@ -71,7 +74,11 @@ public class UserMapDriver extends AbstractProxyDriver {
             }
             DriverManager.registerDriver(new UserMapDriver());
         } catch (IOException | SQLException e) {
-            throw new RuntimeException(e);
+            // Log the error and continue. This prevents a malformed or inaccessible
+            // UserMapFile or a driver registration failure from crashing the application.
+            // The driver will either operate with an empty map or fail to register,
+            // both of which are handled gracefully by JDBC.
+            LOGGER.log(Level.SEVERE, "PJDBC: Initialization of UserMapDriver failed", e);
         }
     }
 
