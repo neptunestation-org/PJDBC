@@ -56,6 +56,9 @@ public class UserMapDriver extends AbstractProxyDriver {
     private static final Properties p = new Properties();
 
     static {
+        System.err.println("SECURITY WARNING: The UserMapDriver is not recommended for production use.");
+        System.err.println("It stores credentials in plaintext, which is a security risk.");
+        System.err.println("For production environments, use a secure credential management system.");
         try {
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             if (cl == null) {
