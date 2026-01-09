@@ -71,7 +71,8 @@ public class UserMapDriver extends AbstractProxyDriver {
             }
             DriverManager.registerDriver(new UserMapDriver());
         } catch (IOException | SQLException e) {
-            throw new RuntimeException(e);
+            // Log error and continue; prevents DoS from malformed file
+            e.printStackTrace(System.err);
         }
     }
 

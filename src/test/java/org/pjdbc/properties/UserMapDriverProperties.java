@@ -2,9 +2,17 @@ package org.pjdbc.properties;
 
 import net.jqwik.api.*;
 import net.jqwik.api.constraints.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.pjdbc.drivers.*;
 import org.pjdbc.testing.PjdbcArbitraries;
 
+import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -376,5 +384,31 @@ class UserMapDriverProperties {
         return Arbitraries.of(
             "cat", "filter", "retry"
         );
+    }
+
+    /**
+     * Test for Sentinel: loading a malformed UserMapFile should not throw ExceptionInInitializerError.
+     * This test creates a malformed properties file, loads the UserMapDriver in a custom classloader
+     * to isolate it from the main test environment, and verifies that the driver fails gracefully
+     * without a fatal error.
+     */
+    @Test
+    void malformedUserMapFileDoesNotCauseFatalError(@TempDir Path tempDir) throws IOException {
+        // Create a malformed properties file (invalid syntax)
+        Path malformedFile = tempDir.resolve("org.pjdbc.UserMapDriver.UserMapFile");
+        Files.writeString(malformedFile, "this-is-not-valid-properties-content");
+
+        // Create a custom classloader pointing to the temp directory and the test classpath
+        URL[] urls = {tempDir.toUri().toURL(),
+                      // Add current classpath to resolve UserMapDriver
+                      Paths.get("target/classes").toUri().toURL()
+        };
+        try (URLClassLoader isolatedClassLoader = new URLClassLoader(urls, ClassLoader.getSystemClassLoader().getParent())) {
+            // Attempt to load the driver class in the isolated classloader
+            // This should trigger the static initializer
+            assertDoesNotThrow(() -> {
+                Class.forName(UserMapDriver.class.getName(), true, isolatedClassLoader);
+            }, "Driver loading should not throw ExceptionInInitializerError for a malformed file.");
+        }
     }
 }
