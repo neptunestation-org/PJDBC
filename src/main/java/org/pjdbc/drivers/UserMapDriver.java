@@ -2,10 +2,19 @@ package org.pjdbc.drivers;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermission;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverSideEffects;
@@ -61,17 +70,44 @@ public class UserMapDriver extends AbstractProxyDriver {
             if (cl == null) {
                 cl = UserMapDriver.class.getClassLoader();
             }
-            InputStream is = cl.getResourceAsStream("org.pjdbc.UserMapDriver.UserMapFile");
-            if (is != null) {
-                try {
+            URL url = cl.getResource("org.pjdbc.UserMapDriver.UserMapFile");
+            if (url != null) {
+                warnOnInsecurePermissions(url);
+                try (InputStream is = url.openStream()) {
                     p.load(is);
-                } finally {
-                    is.close();
                 }
             }
             DriverManager.registerDriver(new UserMapDriver());
         } catch (IOException | SQLException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private static void warnOnInsecurePermissions(URL url) {
+        try {
+            if (!"file".equals(url.getProtocol())) {
+                return;
+            }
+            Path path = Paths.get(url.toURI());
+            if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+                return; // Not a POSIX-compliant file system, cannot check permissions.
+            }
+            Set<PosixFilePermission> perms = Files.getPosixFilePermissions(path);
+            if (perms.contains(PosixFilePermission.GROUP_READ) ||
+                perms.contains(PosixFilePermission.OTHERS_READ) ||
+                perms.contains(PosixFilePermission.GROUP_WRITE) ||
+                perms.contains(PosixFilePermission.OTHERS_WRITE) ||
+                perms.contains(PosixFilePermission.GROUP_EXECUTE) ||
+                perms.contains(PosixFilePermission.OTHERS_EXECUTE)) {
+                Logger.getLogger(UserMapDriver.class.getName()).log(
+                    Level.SEVERE,
+                    "CRITICAL SECURITY WARNING: Credential file is world-readable or group-readable: " + path +
+                    ". This is a security risk. Please restrict permissions to the owner (e.g., 'chmod 600').");
+            }
+        } catch (Exception e) {
+            // Log and ignore any errors during permission check, as it's a non-critical enhancement.
+            Logger.getLogger(UserMapDriver.class.getName()).log(
+                Level.WARNING, "Failed to check permissions on credential file: " + url, e);
         }
     }
 
