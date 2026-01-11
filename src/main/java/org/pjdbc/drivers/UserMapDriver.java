@@ -65,6 +65,14 @@ public class UserMapDriver extends AbstractProxyDriver {
             if (is != null) {
                 try {
                     p.load(is);
+                    System.err.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    System.err.println("!!!                                                                         !!!");
+                    System.err.println("!!! SECURITY WARNING: org.pjdbc.UserMapDriver.UserMapFile IS INSECURE         !!!");
+                    System.err.println("!!!                                                                         !!!");
+                    System.err.println("!!! This file stores credentials in plaintext. It is intended for           !!!");
+                    System.err.println("!!! development and testing only. DO NOT USE IN PRODUCTION.                 !!!");
+                    System.err.println("!!!                                                                         !!!");
+                    System.err.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 } finally {
                     is.close();
                 }
