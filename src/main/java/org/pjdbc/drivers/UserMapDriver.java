@@ -57,6 +57,20 @@ public class UserMapDriver extends AbstractProxyDriver {
 
     static {
         try {
+            System.err.println("████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████");
+            System.err.println("██                                                                                                                        ██");
+            System.err.println("██    /\\ /\\                                                                                                             ██");
+            System.err.println("██   / //_/                                    SECURITY WARNING                                                          ██");
+            System.err.println("██   \\//_/                                                                                                               ██");
+            System.err.println("██    /\\                                                                                                                 ██");
+            System.err.println("██                                                                                                                        ██");
+            System.err.println("██   The UserMapDriver is intended for development and testing, not for production use.                                    ██");
+            System.err.println("██   It loads credentials from a plaintext file on the classpath, which is a critical security risk.                       ██");
+            System.err.println("██   Do not use this driver in production environments. Use a secure credential management system instead.                 ██");
+            System.err.println("██                                                                                                                        ██");
+            System.err.println("██   See https://github.com/neptunestation-org/PJDBC/blob/main/SECURITY.md for more information.                         ██");
+            System.err.println("██                                                                                                                        ██");
+            System.err.println("████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████");
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             if (cl == null) {
                 cl = UserMapDriver.class.getClassLoader();

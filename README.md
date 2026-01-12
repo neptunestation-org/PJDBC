@@ -262,6 +262,17 @@ Connection conn = DriverManager.getConnection(
 
 Maps application-level usernames to database credentials. Configure mappings in a properties file at `org.pjdbc.UserMapDriver.UserMapFile` on the classpath.
 
+> **⚠️ SECURITY WARNING**
+>
+> This driver is intended for **development and testing purposes only**. It loads credentials from a plaintext file, which is a critical security vulnerability.
+>
+> **Do NOT use `UserMapDriver` in production environments.**
+>
+> For production, use a secure credential management system such as:
+> - Environment variables
+> - A secrets management service (e.g., HashiCorp Vault, AWS Secrets Manager)
+> - Your framework's built-in credential management
+
 Properties file format:
 ```properties
 appuser1=dbuser1/dbpassword1
