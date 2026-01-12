@@ -1,0 +1,4 @@
+## 2024-08-05 - UserMapDriver Plaintext Credential Storage
+**Vulnerability:** The `UserMapDriver` loads database credentials from a plaintext properties file located on the classpath. This file format (`appuser=dbuser/dbpassword`) stores secrets in a trivially readable format, posing a critical risk.
+**Learning:** The project's design prioritizes pluggability and ease of use, but this specific driver's implementation did not adequately consider the security implications of its configuration method. The vulnerability existed because of a failure to treat user-provided configuration as potentially insecure by default.
+**Prevention:** Future configuration-loading components must avoid plaintext secrets. They should integrate with secure secret management systems (like environment variables, Vault, or cloud provider secret managers) or, at a minimum, default to a secure configuration with prominent warnings if a less secure method is used for development purposes.
