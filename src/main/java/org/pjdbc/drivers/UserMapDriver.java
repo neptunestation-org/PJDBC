@@ -44,6 +44,12 @@ import org.pjdbc.sql.AbstractProxyDriver;
  *
  * <p><strong>Security:</strong> Error messages are intentionally generic to prevent
  * user enumeration attacks. Missing users and invalid mappings produce the same error.
+ *
+ * <p><strong><font color="red">SEVERE SECURITY WARNING:</font></strong> This driver
+ * stores and uses database passwords in plaintext. The user map properties file
+ * MUST be protected with strict filesystem permissions. Exposing this file can lead
+ * to a full database compromise. For production systems, always prefer a secure
+* credential store like HashiCorp Vault, AWS/GCP Secret Manager, or CyberArk.
  */
 @DriverCapability(
     prefix = "mapuser",
@@ -65,6 +71,7 @@ public class UserMapDriver extends AbstractProxyDriver {
             if (is != null) {
                 try {
                     p.load(is);
+                    System.err.println("PJDBC-SECURITY-WARNING: UserMapDriver is loading credentials from a plaintext file. This is a security risk. For production, use a secure credential store.");
                 } finally {
                     is.close();
                 }
