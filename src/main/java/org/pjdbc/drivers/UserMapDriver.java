@@ -57,6 +57,13 @@ public class UserMapDriver extends AbstractProxyDriver {
 
     static {
         try {
+            System.err.println(
+                "\n********************************************************************************\n" +
+                "** SECURITY WARNING: UserMapDriver is NOT for production use.                   **\n" +
+                "** It loads credentials from a plaintext file, which is a critical              **\n" +
+                "** security vulnerability. Use a secure credential store like HashiCorp Vault,  **\n" +
+                "** AWS Secrets Manager, or environment variables.                               **\n" +
+                "********************************************************************************");
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             if (cl == null) {
                 cl = UserMapDriver.class.getClassLoader();
