@@ -56,6 +56,23 @@ public class UserMapDriver extends AbstractProxyDriver {
     private static final Properties p = new Properties();
 
     static {
+        // Log a prominent security warning to System.err
+        System.err.println("");
+        System.err.println("********************************************************************************");
+        System.err.println("******************************** SECURITY WARNING ********************************");
+        System.err.println("********************************************************************************");
+        System.err.println("PJDBC: The UserMapDriver is intended for development and testing purposes only.");
+        System.err.println("It loads credentials from a plaintext file on the classpath, which is a");
+        System.err.println("significant security risk in production environments.");
+        System.err.println("");
+        System.err.println("DO NOT USE UserMapDriver IN PRODUCTION without securing the mapping file");
+        System.err.println("and understanding the risks of exposing credentials.");
+        System.err.println("");
+        System.err.println("Consider using a secure credential store like HashiCorp Vault, AWS Secrets");
+        System.err.println("Manager, or environment variables instead.");
+        System.err.println("********************************************************************************");
+        System.err.println("");
+
         try {
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             if (cl == null) {
