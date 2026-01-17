@@ -69,6 +69,16 @@ public class UserMapDriver extends AbstractProxyDriver {
                     is.close();
                 }
             }
+            System.err.println("");
+            System.err.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            System.err.println("!!!                          SECURITY WARNING                                !!!");
+            System.err.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            System.err.println("!!! The UserMapDriver is configured to load credentials from a plaintext     !!!");
+            System.err.println("!!! file. This is a CRITICAL security vulnerability and should NOT be used   !!!");
+            System.err.println("!!! in production environments. For safer alternatives, please consult the   !!!");
+            System.err.println("!!! project's security documentation.                                        !!!");
+            System.err.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            System.err.println("");
             DriverManager.registerDriver(new UserMapDriver());
         } catch (IOException | SQLException e) {
             throw new RuntimeException(e);
