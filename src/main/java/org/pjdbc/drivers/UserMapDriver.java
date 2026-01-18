@@ -54,6 +54,7 @@ import org.pjdbc.sql.AbstractProxyDriver;
 public class UserMapDriver extends AbstractProxyDriver {
 
     private static final Properties p = new Properties();
+    private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(UserMapDriver.class.getName());
 
     static {
         try {
@@ -63,6 +64,9 @@ public class UserMapDriver extends AbstractProxyDriver {
             }
             InputStream is = cl.getResourceAsStream("org.pjdbc.UserMapDriver.UserMapFile");
             if (is != null) {
+                logger.severe("CRITICAL SECURITY WARNING: The UserMapDriver is loading credentials from a plaintext file."
+                    + " This is highly insecure and should NOT be used in production."
+                    + " Protect the 'org.pjdbc.UserMapDriver.UserMapFile' file and restrict its access.");
                 try {
                     p.load(is);
                 } finally {
