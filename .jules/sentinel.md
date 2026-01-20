@@ -1,0 +1,4 @@
+## 2024-07-22 - UserMapDriver Plaintext Credential Vulnerability
+**Vulnerability:** The `UserMapDriver` class loads database credentials from a properties file in plaintext.
+**Learning:** This behavior is a critical security vulnerability, as acknowledged in the project's `README.md` and `SECURITY.md`. It's a known risk, and a direct fix would be a breaking change.
+**Prevention:** When a direct fix for a critical vulnerability is a breaking change, an acceptable alternative is to add a prominent, non-ignorable warning to alert developers to the risk. This increases security awareness and pushes users towards safer practices without breaking existing implementations.
