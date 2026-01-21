@@ -6,7 +6,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
-
+import java.util.logging.Logger;
 import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverSideEffects;
 import org.pjdbc.sql.AbstractProxyDriver;
@@ -42,6 +42,13 @@ import org.pjdbc.sql.AbstractProxyDriver;
  * Connection conn = DriverManager.getConnection("jdbc:mapuser:jdbc:postgresql://localhost/db", info);
  * </pre>
  *
+ * <p><strong><span style="color:red">CRITICAL SECURITY WARNING:</span></strong> This driver
+ * is designed to load credentials from a plaintext file. Storing passwords in plaintext is a
+ * severe security vulnerability. DO NOT use this driver in production environments without
+ * implementing compensating controls, such as securing the properties file with strict file
+ * permissions. For secure credential management, use environment variables, a KMS, or a secrets
+ * management tool instead of this driver.
+ *
  * <p><strong>Security:</strong> Error messages are intentionally generic to prevent
  * user enumeration attacks. Missing users and invalid mappings produce the same error.
  */
@@ -53,6 +60,7 @@ import org.pjdbc.sql.AbstractProxyDriver;
 @DriverSideEffects(filesystem = true)
 public class UserMapDriver extends AbstractProxyDriver {
 
+    private static final Logger LOGGER = Logger.getLogger(UserMapDriver.class.getName());
     private static final Properties p = new Properties();
 
     static {
@@ -68,6 +76,10 @@ public class UserMapDriver extends AbstractProxyDriver {
                 } finally {
                     is.close();
                 }
+            } else {
+                LOGGER.severe(
+                        "PJDBC: UserMapDriver.UserMapFile not found on classpath. "
+                                + "UserMapDriver will not be able to map any users.");
             }
             DriverManager.registerDriver(new UserMapDriver());
         } catch (IOException | SQLException e) {
