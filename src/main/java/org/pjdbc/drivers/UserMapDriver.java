@@ -56,6 +56,12 @@ public class UserMapDriver extends AbstractProxyDriver {
     private static final Properties p = new Properties();
 
     static {
+        System.err.println("████████████████████████████████████████████████████████████████████████████████");
+        System.err.println("█ SECURITY WARNING: UserMapDriver is not recommended for production use.      █");
+        System.err.println("█ It stores database credentials in plaintext, which is a security risk.      █");
+        System.err.println("█ For production, use a secure credential store like HashiCorp Vault,         █");
+        System.err.println("█ AWS Secrets Manager, or your cloud provider's equivalent.                   █");
+        System.err.println("████████████████████████████████████████████████████████████████████████████████");
         try {
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             if (cl == null) {
