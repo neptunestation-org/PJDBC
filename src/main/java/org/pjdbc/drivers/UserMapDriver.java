@@ -56,6 +56,8 @@ public class UserMapDriver extends AbstractProxyDriver {
     private static final Properties p = new Properties();
 
     static {
+        System.err.println("WARNING: PJDBC UserMapDriver is loading credentials from a plaintext file.");
+        System.err.println("This is a security risk. Ensure the file 'org.pjdbc.UserMapDriver.UserMapFile' is protected.");
         try {
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             if (cl == null) {
