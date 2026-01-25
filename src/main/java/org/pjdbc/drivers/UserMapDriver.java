@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
+import java.util.logging.Logger;
 
 import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverSideEffects;
@@ -53,9 +54,15 @@ import org.pjdbc.sql.AbstractProxyDriver;
 @DriverSideEffects(filesystem = true)
 public class UserMapDriver extends AbstractProxyDriver {
 
+    private static final Logger logger = Logger.getLogger(UserMapDriver.class.getName());
     private static final Properties p = new Properties();
 
     static {
+        logger.severe(
+                "SECURITY WARNING: UserMapDriver stores credentials in plaintext in a properties file. "
+                        + "This is a significant security risk. Do NOT use this in production without "
+                        + "securing the properties file with strict filesystem permissions. "
+                        + "Consider using a secure credential store instead.");
         try {
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             if (cl == null) {
