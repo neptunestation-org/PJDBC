@@ -14,6 +14,11 @@ import org.pjdbc.sql.AbstractProxyDriver;
 /**
  * Maps application usernames to database credentials.
  *
+ * <p><strong>SECURITY WARNING: This driver is insecure as it stores credentials in plaintext.</strong>
+ * It is intended for legacy use cases or development environments only. For production,
+ * use a secure credential store such as HashiCorp Vault, AWS Secrets Manager, or your
+ * platform's equivalent. This driver is deprecated and will be removed in a future version.
+ *
  * <p>UserMapDriver enables multi-tenant or role-based database access by translating
  * application-level usernames to actual database credentials. This is useful for:
  * <ul>
@@ -44,7 +49,11 @@ import org.pjdbc.sql.AbstractProxyDriver;
  *
  * <p><strong>Security:</strong> Error messages are intentionally generic to prevent
  * user enumeration attacks. Missing users and invalid mappings produce the same error.
+ *
+ * @deprecated This driver is insecure and will be removed in a future version.
+ *             Use a secure credential store instead.
  */
+@Deprecated
 @DriverCapability(
     prefix = "mapuser",
     description = "Maps application usernames to database credentials",
@@ -57,6 +66,7 @@ public class UserMapDriver extends AbstractProxyDriver {
 
     static {
         try {
+            System.err.println("WARNING: PJDBC: UserMapDriver stores credentials in plaintext and is insecure. Use a secure credential store instead. This driver will be removed in a future version.");
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             if (cl == null) {
                 cl = UserMapDriver.class.getClassLoader();
