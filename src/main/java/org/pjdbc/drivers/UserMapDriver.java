@@ -56,6 +56,11 @@ public class UserMapDriver extends AbstractProxyDriver {
     private static final Properties p = new Properties();
 
     static {
+        System.err.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        System.err.println("!!! WARNING: UserMapDriver stores credentials in a plaintext properties file.  !!!");
+        System.err.println("!!! This is a significant security risk and is NOT recommended for production. !!!");
+        System.err.println("!!! Ensure the UserMapFile is secured with strict file permissions.            !!!");
+        System.err.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         try {
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             if (cl == null) {
