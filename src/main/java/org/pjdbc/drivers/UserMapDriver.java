@@ -44,6 +44,10 @@ import org.pjdbc.sql.AbstractProxyDriver;
  *
  * <p><strong>Security:</strong> Error messages are intentionally generic to prevent
  * user enumeration attacks. Missing users and invalid mappings produce the same error.
+ *
+ * <p><b>WARNING:</b> This driver is inherently insecure as it relies on a plaintext
+ * properties file for credential mapping. A warning is logged upon initialization
+ * to alert developers to this risk.
  */
 @DriverCapability(
     prefix = "mapuser",
