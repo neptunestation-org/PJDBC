@@ -89,8 +89,6 @@ import org.pjdbc.sql.WhereTransformer;
     description = "Schema prefix to add to unqualified table names")
 @DriverParameter(name = "where", type = ParameterType.STRING,
     description = "Condition to append to WHERE clauses (e.g., deleted=false)")
-@DriverParameter(name = "rename.*", type = ParameterType.STRING,
-    description = "Rename identifiers: rename.OLD_NAME=NEW_NAME")
 public class FilterDriver extends AbstractProxyDriver {
     private static final Logger LOG = Logger.getLogger(FilterDriver.class.getName());
 
