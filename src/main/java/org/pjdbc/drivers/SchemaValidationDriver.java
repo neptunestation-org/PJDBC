@@ -78,8 +78,9 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
 
     // Pattern to extract table names from SQL
     // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
+    // Supports quoted identifiers: "table", `table`, [table]
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+(?:\"([^\"]+)\"|`([^`]+)`|\\[([^\\]]+)\\]|([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?))",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -102,8 +103,9 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
     );
 
     // Pattern to parse column names (handles table.column and aliases)
+    // Supports quoted identifiers: "column", `column`, [column]
     private static final Pattern COLUMN_NAME_PATTERN = Pattern.compile(
-        "([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)"
+        "(?:\"([^\"]+)\"|`([^`]+)`|\\[([^\\]]+)\\]|([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?))"
     );
 
     // Global configurations for external access
@@ -302,12 +304,20 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
             Set<String> tables = new HashSet<>();
             Matcher matcher = TABLE_PATTERN.matcher(sql);
             while (matcher.find()) {
-                String table = matcher.group(1);
-                // Handle schema.table format - extract just table name
-                if (table.contains(".")) {
-                    table = table.substring(table.lastIndexOf('.') + 1);
+                String table = null;
+                for (int i = 1; i <= matcher.groupCount(); i++) {
+                    if (matcher.group(i) != null) {
+                        table = matcher.group(i);
+                        break;
+                    }
                 }
-                tables.add(caseSensitive ? table : table.toLowerCase());
+                if (table != null) {
+                    // Handle schema.table format - extract just table name
+                    if (table.contains(".")) {
+                        table = table.substring(table.lastIndexOf('.') + 1);
+                    }
+                    tables.add(caseSensitive ? table : table.toLowerCase());
+                }
             }
             return tables;
         }
@@ -357,12 +367,20 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
                 // Extract column name from expression
                 Matcher nameMatcher = COLUMN_NAME_PATTERN.matcher(columnExpr);
                 if (nameMatcher.find()) {
-                    String col = nameMatcher.group(1);
-                    // Handle table.column - extract just column name for checking
-                    if (col.contains(".")) {
-                        col = col.substring(col.lastIndexOf('.') + 1);
+                    String col = null;
+                    for (int i = 1; i <= nameMatcher.groupCount(); i++) {
+                        if (nameMatcher.group(i) != null) {
+                            col = nameMatcher.group(i);
+                            break;
+                        }
                     }
-                    columns.add(caseSensitive ? col : col.toLowerCase());
+                    if (col != null) {
+                        // Handle table.column - extract just column name for checking
+                        if (col.contains(".")) {
+                            col = col.substring(col.lastIndexOf('.') + 1);
+                        }
+                        columns.add(caseSensitive ? col : col.toLowerCase());
+                    }
                 }
             }
         }
