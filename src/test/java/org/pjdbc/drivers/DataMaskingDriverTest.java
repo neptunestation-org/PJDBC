@@ -752,4 +752,77 @@ public class DataMaskingDriverTest {
             }
         }
     }
+
+    private void setupLOBTable(String dbName) throws SQLException {
+        try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE TABLE IF NOT EXISTS lob_data (" +
+                    "id INT PRIMARY KEY, " +
+                    "secret_blob BLOB, " +
+                    "secret_clob CLOB)");
+                stmt.execute("INSERT INTO lob_data VALUES (1, X'0102030405', 'very secret message')");
+            }
+        }
+    }
+
+    @Test
+    public void testBlobNoLeak() throws SQLException {
+        setupLOBTable("test_blob_no_leak");
+        String url = "jdbc:mask[columns=secret_blob]:jdbc:h2:mem:test_blob_no_leak;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_blob FROM lob_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    try {
+                        rs.getBlob("secret_blob");
+                        fail("Expected SQLException for masked BLOB column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                        assertTrue(e.getMessage().contains("getBlob"));
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testClobNoLeak() throws SQLException {
+        setupLOBTable("test_clob_no_leak");
+        String url = "jdbc:mask[columns=secret_clob]:jdbc:h2:mem:test_clob_no_leak;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_clob FROM lob_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    try {
+                        rs.getClob("secret_clob");
+                        fail("Expected SQLException for masked CLOB column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                        assertTrue(e.getMessage().contains("getClob"));
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testHashCollisionFixed() {
+        DataMaskingDriver.MaskingConfig config = new DataMaskingDriver.MaskingConfig(
+            "jdbc:mask[columns=test,strategy=HASH]:jdbc:h2:mem:test"
+        );
+        // Aa and BB have the same hashCode in Java, but should have different SHA-256 hashes
+        String hash1 = config.maskValue("Aa");
+        String hash2 = config.maskValue("BB");
+        assertNotEquals("SHA-256 should not have collision for Aa and BB", hash1, hash2);
+
+        // Also verify it's still 8 chars + "..."
+        assertEquals(11, hash1.length());
+        assertTrue(hash1.endsWith("..."));
+    }
+
+    private void assertNotEquals(String message, Object unexpected, Object actual) {
+        if (unexpected != null && unexpected.equals(actual)) {
+            fail(message + " - expected not equals but was: " + actual);
+        }
+    }
 }

@@ -1,0 +1,4 @@
+## 2026-02-01 - [DataMaskingDriver Vulnerabilities]
+**Vulnerability:** `DataMaskingDriver` leaked sensitive data when accessed via complex JDBC types like `Blob`, `Clob`, `Array`, etc., because these methods were not overridden in the `MaskingResultSet`. Additionally, the `HASH` strategy used `String.hashCode()`, which is cryptographically weak and has predictable collisions.
+**Learning:** Security proxy drivers must be exhaustive in their overrides. Partially implementing a security interface (like `ResultSet`) creates a false sense of security while leaving major gaps. `String.hashCode()` should never be used for security purposes even for pseudonymization if any level of collision resistance is required.
+**Prevention:** When implementing security wrappers for standard APIs (like JDBC), always review the entire interface for potential bypasses. Use `SHA-256` or better for hashing.
