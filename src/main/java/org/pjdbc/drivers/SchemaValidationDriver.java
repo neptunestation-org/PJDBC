@@ -76,10 +76,9 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Semicolon-separated table types for metadata", defaultValue = "TABLE;VIEW")
 public class SchemaValidationDriver extends AbstractProxyDriver {
 
-    // Pattern to extract table names from SQL
-    // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
+    private static final String IDENT = "(?:\"[^\"]+\"|`[^`]+`|\\[[^\\]]+\\]|[a-zA-Z_][a-zA-Z0-9_]*)";
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+(" + IDENT + "(?:\\." + IDENT + ")?)",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -303,10 +302,8 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
             Matcher matcher = TABLE_PATTERN.matcher(sql);
             while (matcher.find()) {
                 String table = matcher.group(1);
-                // Handle schema.table format - extract just table name
-                if (table.contains(".")) {
-                    table = table.substring(table.lastIndexOf('.') + 1);
-                }
+                if (table.contains(".")) table = table.substring(table.lastIndexOf('.') + 1);
+                table = table.replaceAll("[\"`\\[\\]]", "");
                 tables.add(caseSensitive ? table : table.toLowerCase());
             }
             return tables;

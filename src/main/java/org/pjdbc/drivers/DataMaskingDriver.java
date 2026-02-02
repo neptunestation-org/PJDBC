@@ -740,6 +740,30 @@ public class DataMaskingDriver extends AbstractProxyDriver {
             return super.getTimestamp(columnLabel, cal);
         }
 
+        @Override
+        public java.sql.Blob getBlob(int i) throws SQLException {
+            if (shouldMaskColumn(i)) throwMaskedColumnException(String.valueOf(i), "getBlob");
+            return super.getBlob(i);
+        }
+
+        @Override
+        public java.sql.Blob getBlob(String l) throws SQLException {
+            if (config.shouldMask(l)) throwMaskedColumnException(l, "getBlob");
+            return super.getBlob(l);
+        }
+
+        @Override
+        public java.sql.Clob getClob(int i) throws SQLException {
+            if (shouldMaskColumn(i)) throwMaskedColumnException(String.valueOf(i), "getClob");
+            return super.getClob(i);
+        }
+
+        @Override
+        public java.sql.Clob getClob(String l) throws SQLException {
+            if (config.shouldMask(l)) throwMaskedColumnException(l, "getClob");
+            return super.getClob(l);
+        }
+
         // === CHARACTER STREAMS - return stream of masked content ===
 
         @Override
