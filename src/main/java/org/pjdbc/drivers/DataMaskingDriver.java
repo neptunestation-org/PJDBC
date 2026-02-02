@@ -740,20 +740,6 @@ public class DataMaskingDriver extends AbstractProxyDriver {
             return super.getTimestamp(columnLabel, cal);
         }
 
-        // === COMPLEX TYPES - throw SQLException for masked columns ===
-
-        @Override
-        public java.sql.Array getArray(int i) throws SQLException {
-            if (shouldMaskColumn(i)) throwMaskedColumnException(String.valueOf(i), "getArray");
-            return super.getArray(i);
-        }
-
-        @Override
-        public java.sql.Array getArray(String l) throws SQLException {
-            if (config.shouldMask(l)) throwMaskedColumnException(l, "getArray");
-            return super.getArray(l);
-        }
-
         @Override
         public java.sql.Blob getBlob(int i) throws SQLException {
             if (shouldMaskColumn(i)) throwMaskedColumnException(String.valueOf(i), "getBlob");
