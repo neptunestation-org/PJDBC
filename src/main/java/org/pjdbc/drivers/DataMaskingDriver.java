@@ -851,5 +851,159 @@ public class DataMaskingDriver extends AbstractProxyDriver {
             }
             return super.getUnicodeStream(columnLabel);
         }
+
+        // === LOB METHODS - throw SQLException for masked columns ===
+
+        @Override
+        public java.sql.Blob getBlob(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getBlob");
+            return super.getBlob(columnIndex);
+        }
+
+        @Override
+        public java.sql.Blob getBlob(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getBlob");
+            return super.getBlob(columnLabel);
+        }
+
+        @Override
+        public java.sql.Clob getClob(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getClob");
+            return super.getClob(columnIndex);
+        }
+
+        @Override
+        public java.sql.Clob getClob(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getClob");
+            return super.getClob(columnLabel);
+        }
+
+        @Override
+        public java.sql.NClob getNClob(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getNClob");
+            return super.getNClob(columnIndex);
+        }
+
+        @Override
+        public java.sql.NClob getNClob(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getNClob");
+            return super.getNClob(columnLabel);
+        }
+
+        // === COMPLEX TYPE METHODS - throw SQLException for masked columns ===
+
+        @Override
+        public java.sql.Array getArray(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getArray");
+            return super.getArray(columnIndex);
+        }
+
+        @Override
+        public java.sql.Array getArray(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getArray");
+            return super.getArray(columnLabel);
+        }
+
+        @Override
+        public java.sql.Ref getRef(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getRef");
+            return super.getRef(columnIndex);
+        }
+
+        @Override
+        public java.sql.Ref getRef(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getRef");
+            return super.getRef(columnLabel);
+        }
+
+        @Override
+        public java.net.URL getURL(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getURL");
+            return super.getURL(columnIndex);
+        }
+
+        @Override
+        public java.net.URL getURL(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getURL");
+            return super.getURL(columnLabel);
+        }
+
+        @Override
+        public java.sql.RowId getRowId(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getRowId");
+            return super.getRowId(columnIndex);
+        }
+
+        @Override
+        public java.sql.RowId getRowId(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getRowId");
+            return super.getRowId(columnLabel);
+        }
+
+        @Override
+        public java.sql.SQLXML getSQLXML(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getSQLXML");
+            return super.getSQLXML(columnIndex);
+        }
+
+        @Override
+        public java.sql.SQLXML getSQLXML(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getSQLXML");
+            return super.getSQLXML(columnLabel);
+        }
+
+        // === ADDITIONAL OBJECT METHODS - throw/mask for masked columns ===
+
+        @Override
+        public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) {
+                T value = super.getObject(columnIndex, type);
+                if (value == null) return null;
+                if (type == String.class) {
+                    return type.cast(config.maskValue((String) value));
+                }
+                throwMaskedColumnException(String.valueOf(columnIndex), "getObject");
+            }
+            return super.getObject(columnIndex, type);
+        }
+
+        @Override
+        public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
+            if (config.shouldMask(columnLabel)) {
+                T value = super.getObject(columnLabel, type);
+                if (value == null) return null;
+                if (type == String.class) {
+                    return type.cast(config.maskValue((String) value));
+                }
+                throwMaskedColumnException(columnLabel, "getObject");
+            }
+            return super.getObject(columnLabel, type);
+        }
+
+        @Override
+        public Object getObject(int columnIndex, java.util.Map<String, Class<?>> map) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) {
+                Object value = super.getObject(columnIndex, map);
+                if (value == null) return null;
+                if (value instanceof String s) {
+                    return config.maskValue(s);
+                }
+                throwMaskedColumnException(String.valueOf(columnIndex), "getObject");
+            }
+            return super.getObject(columnIndex, map);
+        }
+
+        @Override
+        public Object getObject(String columnLabel, java.util.Map<String, Class<?>> map) throws SQLException {
+            if (config.shouldMask(columnLabel)) {
+                Object value = super.getObject(columnLabel, map);
+                if (value == null) return null;
+                if (value instanceof String s) {
+                    return config.maskValue(s);
+                }
+                throwMaskedColumnException(columnLabel, "getObject");
+            }
+            return super.getObject(columnLabel, map);
+        }
     }
 }
