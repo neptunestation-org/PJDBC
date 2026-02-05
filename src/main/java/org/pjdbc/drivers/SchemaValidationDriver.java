@@ -76,10 +76,14 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Semicolon-separated table types for metadata", defaultValue = "TABLE;VIEW")
 public class SchemaValidationDriver extends AbstractProxyDriver {
 
+    // Regex for SQL identifiers (from AbstractProxyDriver)
+    private static final String ID = AbstractProxyDriver.IDENTIFIER_REGEX;
+
     // Pattern to extract table names from SQL
-    // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
+    // Matches: FROM [schema.]table, JOIN [schema.]table, etc.
+    // Group 1: schema (or table if no dot), Group 2: table (if dot exists)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+(" + ID + ")(?:\\.(" + ID + "))?",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -91,19 +95,20 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
 
     // Pattern to extract columns from INSERT
     private static final Pattern INSERT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bINSERT\\s+INTO\\s+[a-zA-Z_][a-zA-Z0-9_.]*\\s*\\(([^)]+)\\)",
+        "\\bINSERT\\s+INTO\\s+" + ID + "(?:\\." + ID + ")?\\s*\\(([^)]+)\\)",
         Pattern.CASE_INSENSITIVE
     );
 
     // Pattern to extract columns from UPDATE SET
     private static final Pattern UPDATE_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSET\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+        "\\bSET\\s+(" + ID + ")",
         Pattern.CASE_INSENSITIVE
     );
 
-    // Pattern to parse column names (handles table.column and aliases)
+    // Pattern to parse column names (handles [table.]column and aliases)
+    // Group 1: table (or column if no dot), Group 2: column (if dot exists)
     private static final Pattern COLUMN_NAME_PATTERN = Pattern.compile(
-        "([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)"
+        "(" + ID + ")(?:\\.(" + ID + "))?"
     );
 
     // Global configurations for external access
@@ -302,11 +307,9 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
             Set<String> tables = new HashSet<>();
             Matcher matcher = TABLE_PATTERN.matcher(sql);
             while (matcher.find()) {
-                String table = matcher.group(1);
-                // Handle schema.table format - extract just table name
-                if (table.contains(".")) {
-                    table = table.substring(table.lastIndexOf('.') + 1);
-                }
+                String first = matcher.group(1);
+                String second = matcher.group(2);
+                String table = AbstractProxyDriver.unquote(second != null ? second : first);
                 tables.add(caseSensitive ? table : table.toLowerCase());
             }
             return tables;
@@ -333,7 +336,7 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
             // Extract from UPDATE SET
             Matcher updateMatcher = UPDATE_COLUMNS_PATTERN.matcher(sql);
             while (updateMatcher.find()) {
-                String col = updateMatcher.group(1);
+                String col = AbstractProxyDriver.unquote(updateMatcher.group(1));
                 columns.add(caseSensitive ? col : col.toLowerCase());
             }
 
@@ -357,11 +360,9 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
                 // Extract column name from expression
                 Matcher nameMatcher = COLUMN_NAME_PATTERN.matcher(columnExpr);
                 if (nameMatcher.find()) {
-                    String col = nameMatcher.group(1);
-                    // Handle table.column - extract just column name for checking
-                    if (col.contains(".")) {
-                        col = col.substring(col.lastIndexOf('.') + 1);
-                    }
+                    String first = nameMatcher.group(1);
+                    String second = nameMatcher.group(2);
+                    String col = AbstractProxyDriver.unquote(second != null ? second : first);
                     columns.add(caseSensitive ? col : col.toLowerCase());
                 }
             }

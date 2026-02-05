@@ -32,6 +32,26 @@ import org.pjdbc.validation.CompositionValidator;
  */
 public abstract class AbstractProxyDriver extends AbstractDriver {
 
+    /**
+     * Regex for SQL identifiers (supports double quotes, backticks, and brackets).
+     */
+    public static final String IDENTIFIER_REGEX = "(?:\"[^\"]+\"|`[^`]+`|\\[[^\\]]+\\]|[a-zA-Z_][a-zA-Z0-9_]*)";
+
+    /**
+     * Unquote a SQL identifier.
+     */
+    public static String unquote(String s) {
+        if (s == null || s.length() < 2) return s;
+        char first = s.charAt(0);
+        char last = s.charAt(s.length() - 1);
+        if ((first == '"' && last == '"') ||
+            (first == '`' && last == '`') ||
+            (first == '[' && last == ']')) {
+            return s.substring(1, s.length() - 1);
+        }
+        return s;
+    }
+
     protected boolean acceptsSubName(String subname) {
         try {
             return DriverManager.getDriver(subname) != null;

@@ -36,6 +36,9 @@ public class SchemaTransformer extends AbstractJdbcTransformer {
 
     private final String schemaPrefix;
 
+    // Regex for SQL identifiers (from AbstractProxyDriver)
+    private static final String ID = AbstractProxyDriver.IDENTIFIER_REGEX;
+
     // Pattern to match table name contexts:
     // - FROM tablename
     // - JOIN tablename
@@ -44,7 +47,7 @@ public class SchemaTransformer extends AbstractJdbcTransformer {
     // - TABLE tablename (for TRUNCATE TABLE, etc.)
     // Captures: keyword, optional whitespace, table name (not already qualified)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(FROM|JOIN|INTO|UPDATE|TABLE)\\s+(?!\\w+\\.)([a-zA-Z_][a-zA-Z0-9_]*)",
+        "\\b(FROM|JOIN|INTO|UPDATE|TABLE)\\s+(?!" + ID + "\\.)(" + ID + ")",
         Pattern.CASE_INSENSITIVE
     );
 
