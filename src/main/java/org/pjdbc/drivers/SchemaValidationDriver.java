@@ -76,10 +76,13 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Semicolon-separated table types for metadata", defaultValue = "TABLE;VIEW")
 public class SchemaValidationDriver extends AbstractProxyDriver {
 
+    private static final String ID_REGEX = "[a-zA-Z_]\\w*|\"[^\"]+\"|`[^`]+`|\\[[^\\]]+\\]";
+    private static final String QID_REGEX = "(?:" + ID_REGEX + ")(?:\\.(?:" + ID_REGEX + "))?";
+
     // Pattern to extract table names from SQL
     // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+(" + QID_REGEX + ")",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -91,20 +94,18 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
 
     // Pattern to extract columns from INSERT
     private static final Pattern INSERT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bINSERT\\s+INTO\\s+[a-zA-Z_][a-zA-Z0-9_.]*\\s*\\(([^)]+)\\)",
+        "\\bINSERT\\s+INTO\\s+" + QID_REGEX + "\\s*\\(([^)]+)\\)",
         Pattern.CASE_INSENSITIVE
     );
 
     // Pattern to extract columns from UPDATE SET
     private static final Pattern UPDATE_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSET\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+        "\\bSET\\s+(" + ID_REGEX + ")",
         Pattern.CASE_INSENSITIVE
     );
 
     // Pattern to parse column names (handles table.column and aliases)
-    private static final Pattern COLUMN_NAME_PATTERN = Pattern.compile(
-        "([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)"
-    );
+    private static final Pattern COLUMN_NAME_PATTERN = Pattern.compile("(" + QID_REGEX + ")");
 
     // Global configurations for external access
     private static final Map<Connection, SchemaConfig> connectionConfigs = new ConcurrentHashMap<>();
@@ -173,6 +174,16 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
         WHITELIST,  // Only allow explicitly listed tables
         BLACKLIST,  // Block explicitly listed tables, allow all others
         METADATA    // Load allowed tables from database metadata
+    }
+
+    private static String unquote(String s) {
+        if (s == null || s.length() < 2) return s;
+        char first = s.charAt(0);
+        char last = s.charAt(s.length() - 1);
+        if ((first == '"' && last == '"') || (first == '`' && last == '`') || (first == '[' && last == ']')) {
+            return s.substring(1, s.length() - 1);
+        }
+        return s;
     }
 
     /**
@@ -302,14 +313,29 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
             Set<String> tables = new HashSet<>();
             Matcher matcher = TABLE_PATTERN.matcher(sql);
             while (matcher.find()) {
-                String table = matcher.group(1);
-                // Handle schema.table format - extract just table name
-                if (table.contains(".")) {
-                    table = table.substring(table.lastIndexOf('.') + 1);
+                addTable(tables, matcher.group(1));
+            }
+            // Also handle comma-separated tables in FROM clause
+            Matcher fromMatcher = Pattern.compile("\\bFROM\\s+([^;()]+)", Pattern.CASE_INSENSITIVE).matcher(sql);
+            while (fromMatcher.find()) {
+                String fromPart = fromMatcher.group(1).split("(?i)\\b(WHERE|GROUP|ORDER|LIMIT|JOIN|UNION|INTERSECT|EXCEPT)\\b")[0];
+                for (String part : fromPart.split(",")) {
+                    Matcher m = COLUMN_NAME_PATTERN.matcher(part.trim());
+                    if (m.find()) addTable(tables, m.group(1));
                 }
-                tables.add(caseSensitive ? table : table.toLowerCase());
             }
             return tables;
+        }
+
+        private void addTable(Set<String> tables, String table) {
+            if (table == null) return;
+            // Handle schema.table format - extract and unquote just table name
+            String tableName = table;
+            if (tableName.contains(".")) {
+                tableName = tableName.substring(tableName.lastIndexOf('.') + 1);
+            }
+            tableName = unquote(tableName);
+            tables.add(caseSensitive ? tableName : tableName.toLowerCase());
         }
 
         private Set<String> extractColumns(String sql) {
@@ -358,10 +384,11 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
                 Matcher nameMatcher = COLUMN_NAME_PATTERN.matcher(columnExpr);
                 if (nameMatcher.find()) {
                     String col = nameMatcher.group(1);
-                    // Handle table.column - extract just column name for checking
+                    // Handle table.column - extract and unquote just column name for checking
                     if (col.contains(".")) {
                         col = col.substring(col.lastIndexOf('.') + 1);
                     }
+                    col = unquote(col);
                     columns.add(caseSensitive ? col : col.toLowerCase());
                 }
             }
