@@ -851,5 +851,43 @@ public class DataMaskingDriver extends AbstractProxyDriver {
             }
             return super.getUnicodeStream(columnLabel);
         }
+
+        private void check(int i, String m) throws SQLException { if (shouldMaskColumn(i)) throwMaskedColumnException(String.valueOf(i), m); }
+        private void check(String l, String m) throws SQLException { if (config.shouldMask(l)) throwMaskedColumnException(l, m); }
+
+        @Override public java.sql.Array getArray(int i) throws SQLException { check(i, "getArray"); return super.getArray(i); }
+        @Override public java.sql.Array getArray(String l) throws SQLException { check(l, "getArray"); return super.getArray(l); }
+        @Override public java.sql.Blob getBlob(int i) throws SQLException { check(i, "getBlob"); return super.getBlob(i); }
+        @Override public java.sql.Blob getBlob(String l) throws SQLException { check(l, "getBlob"); return super.getBlob(l); }
+        @Override public java.sql.Clob getClob(int i) throws SQLException { check(i, "getClob"); return super.getClob(i); }
+        @Override public java.sql.Clob getClob(String l) throws SQLException { check(l, "getClob"); return super.getClob(l); }
+        @Override public java.sql.NClob getNClob(int i) throws SQLException { check(i, "getNClob"); return super.getNClob(i); }
+        @Override public java.sql.NClob getNClob(String l) throws SQLException { check(l, "getNClob"); return super.getNClob(l); }
+        @Override public java.sql.Ref getRef(int i) throws SQLException { check(i, "getRef"); return super.getRef(i); }
+        @Override public java.sql.Ref getRef(String l) throws SQLException { check(l, "getRef"); return super.getRef(l); }
+        @Override public java.sql.RowId getRowId(int i) throws SQLException { check(i, "getRowId"); return super.getRowId(i); }
+        @Override public java.sql.RowId getRowId(String l) throws SQLException { check(l, "getRowId"); return super.getRowId(l); }
+        @Override public java.sql.SQLXML getSQLXML(int i) throws SQLException { check(i, "getSQLXML"); return super.getSQLXML(i); }
+        @Override public java.sql.SQLXML getSQLXML(String l) throws SQLException { check(l, "getSQLXML"); return super.getSQLXML(l); }
+        @Override public java.net.URL getURL(int i) throws SQLException { check(i, "getURL"); return super.getURL(i); }
+        @Override public java.net.URL getURL(String l) throws SQLException { check(l, "getURL"); return super.getURL(l); }
+
+        @Override
+        public <T> T getObject(int i, Class<T> t) throws SQLException {
+            if (shouldMaskColumn(i)) {
+                if (t == String.class) return t.cast(config.maskValue(super.getString(i)));
+                throwMaskedColumnException(String.valueOf(i), "getObject");
+            }
+            return super.getObject(i, t);
+        }
+
+        @Override
+        public <T> T getObject(String l, Class<T> t) throws SQLException {
+            if (config.shouldMask(l)) {
+                if (t == String.class) return t.cast(config.maskValue(super.getString(l)));
+                throwMaskedColumnException(l, "getObject");
+            }
+            return super.getObject(l, t);
+        }
     }
 }
