@@ -76,34 +76,42 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Semicolon-separated table types for metadata", defaultValue = "TABLE;VIEW")
 public class SchemaValidationDriver extends AbstractProxyDriver {
 
-    // Pattern to extract table names from SQL
-    // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
+    // Regex for unquoted or quoted (", `, []) SQL identifiers.
+    // Uses non-capturing groups to avoid shifting capturing group indices in complex patterns.
+    private static final String IDENTIFIER_REGEX =
+        "(?:[a-zA-Z_][a-zA-Z0-9_]*|\"(?:\"\"|[^\"])*\"|`(?:``|[^`])*`|\\[[^\\]]+\\])";
+
+    // Pattern to extract table names from SQL.
+    // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE).
+    // Also handles comma-separated table lists.
+    // Captures the whole table list in group 1.
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+(" + IDENTIFIER_REGEX + "(?:\\s*[,.]\\s*" + IDENTIFIER_REGEX + ")*)",
         Pattern.CASE_INSENSITIVE
     );
 
-    // Pattern to extract column names from SELECT
+    // Pattern to extract column names from SELECT clause.
     private static final Pattern SELECT_COLUMNS_PATTERN = Pattern.compile(
         "\\bSELECT\\s+(.+?)\\s+FROM\\b",
         Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
-    // Pattern to extract columns from INSERT
+    // Pattern to extract columns from INSERT statement.
+    // Uses non-capturing groups for identifiers so the column list is captured in group 1.
     private static final Pattern INSERT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bINSERT\\s+INTO\\s+[a-zA-Z_][a-zA-Z0-9_.]*\\s*\\(([^)]+)\\)",
+        "\\bINSERT\\s+INTO\\s+" + IDENTIFIER_REGEX + "(?:\\." + IDENTIFIER_REGEX + ")*" + "\\s*\\(([^)]+)\\)",
         Pattern.CASE_INSENSITIVE
     );
 
-    // Pattern to extract columns from UPDATE SET
+    // Pattern to extract columns from UPDATE SET clause.
     private static final Pattern UPDATE_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSET\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+        "\\bSET\\s+(" + IDENTIFIER_REGEX + ")",
         Pattern.CASE_INSENSITIVE
     );
 
-    // Pattern to parse column names (handles table.column and aliases)
+    // Pattern to parse column names (handles table.column and aliases).
     private static final Pattern COLUMN_NAME_PATTERN = Pattern.compile(
-        "([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)"
+        IDENTIFIER_REGEX
     );
 
     // Global configurations for external access
@@ -222,11 +230,26 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
                 for (String part : s.split(";")) {
                     String trimmed = part.trim();
                     if (!trimmed.isEmpty()) {
-                        result.add(caseSensitive ? trimmed : trimmed.toLowerCase());
+                        String stripped = stripQuotes(trimmed);
+                        result.add(caseSensitive ? stripped : stripped.toLowerCase());
                     }
                 }
             }
             return result;
+        }
+
+        private static String stripQuotes(String s) {
+            if (s == null) return null;
+            String trimmed = s.trim();
+            if (trimmed.length() < 2) return trimmed;
+            char first = trimmed.charAt(0);
+            char last = trimmed.charAt(trimmed.length() - 1);
+            if ((first == '"' && last == '"') ||
+                (first == '`' && last == '`') ||
+                (first == '[' && last == ']')) {
+                return trimmed.substring(1, trimmed.length() - 1);
+            }
+            return trimmed;
         }
 
         /**
@@ -242,7 +265,8 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
                 while (rs.next()) {
                     String tableName = rs.getString("TABLE_NAME");
                     if (tableName != null) {
-                        allowedTables.add(caseSensitive ? tableName : tableName.toLowerCase());
+                        String stripped = stripQuotes(tableName);
+                        allowedTables.add(caseSensitive ? stripped : stripped.toLowerCase());
                     }
                 }
             }
@@ -261,21 +285,24 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
          * Add a table to the allowed list programmatically.
          */
         public void addAllowedTable(String table) {
-            allowedTables.add(caseSensitive ? table : table.toLowerCase());
+            String stripped = stripQuotes(table);
+            allowedTables.add(caseSensitive ? stripped : stripped.toLowerCase());
         }
 
         /**
          * Add a table to the blocked list programmatically.
          */
         public void addBlockedTable(String table) {
-            blockedTables.add(caseSensitive ? table : table.toLowerCase());
+            String stripped = stripQuotes(table);
+            blockedTables.add(caseSensitive ? stripped : stripped.toLowerCase());
         }
 
         /**
          * Add a column to the blocked list programmatically.
          */
         public void addBlockedColumn(String column) {
-            blockedColumns.add(caseSensitive ? column : column.toLowerCase());
+            String stripped = stripQuotes(column);
+            blockedColumns.add(caseSensitive ? stripped : stripped.toLowerCase());
         }
 
         /**
@@ -302,12 +329,18 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
             Set<String> tables = new HashSet<>();
             Matcher matcher = TABLE_PATTERN.matcher(sql);
             while (matcher.find()) {
-                String table = matcher.group(1);
-                // Handle schema.table format - extract just table name
-                if (table.contains(".")) {
-                    table = table.substring(table.lastIndexOf('.') + 1);
+                String tableList = matcher.group(1);
+                for (String tableItem : tableList.split(",")) {
+                    String table = tableItem.trim();
+                    // Handle schema.table format - extract just table name
+                    if (table.contains(".")) {
+                        table = table.substring(table.lastIndexOf('.') + 1);
+                    }
+                    String stripped = stripQuotes(table);
+                    if (!stripped.isEmpty()) {
+                        tables.add(caseSensitive ? stripped : stripped.toLowerCase());
+                    }
                 }
-                tables.add(caseSensitive ? table : table.toLowerCase());
             }
             return tables;
         }
@@ -350,19 +383,16 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
                     continue;
                 }
 
-                // Handle aliases (column AS alias or column alias)
-                String[] asParts = trimmed.split("\\s+(?:AS\\s+)?", 2);
-                String columnExpr = asParts[0].trim();
-
-                // Extract column name from expression
-                Matcher nameMatcher = COLUMN_NAME_PATTERN.matcher(columnExpr);
-                if (nameMatcher.find()) {
-                    String col = nameMatcher.group(1);
+                // Extract column names from expression (including aliases)
+                Matcher nameMatcher = COLUMN_NAME_PATTERN.matcher(trimmed);
+                while (nameMatcher.find()) {
+                    String col = nameMatcher.group(0);
                     // Handle table.column - extract just column name for checking
                     if (col.contains(".")) {
                         col = col.substring(col.lastIndexOf('.') + 1);
                     }
-                    columns.add(caseSensitive ? col : col.toLowerCase());
+                    String stripped = stripQuotes(col);
+                    columns.add(caseSensitive ? stripped : stripped.toLowerCase());
                 }
             }
         }
