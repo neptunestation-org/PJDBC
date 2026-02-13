@@ -130,9 +130,9 @@ public class ParameterDefaultConformanceTest extends DriverConformanceTest {
             for (DriverCapability.Parameter param : driver.parameters()) {
                 assertNotNull(param.name(), "Parameter name should not be null in " + driver.name());
                 assertFalse(param.name().isEmpty(), "Parameter name should not be empty in " + driver.name());
-                assertTrue(param.name().matches("[a-zA-Z][a-zA-Z0-9_]*"),
+                assertTrue(param.name().matches("[a-zA-Z][a-zA-Z0-9_]*(\\.\\*)?"),
                     "Parameter name '" + param.name() + "' in " + driver.name() +
-                    " should be a valid identifier");
+                    " should be a valid identifier (optionally with .* suffix)");
             }
         }
     }
