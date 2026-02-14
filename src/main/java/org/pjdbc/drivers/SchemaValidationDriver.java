@@ -76,11 +76,16 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Semicolon-separated table types for metadata", defaultValue = "TABLE;VIEW")
 public class SchemaValidationDriver extends AbstractProxyDriver {
 
+    // Robust identifier regex handling quoted identifiers (double quotes, backticks, square brackets)
+    private static final String IDENTIFIER_REGEX = "(?:[a-zA-Z_][a-zA-Z0-9_]*|\"(?:[^\"]|\"\")*\"|`(?:[^`]|``)*`|\\[(?:[^\\]])*\\])";
+    private static final String QUALIFIED_IDENTIFIER_REGEX = IDENTIFIER_REGEX + "(?:\\." + IDENTIFIER_REGEX + ")?";
+
     // Pattern to extract table names from SQL
     // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
+    // Supports multiple tables separated by commas and handles comments as separators.
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
-        Pattern.CASE_INSENSITIVE
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)(?:\\s+|/\\*.*?\\*/|--.*$)*(" + QUALIFIED_IDENTIFIER_REGEX + "(?:(?:\\s+|/\\*.*?\\*/|--.*$)*,(?:\\s+|/\\*.*?\\*/|--.*$)*" + QUALIFIED_IDENTIFIER_REGEX + ")*)",
+        Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
     );
 
     // Pattern to extract column names from SELECT
@@ -91,20 +96,18 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
 
     // Pattern to extract columns from INSERT
     private static final Pattern INSERT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bINSERT\\s+INTO\\s+[a-zA-Z_][a-zA-Z0-9_.]*\\s*\\(([^)]+)\\)",
-        Pattern.CASE_INSENSITIVE
+        "\\bINSERT\\s+INTO\\s+" + QUALIFIED_IDENTIFIER_REGEX + "(?:\\s+|/\\*.*?\\*/|--.*$)*\\(([^)]+)\\)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract columns from UPDATE SET
     private static final Pattern UPDATE_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSET\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
-        Pattern.CASE_INSENSITIVE
+        "\\bSET\\s+(.+?)(?:\\s+WHERE\\b|$)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to parse column names (handles table.column and aliases)
-    private static final Pattern COLUMN_NAME_PATTERN = Pattern.compile(
-        "([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)"
-    );
+    private static final Pattern COLUMN_NAME_PATTERN = Pattern.compile(QUALIFIED_IDENTIFIER_REGEX);
 
     // Global configurations for external access
     private static final Map<Connection, SchemaConfig> connectionConfigs = new ConcurrentHashMap<>();
@@ -302,12 +305,19 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
             Set<String> tables = new HashSet<>();
             Matcher matcher = TABLE_PATTERN.matcher(sql);
             while (matcher.find()) {
-                String table = matcher.group(1);
-                // Handle schema.table format - extract just table name
-                if (table.contains(".")) {
-                    table = table.substring(table.lastIndexOf('.') + 1);
+                String tableList = matcher.group(1);
+                // Extract individual identifiers from the comma-separated list
+                Matcher idMatcher = Pattern.compile(QUALIFIED_IDENTIFIER_REGEX).matcher(tableList);
+                while (idMatcher.find()) {
+                    String qualifiedTable = idMatcher.group();
+                    String table = qualifiedTable;
+                    // Handle schema.table format - extract just table name and strip quotes
+                    if (table.contains(".")) {
+                        table = table.substring(table.lastIndexOf('.') + 1);
+                    }
+                    table = stripQuotes(table);
+                    tables.add(caseSensitive ? table : table.toLowerCase());
                 }
-                tables.add(caseSensitive ? table : table.toLowerCase());
             }
             return tables;
         }
@@ -332,39 +342,45 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
 
             // Extract from UPDATE SET
             Matcher updateMatcher = UPDATE_COLUMNS_PATTERN.matcher(sql);
-            while (updateMatcher.find()) {
-                String col = updateMatcher.group(1);
-                columns.add(caseSensitive ? col : col.toLowerCase());
+            if (updateMatcher.find()) {
+                extractColumnNames(updateMatcher.group(1), columns);
             }
 
             return columns;
         }
 
-        private void extractColumnNames(String columnList, Set<String> columns) {
-            // Split by comma and extract column names
-            for (String part : columnList.split(",")) {
-                // Skip aggregate functions and literals
-                String trimmed = part.trim();
-                if (trimmed.isEmpty() || trimmed.startsWith("'") ||
-                    trimmed.matches("\\d+") || trimmed.equals("*")) {
-                    continue;
+        private void extractColumnNames(String segment, Set<String> columns) {
+            // Find all identifiers in the segment
+            Matcher matcher = COLUMN_NAME_PATTERN.matcher(segment);
+            while (matcher.find()) {
+                String qualifiedCol = matcher.group();
+                String col = qualifiedCol;
+                // Handle table.column - extract just column name for checking
+                if (col.contains(".")) {
+                    col = col.substring(col.lastIndexOf('.') + 1);
                 }
+                col = stripQuotes(col);
 
-                // Handle aliases (column AS alias or column alias)
-                String[] asParts = trimmed.split("\\s+(?:AS\\s+)?", 2);
-                String columnExpr = asParts[0].trim();
+                // Skip common SQL keywords that might be picked up if not properly filtered
+                if (isSqlKeyword(col)) continue;
 
-                // Extract column name from expression
-                Matcher nameMatcher = COLUMN_NAME_PATTERN.matcher(columnExpr);
-                if (nameMatcher.find()) {
-                    String col = nameMatcher.group(1);
-                    // Handle table.column - extract just column name for checking
-                    if (col.contains(".")) {
-                        col = col.substring(col.lastIndexOf('.') + 1);
-                    }
-                    columns.add(caseSensitive ? col : col.toLowerCase());
-                }
+                columns.add(caseSensitive ? col : col.toLowerCase());
             }
+        }
+
+        private static String stripQuotes(String s) {
+            if (s == null || s.isEmpty()) return s;
+            if (s.startsWith("\"") && s.endsWith("\"")) return s.substring(1, s.length() - 1).replace("\"\"", "\"");
+            if (s.startsWith("`") && s.endsWith("`")) return s.substring(1, s.length() - 1).replace("``", "`");
+            if (s.startsWith("[") && s.endsWith("]")) return s.substring(1, s.length() - 1);
+            return s;
+        }
+
+        private static boolean isSqlKeyword(String s) {
+            String upper = s.toUpperCase();
+            return upper.equals("AS") || upper.equals("DISTINCT") || upper.equals("ALL") ||
+                   upper.equals("NULL") || upper.equals("AND") || upper.equals("OR") ||
+                   upper.equals("NOT") || upper.equals("IN") || upper.equals("IS");
         }
 
         private void validateTable(String table, String sql) throws SQLException {

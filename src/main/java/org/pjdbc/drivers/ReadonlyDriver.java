@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.pjdbc.annotations.DriverCapability;
@@ -54,22 +55,25 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Custom error message for blocked operations")
 public class ReadonlyDriver extends AbstractProxyDriver {
 
+    // Pattern to handle various SQL separators including comments
+    private static final String SEPARATOR = "(?:\\s+|/\\*.*?\\*/|--.*$)*";
+
     // Pattern to detect DML write operations
     private static final Pattern DML_PATTERN = Pattern.compile(
-        "^\\s*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
-        Pattern.CASE_INSENSITIVE
+        "^" + SEPARATOR + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
     );
 
     // Pattern to detect DDL operations
     private static final Pattern DDL_PATTERN = Pattern.compile(
-        "^\\s*(CREATE|ALTER|DROP|RENAME)\\b",
-        Pattern.CASE_INSENSITIVE
+        "^" + SEPARATOR + "(CREATE|ALTER|DROP|RENAME)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
     );
 
     // Pattern to detect DCL operations
     private static final Pattern DCL_PATTERN = Pattern.compile(
-        "^\\s*(GRANT|REVOKE)\\b",
-        Pattern.CASE_INSENSITIVE
+        "^" + SEPARATOR + "(GRANT|REVOKE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
     );
 
     static {
@@ -166,6 +170,13 @@ public class ReadonlyDriver extends AbstractProxyDriver {
 
         private String getStatementType(String sql) {
             String trimmed = sql.trim();
+            // Handle comments at the beginning
+            Matcher m = Pattern.compile("^(?:\\s+|/\\*.*?\\*/|--.*$)*([a-zA-Z]+)",
+                                        Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL).matcher(trimmed);
+            if (m.find()) {
+                return m.group(1).toUpperCase();
+            }
+
             int spaceIdx = trimmed.indexOf(' ');
             if (spaceIdx > 0) {
                 return trimmed.substring(0, spaceIdx).toUpperCase();
@@ -191,17 +202,20 @@ public class ReadonlyDriver extends AbstractProxyDriver {
 
         @Override
         public Statement createStatement() throws SQLException {
-            return proxyStatement(getDelegate().createStatement(), this);
+            ReadonlyDriver filterDriver = (ReadonlyDriver) getDriver();
+            return filterDriver.proxyStatement(getDelegate().createStatement(), this);
         }
 
         @Override
         public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
-            return proxyStatement(getDelegate().createStatement(resultSetType, resultSetConcurrency), this);
+            ReadonlyDriver filterDriver = (ReadonlyDriver) getDriver();
+            return filterDriver.proxyStatement(getDelegate().createStatement(resultSetType, resultSetConcurrency), this);
         }
 
         @Override
         public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-            return proxyStatement(getDelegate().createStatement(resultSetType, resultSetConcurrency, resultSetHoldability), this);
+            ReadonlyDriver filterDriver = (ReadonlyDriver) getDriver();
+            return filterDriver.proxyStatement(getDelegate().createStatement(resultSetType, resultSetConcurrency, resultSetHoldability), this);
         }
 
         @Override
