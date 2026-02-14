@@ -1,0 +1,4 @@
+## 2026-02-14 - Naive SQL Regex Bypass Pattern
+**Vulnerability:** Multiple security drivers (SchemaValidationDriver, ReadonlyDriver) used naive regex patterns that could be bypassed using SQL comments (e.g., `FROM/**/table`), quoted identifiers (e.g., `FROM "table"`), or multiple items in lists (e.g., `FROM table1, table2`).
+**Learning:** SQL parsing with simple regex is extremely fragile because SQL allows comments and various separators almost anywhere. A regex expecting `\s+` can be bypassed by anything the DB treats as a separator but the regex does not.
+**Prevention:** Use robust identifier regexes that handle all quoting styles. When identifying "zones" in SQL (like the list of tables after FROM), capture the entire zone and then extract all identifiers from it, rather than assuming a single identifier or using naive splitting. Replace or account for comments in all security-sensitive regexes.
