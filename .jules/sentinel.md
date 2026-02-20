@@ -1,0 +1,4 @@
+## 2026-02-20 - Fix SQL Comment Bypass in Proxy Drivers
+**Vulnerability:** Regex-based SQL parsing logic in `SchemaValidationDriver`, `SchemaTransformer`, and `WhereTransformer` used `\s+` to identify boundaries between keywords and identifiers. This allowed bypasses using SQL comments (e.g., `SELECT*FROM/**/secrets`) which effectively acted as separators but were not matched by `\s+`.
+**Learning:** Standard whitespace regexes in security-sensitive SQL parsing are insufficient. Even simple proxy drivers that don't use full AST parsers must account for the full range of SQL separators allowed by the target database engine, including various comment styles.
+**Prevention:** Use a centralized, comment-aware SQL separator pattern (like `SqlPatterns.SQL_SEP`) for all regex-based SQL parsing and transformation logic.
