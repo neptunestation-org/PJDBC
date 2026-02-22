@@ -752,4 +752,57 @@ public class DataMaskingDriverTest {
             }
         }
     }
+
+    @Test
+    public void testAliasBypass() throws SQLException {
+        setupTestTable("test_alias_bypass");
+        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:h2:mem:test_alias_bypass;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT ssn AS alias FROM users WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    assertEquals("[REDACTED]", rs.getString("alias"));
+                }
+            }
+        }
+    }
+
+    @Test(expected = SQLException.class)
+    public void testBlobLeak() throws SQLException {
+        try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:test_blob;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE TABLE blob_data (id INT, secret BLOB)");
+                stmt.execute("INSERT INTO blob_data VALUES (1, CAST('secret' AS BLOB))");
+            }
+        }
+        String url = "jdbc:mask[columns=secret]:jdbc:h2:mem:test_blob;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret FROM blob_data")) {
+                    assertTrue(rs.next());
+                    rs.getBlob("secret");
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetObjectWithClass() throws SQLException {
+        setupTestTable("test_getobject_class");
+        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:h2:mem:test_getobject_class;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT ssn FROM users WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    assertEquals("[REDACTED]", rs.getObject("ssn", String.class));
+                    try {
+                        rs.getObject("ssn", Object.class);
+                        fail("Expected SQLException");
+                    } catch (SQLException e) {
+                        // expected
+                    }
+                }
+            }
+        }
+    }
 }
