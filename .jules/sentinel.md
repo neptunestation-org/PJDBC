@@ -1,0 +1,4 @@
+## 2026-02-23 - [DataMaskingDriver Hardening]
+**Vulnerability:** The `DataMaskingDriver` had multiple security gaps: 1) Alias bypass via `SELECT secret AS alias`, 2) Data leakage through complex JDBC types (Blobs, Clobs, Arrays, etc.) that weren't overridden, 3) Bypasses via `getObject(..., Class)` and various stream methods.
+**Learning:** For a security-focused proxy driver, it is critical to ensure TOTAL coverage of the delegated interface (e.g., `ResultSet`). Any method not explicitly handled that returns sensitive data represents a potential bypass.
+**Prevention:** Use a fail-secure approach: any method not handled that could return sensitive data should be overridden to throw `SQLException` for masked columns. Refactor label-based getters to delegate to index-based getters using `findColumn` to ensure consistent application of security checks regardless of aliasing.
