@@ -13,6 +13,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Blob;
+import java.sql.Clob;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -748,6 +750,66 @@ public class DataMaskingDriverTest {
                     }
                     // But getString works and returns masked value
                     assertEquals("[REDACTED]", rs.getString("secret_int"));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testAliasBypass() throws SQLException {
+        try (Connection setupConn = DriverManager.getConnection("jdbc:h2:mem:test_alias;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = setupConn.createStatement()) {
+                stmt.execute("CREATE TABLE secrets (id INT, secret_val VARCHAR(100))");
+                stmt.execute("INSERT INTO secrets VALUES (1, 'SUPER_SECRET_DATA')");
+            }
+        }
+        String url = "jdbc:mask[columns=secret_val,strategy=REDACT]:jdbc:h2:mem:test_alias;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_val AS alias_val FROM secrets")) {
+                    assertTrue(rs.next());
+                    assertEquals("[REDACTED]", rs.getString("alias_val"));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testLOBLeakage() throws SQLException {
+        try (Connection setupConn = DriverManager.getConnection("jdbc:h2:mem:test_lob;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = setupConn.createStatement()) {
+                stmt.execute("CREATE TABLE lob_secrets (id INT, secret_blob BLOB, secret_clob CLOB)");
+                stmt.execute("INSERT INTO lob_secrets VALUES (1, CAST('SECRET_BLOB_CONTENT' AS BLOB), CAST('SECRET_CLOB_CONTENT' AS CLOB))");
+            }
+        }
+        String url = "jdbc:mask[columns=secret_blob;secret_clob,strategy=REDACT]:jdbc:h2:mem:test_lob;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_blob, secret_clob FROM lob_secrets")) {
+                    assertTrue(rs.next());
+                    try { rs.getBlob("secret_blob"); fail("Expected SQLException for masked Blob"); } catch (SQLException e) { assertTrue(e.getMessage().contains("masked")); }
+                    try { rs.getClob("secret_clob"); fail("Expected SQLException for masked Clob"); } catch (SQLException e) { assertTrue(e.getMessage().contains("masked")); }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetObjectTypeBypass() throws SQLException {
+        try (Connection setupConn = DriverManager.getConnection("jdbc:h2:mem:test_getobject_type;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = setupConn.createStatement()) {
+                stmt.execute("CREATE TABLE type_secrets (id INT, secret_val VARCHAR(100))");
+                stmt.execute("INSERT INTO type_secrets VALUES (1, 'TYPE_SECRET_DATA')");
+            }
+        }
+        String url = "jdbc:mask[columns=secret_val,strategy=REDACT]:jdbc:h2:mem:test_getobject_type;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_val FROM type_secrets")) {
+                    assertTrue(rs.next());
+                    assertEquals("[REDACTED]", rs.getObject(1, String.class));
+                    assertEquals("[REDACTED]", rs.getObject("secret_val", String.class));
+                    try { rs.getObject(1, Integer.class); fail("Expected SQLException for masked column via getObject(int, Class)"); } catch (SQLException e) { assertTrue(e.getMessage().contains("masked")); }
                 }
             }
         }
