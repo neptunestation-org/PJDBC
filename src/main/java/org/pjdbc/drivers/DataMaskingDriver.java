@@ -418,6 +418,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
      *   <li>Numeric methods (getInt, getLong, getBigDecimal, etc.): throw SQLException</li>
      *   <li>Date/time methods (getDate, getTime, getTimestamp): throw SQLException</li>
      *   <li>Boolean (getBoolean): throw SQLException</li>
+     *   <li>Complex types (getBlob, getClob, etc.): throw SQLException</li>
      *   <li>Object (getObject): returns masked string if String, throws for other types</li>
      * </ul>
      *
@@ -474,63 +475,44 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public String getString(String columnLabel) throws SQLException {
-            String value = super.getString(columnLabel);
-            if (config.shouldMask(columnLabel) && value != null) {
-                return config.maskValue(value);
-            }
-            return value;
-        }
+        public String getString(String label) throws SQLException { return getString(findColumn(label)); }
 
         @Override
         public String getNString(int columnIndex) throws SQLException {
-            String value = super.getNString(columnIndex);
-            if (shouldMaskColumn(columnIndex) && value != null) {
-                return config.maskValue(value);
-            }
-            return value;
+            String val = super.getNString(columnIndex);
+            return (shouldMaskColumn(columnIndex) && val != null) ? config.maskValue(val) : val;
         }
 
         @Override
-        public String getNString(String columnLabel) throws SQLException {
-            String value = super.getNString(columnLabel);
-            if (config.shouldMask(columnLabel) && value != null) {
-                return config.maskValue(value);
-            }
-            return value;
-        }
-
-        // === OBJECT METHODS ===
+        public String getNString(String label) throws SQLException { return getNString(findColumn(label)); }
 
         @Override
         public Object getObject(int columnIndex) throws SQLException {
             if (shouldMaskColumn(columnIndex)) {
-                Object value = super.getObject(columnIndex);
-                if (value == null) return null;
-                if (value instanceof String s) {
-                    return config.maskValue(s);
-                }
-                // Non-string type in masked column - throw to prevent data leak
-                throwMaskedColumnException(String.valueOf(columnIndex), "getObject");
+                Object val = super.getObject(columnIndex);
+                if (val instanceof String s) return config.maskValue(s);
+                if (val != null) throwMaskedColumnException(String.valueOf(columnIndex), "getObject");
             }
             return super.getObject(columnIndex);
         }
 
         @Override
-        public Object getObject(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                Object value = super.getObject(columnLabel);
-                if (value == null) return null;
-                if (value instanceof String s) {
-                    return config.maskValue(s);
+        public Object getObject(String label) throws SQLException { return getObject(findColumn(label)); }
+
+        @Override
+        public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) {
+                if (type == String.class) {
+                    String val = super.getString(columnIndex);
+                    return val == null ? null : type.cast(config.maskValue(val));
                 }
-                // Non-string type in masked column - throw to prevent data leak
-                throwMaskedColumnException(columnLabel, "getObject");
+                throwMaskedColumnException(String.valueOf(columnIndex), "getObject");
             }
-            return super.getObject(columnLabel);
+            return super.getObject(columnIndex, type);
         }
 
-        // === NUMERIC METHODS - throw SQLException for masked columns ===
+        @Override
+        public <T> T getObject(String label, Class<T> type) throws SQLException { return getObject(findColumn(label), type); }
 
         @Override
         public byte getByte(int columnIndex) throws SQLException {
@@ -539,10 +521,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public byte getByte(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getByte");
-            return super.getByte(columnLabel);
-        }
+        public byte getByte(String label) throws SQLException { return getByte(findColumn(label)); }
 
         @Override
         public short getShort(int columnIndex) throws SQLException {
@@ -551,10 +530,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public short getShort(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getShort");
-            return super.getShort(columnLabel);
-        }
+        public short getShort(String label) throws SQLException { return getShort(findColumn(label)); }
 
         @Override
         public int getInt(int columnIndex) throws SQLException {
@@ -563,10 +539,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public int getInt(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getInt");
-            return super.getInt(columnLabel);
-        }
+        public int getInt(String label) throws SQLException { return getInt(findColumn(label)); }
 
         @Override
         public long getLong(int columnIndex) throws SQLException {
@@ -575,10 +548,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public long getLong(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getLong");
-            return super.getLong(columnLabel);
-        }
+        public long getLong(String label) throws SQLException { return getLong(findColumn(label)); }
 
         @Override
         public float getFloat(int columnIndex) throws SQLException {
@@ -587,10 +557,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public float getFloat(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getFloat");
-            return super.getFloat(columnLabel);
-        }
+        public float getFloat(String label) throws SQLException { return getFloat(findColumn(label)); }
 
         @Override
         public double getDouble(int columnIndex) throws SQLException {
@@ -599,10 +566,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public double getDouble(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getDouble");
-            return super.getDouble(columnLabel);
-        }
+        public double getDouble(String label) throws SQLException { return getDouble(findColumn(label)); }
 
         @Override
         public java.math.BigDecimal getBigDecimal(int columnIndex) throws SQLException {
@@ -611,48 +575,28 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public java.math.BigDecimal getBigDecimal(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getBigDecimal");
-            return super.getBigDecimal(columnLabel);
-        }
+        public java.math.BigDecimal getBigDecimal(String label) throws SQLException { return getBigDecimal(findColumn(label)); }
 
-        @Override
-        @SuppressWarnings("deprecation")
+        @Override @SuppressWarnings("deprecation")
         public java.math.BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
             if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getBigDecimal");
             return super.getBigDecimal(columnIndex, scale);
         }
 
-        @Override
-        @SuppressWarnings("deprecation")
-        public java.math.BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getBigDecimal");
-            return super.getBigDecimal(columnLabel, scale);
-        }
-
-        // === BYTES - return masked string as bytes ===
+        @Override @SuppressWarnings("deprecation")
+        public java.math.BigDecimal getBigDecimal(String label, int scale) throws SQLException { return getBigDecimal(findColumn(label), scale); }
 
         @Override
         public byte[] getBytes(int columnIndex) throws SQLException {
             if (shouldMaskColumn(columnIndex)) {
-                String value = super.getString(columnIndex);
-                if (value == null) return null;
-                return config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                String val = super.getString(columnIndex);
+                return val == null ? null : config.maskValue(val).getBytes(java.nio.charset.StandardCharsets.UTF_8);
             }
             return super.getBytes(columnIndex);
         }
 
         @Override
-        public byte[] getBytes(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                String value = super.getString(columnLabel);
-                if (value == null) return null;
-                return config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_8);
-            }
-            return super.getBytes(columnLabel);
-        }
-
-        // === BOOLEAN - throw SQLException for masked columns ===
+        public byte[] getBytes(String label) throws SQLException { return getBytes(findColumn(label)); }
 
         @Override
         public boolean getBoolean(int columnIndex) throws SQLException {
@@ -661,12 +605,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public boolean getBoolean(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getBoolean");
-            return super.getBoolean(columnLabel);
-        }
-
-        // === DATE/TIME METHODS - throw SQLException for masked columns ===
+        public boolean getBoolean(String label) throws SQLException { return getBoolean(findColumn(label)); }
 
         @Override
         public java.sql.Date getDate(int columnIndex) throws SQLException {
@@ -675,10 +614,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public java.sql.Date getDate(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getDate");
-            return super.getDate(columnLabel);
-        }
+        public java.sql.Date getDate(String label) throws SQLException { return getDate(findColumn(label)); }
 
         @Override
         public java.sql.Date getDate(int columnIndex, java.util.Calendar cal) throws SQLException {
@@ -687,10 +623,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public java.sql.Date getDate(String columnLabel, java.util.Calendar cal) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getDate");
-            return super.getDate(columnLabel, cal);
-        }
+        public java.sql.Date getDate(String label, java.util.Calendar cal) throws SQLException { return getDate(findColumn(label), cal); }
 
         @Override
         public java.sql.Time getTime(int columnIndex) throws SQLException {
@@ -699,10 +632,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public java.sql.Time getTime(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getTime");
-            return super.getTime(columnLabel);
-        }
+        public java.sql.Time getTime(String label) throws SQLException { return getTime(findColumn(label)); }
 
         @Override
         public java.sql.Time getTime(int columnIndex, java.util.Calendar cal) throws SQLException {
@@ -711,10 +641,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public java.sql.Time getTime(String columnLabel, java.util.Calendar cal) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getTime");
-            return super.getTime(columnLabel, cal);
-        }
+        public java.sql.Time getTime(String label, java.util.Calendar cal) throws SQLException { return getTime(findColumn(label), cal); }
 
         @Override
         public java.sql.Timestamp getTimestamp(int columnIndex) throws SQLException {
@@ -723,10 +650,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public java.sql.Timestamp getTimestamp(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getTimestamp");
-            return super.getTimestamp(columnLabel);
-        }
+        public java.sql.Timestamp getTimestamp(String label) throws SQLException { return getTimestamp(findColumn(label)); }
 
         @Override
         public java.sql.Timestamp getTimestamp(int columnIndex, java.util.Calendar cal) throws SQLException {
@@ -735,121 +659,73 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
-        public java.sql.Timestamp getTimestamp(String columnLabel, java.util.Calendar cal) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getTimestamp");
-            return super.getTimestamp(columnLabel, cal);
-        }
-
-        // === CHARACTER STREAMS - return stream of masked content ===
+        public java.sql.Timestamp getTimestamp(String label, java.util.Calendar cal) throws SQLException { return getTimestamp(findColumn(label), cal); }
 
         @Override
         public java.io.Reader getCharacterStream(int columnIndex) throws SQLException {
             if (shouldMaskColumn(columnIndex)) {
-                String value = super.getString(columnIndex);
-                if (value == null) return null;
-                return new java.io.StringReader(config.maskValue(value));
+                String val = super.getString(columnIndex);
+                return val == null ? null : new java.io.StringReader(config.maskValue(val));
             }
             return super.getCharacterStream(columnIndex);
         }
 
         @Override
-        public java.io.Reader getCharacterStream(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                String value = super.getString(columnLabel);
-                if (value == null) return null;
-                return new java.io.StringReader(config.maskValue(value));
-            }
-            return super.getCharacterStream(columnLabel);
-        }
+        public java.io.Reader getCharacterStream(String label) throws SQLException { return getCharacterStream(findColumn(label)); }
 
         @Override
         public java.io.Reader getNCharacterStream(int columnIndex) throws SQLException {
             if (shouldMaskColumn(columnIndex)) {
-                String value = super.getNString(columnIndex);
-                if (value == null) return null;
-                return new java.io.StringReader(config.maskValue(value));
+                String val = super.getNString(columnIndex);
+                return val == null ? null : new java.io.StringReader(config.maskValue(val));
             }
             return super.getNCharacterStream(columnIndex);
         }
 
         @Override
-        public java.io.Reader getNCharacterStream(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                String value = super.getNString(columnLabel);
-                if (value == null) return null;
-                return new java.io.StringReader(config.maskValue(value));
-            }
-            return super.getNCharacterStream(columnLabel);
-        }
-
-        // === BINARY STREAMS - return stream of masked bytes ===
+        public java.io.Reader getNCharacterStream(String label) throws SQLException { return getNCharacterStream(findColumn(label)); }
 
         @Override
         public java.io.InputStream getAsciiStream(int columnIndex) throws SQLException {
             if (shouldMaskColumn(columnIndex)) {
-                String value = super.getString(columnIndex);
-                if (value == null) return null;
-                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.US_ASCII);
-                return new java.io.ByteArrayInputStream(maskedBytes);
+                String val = super.getString(columnIndex);
+                return val == null ? null : new java.io.ByteArrayInputStream(config.maskValue(val).getBytes(java.nio.charset.StandardCharsets.US_ASCII));
             }
             return super.getAsciiStream(columnIndex);
         }
 
         @Override
-        public java.io.InputStream getAsciiStream(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                String value = super.getString(columnLabel);
-                if (value == null) return null;
-                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.US_ASCII);
-                return new java.io.ByteArrayInputStream(maskedBytes);
-            }
-            return super.getAsciiStream(columnLabel);
-        }
+        public java.io.InputStream getAsciiStream(String label) throws SQLException { return getAsciiStream(findColumn(label)); }
 
         @Override
         public java.io.InputStream getBinaryStream(int columnIndex) throws SQLException {
             if (shouldMaskColumn(columnIndex)) {
-                String value = super.getString(columnIndex);
-                if (value == null) return null;
-                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                return new java.io.ByteArrayInputStream(maskedBytes);
+                String val = super.getString(columnIndex);
+                return val == null ? null : new java.io.ByteArrayInputStream(config.maskValue(val).getBytes(java.nio.charset.StandardCharsets.UTF_8));
             }
             return super.getBinaryStream(columnIndex);
         }
 
         @Override
-        public java.io.InputStream getBinaryStream(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                String value = super.getString(columnLabel);
-                if (value == null) return null;
-                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                return new java.io.ByteArrayInputStream(maskedBytes);
-            }
-            return super.getBinaryStream(columnLabel);
-        }
+        public java.io.InputStream getBinaryStream(String label) throws SQLException { return getBinaryStream(findColumn(label)); }
 
-        @Override
-        @SuppressWarnings("deprecation")
+        @Override @SuppressWarnings("deprecation")
         public java.io.InputStream getUnicodeStream(int columnIndex) throws SQLException {
             if (shouldMaskColumn(columnIndex)) {
-                String value = super.getString(columnIndex);
-                if (value == null) return null;
-                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_16);
-                return new java.io.ByteArrayInputStream(maskedBytes);
+                String val = super.getString(columnIndex);
+                return val == null ? null : new java.io.ByteArrayInputStream(config.maskValue(val).getBytes(java.nio.charset.StandardCharsets.UTF_16));
             }
             return super.getUnicodeStream(columnIndex);
         }
 
-        @Override
-        @SuppressWarnings("deprecation")
-        public java.io.InputStream getUnicodeStream(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                String value = super.getString(columnLabel);
-                if (value == null) return null;
-                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_16);
-                return new java.io.ByteArrayInputStream(maskedBytes);
-            }
-            return super.getUnicodeStream(columnLabel);
-        }
+        @Override @SuppressWarnings("deprecation")
+        public java.io.InputStream getUnicodeStream(String label) throws SQLException { return getUnicodeStream(findColumn(label)); }
+
+        @Override public java.sql.Blob getBlob(int i) throws SQLException { if (shouldMaskColumn(i)) throwMaskedColumnException(String.valueOf(i), "getBlob"); return super.getBlob(i); }
+        @Override public java.sql.Blob getBlob(String l) throws SQLException { return getBlob(findColumn(l)); }
+        @Override public java.sql.Clob getClob(int i) throws SQLException { if (shouldMaskColumn(i)) throwMaskedColumnException(String.valueOf(i), "getClob"); return super.getClob(i); }
+        @Override public java.sql.Clob getClob(String l) throws SQLException { return getClob(findColumn(l)); }
+        @Override public java.sql.NClob getNClob(int i) throws SQLException { if (shouldMaskColumn(i)) throwMaskedColumnException(String.valueOf(i), "getNClob"); return super.getNClob(i); }
+        @Override public java.sql.NClob getNClob(String l) throws SQLException { return getNClob(findColumn(l)); }
     }
 }

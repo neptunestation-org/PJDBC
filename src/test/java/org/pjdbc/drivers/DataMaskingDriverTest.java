@@ -13,6 +13,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Blob;
+import java.sql.Clob;
+import java.sql.NClob;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -748,6 +751,72 @@ public class DataMaskingDriverTest {
                     }
                     // But getString works and returns masked value
                     assertEquals("[REDACTED]", rs.getString("secret_int"));
+                }
+            }
+        }
+    }
+
+    private void assertMaskedException(String message, SQLException e) {
+        String msg = e.getMessage();
+        assertTrue(message + " - Expected exception message to contain 'masked', but was: " + msg,
+                 msg != null && msg.contains("masked"));
+    }
+
+    @Test
+    public void testAliasBypass() throws SQLException {
+        try (Connection setupConn = DriverManager.getConnection("jdbc:h2:mem:test_alias;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = setupConn.createStatement()) {
+                stmt.execute("CREATE TABLE secrets (id INT, secret_val VARCHAR(100))");
+                stmt.execute("INSERT INTO secrets VALUES (1, 'SUPER_SECRET_DATA')");
+            }
+        }
+        String url = "jdbc:mask[columns=secret_val,strategy=REDACT]:jdbc:h2:mem:test_alias;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_val AS alias_val FROM secrets")) {
+                    assertTrue(rs.next());
+                    assertEquals("[REDACTED]", rs.getString("alias_val"));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testLOBLeakage() throws SQLException {
+        try (Connection setupConn = DriverManager.getConnection("jdbc:h2:mem:test_lob;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = setupConn.createStatement()) {
+                stmt.execute("CREATE TABLE lob_secrets (id INT, secret_blob BLOB, secret_clob CLOB, secret_nclob NCLOB)");
+                stmt.execute("INSERT INTO lob_secrets VALUES (1, CAST('SECRET_BLOB_CONTENT' AS BLOB), CAST('SECRET_CLOB_CONTENT' AS CLOB), CAST('SECRET_NCLOB_CONTENT' AS NCLOB))");
+            }
+        }
+        String url = "jdbc:mask[columns=secret_blob;secret_clob;secret_nclob,strategy=REDACT]:jdbc:h2:mem:test_lob;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_blob, secret_clob, secret_nclob FROM lob_secrets")) {
+                    assertTrue(rs.next());
+                    try { rs.getBlob("secret_blob"); fail("Masking bypassed for Blob!"); } catch (SQLException e) { assertMaskedException("Blob", e); }
+                    try { rs.getClob("secret_clob"); fail("Masking bypassed for Clob!"); } catch (SQLException e) { assertMaskedException("Clob", e); }
+                    try { rs.getNClob("secret_nclob"); fail("Masking bypassed for NClob!"); } catch (SQLException e) { assertMaskedException("NClob", e); }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetObjectWithTypeLeakage() throws SQLException {
+        try (Connection setupConn = DriverManager.getConnection("jdbc:h2:mem:test_getobject_security;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = setupConn.createStatement()) {
+                stmt.execute("CREATE TABLE typed_secrets (id INT, secret_val VARCHAR(100))");
+                stmt.execute("INSERT INTO typed_secrets VALUES (1, 'SUPER_SECRET_DATA')");
+            }
+        }
+        String url = "jdbc:mask[columns=secret_val,strategy=REDACT]:jdbc:h2:mem:test_getobject_security;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_val FROM typed_secrets")) {
+                    assertTrue(rs.next());
+                    assertEquals("[REDACTED]", rs.getObject("secret_val", String.class));
+                    try { rs.getObject("secret_val", Object.class); fail("getObject(Object.class) should throw"); } catch (SQLException e) { assertMaskedException("getObject(Object.class)", e); }
                 }
             }
         }
