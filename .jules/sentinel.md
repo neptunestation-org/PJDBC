@@ -1,0 +1,4 @@
+## 2026-02-25 - [DataMaskingDriver Label-Based Bypass]
+**Vulnerability:** Data masking in `DataMaskingDriver` could be bypassed by aliasing a masked column (e.g., `SELECT secret AS alias`) and accessing it via the alias label. The driver only checked the provided label against the masking regex, ignoring the underlying column's masked status.
+**Learning:** Security-focused proxy drivers must ensure that all access paths (index-based and label-based) to the same underlying data are consistently protected. Relying on user-provided labels for security checks is fragile.
+**Prevention:** In JDBC `ResultSet` wrappers, always resolve labels to column indices using `findColumn(label)` and delegate to the index-based getter. Ensure that metadata-based masking decisions are made once at initialization and stored in an index-based lookup table.
