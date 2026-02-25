@@ -752,4 +752,68 @@ public class DataMaskingDriverTest {
             }
         }
     }
+
+    @Test
+    public void testAliasBypass() throws SQLException {
+        setupTestTable("test_alias_bypass");
+        // Mask 'ssn' but not 'public_id'
+        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:h2:mem:test_alias_bypass;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT ssn AS public_id FROM users WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    String maskedByLabel = rs.getString("public_id");
+                    assertEquals("Masking should apply even when aliased", "[REDACTED]", maskedByLabel);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testClobBypass() throws SQLException {
+        try (Connection setupConn = DriverManager.getConnection("jdbc:h2:mem:test_clob;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = setupConn.createStatement()) {
+                stmt.execute("CREATE TABLE clobtest (id INT, bio CLOB)");
+                stmt.execute("INSERT INTO clobtest VALUES (1, 'Some secret bio')");
+            }
+        }
+        String url = "jdbc:mask[columns=bio,strategy=REDACT]:jdbc:h2:mem:test_clob;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT bio FROM clobtest WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    try {
+                        rs.getClob("bio");
+                        fail("getClob should throw SQLException for masked columns");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testBlobBypass() throws SQLException {
+        try (Connection setupConn = DriverManager.getConnection("jdbc:h2:mem:test_blob;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = setupConn.createStatement()) {
+                stmt.execute("CREATE TABLE blobtest (id INT, picture BLOB)");
+                stmt.execute("INSERT INTO blobtest VALUES (1, X'01020304')");
+            }
+        }
+        String url = "jdbc:mask[columns=picture,strategy=REDACT]:jdbc:h2:mem:test_blob;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT picture FROM blobtest WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    try {
+                        rs.getBlob("picture");
+                        fail("getBlob should throw SQLException for masked columns");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
+                }
+            }
+        }
+    }
 }
