@@ -752,4 +752,111 @@ public class DataMaskingDriverTest {
             }
         }
     }
+
+    @Test
+    public void testAliasBypass() throws SQLException {
+        setupTestTable("test_alias_bypass");
+        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:h2:mem:test_alias_bypass;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT ssn AS ssn_alias FROM users WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    String value = rs.getString("ssn_alias");
+                    assertEquals("[REDACTED]", value);
+                }
+            }
+        }
+    }
+
+    private void setupLobTable(String dbName) throws SQLException {
+        try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE TABLE IF NOT EXISTS lob_data (" +
+                    "id INT PRIMARY KEY, " +
+                    "secret_blob BLOB, " +
+                    "secret_clob CLOB, " +
+                    "secret_array INT ARRAY)");
+                stmt.execute("INSERT INTO lob_data VALUES (1, CAST('secret blob' AS BLOB), CAST('secret clob' AS CLOB), ARRAY[1, 2, 3])");
+            }
+        }
+    }
+
+    @Test
+    public void testGetBlobMaskedThrows() throws SQLException {
+        setupLobTable("test_blob_mask");
+        String url = "jdbc:mask[columns=secret_blob]:jdbc:h2:mem:test_blob_mask;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_blob FROM lob_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    try {
+                        rs.getBlob("secret_blob");
+                        fail("Expected SQLException for masked Blob");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetClobMaskedThrows() throws SQLException {
+        setupLobTable("test_clob_mask");
+        String url = "jdbc:mask[columns=secret_clob]:jdbc:h2:mem:test_clob_mask;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_clob FROM lob_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    try {
+                        rs.getClob("secret_clob");
+                        fail("Expected SQLException for masked Clob");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetArrayMaskedThrows() throws SQLException {
+        setupLobTable("test_array_mask");
+        String url = "jdbc:mask[columns=secret_array]:jdbc:h2:mem:test_array_mask;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_array FROM lob_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    try {
+                        rs.getArray("secret_array");
+                        fail("Expected SQLException for masked Array");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetObjectWithTypeMasking() throws SQLException {
+        setupLobTable("test_getobject_type_mask");
+        String url = "jdbc:mask[columns=secret_clob,strategy=REDACT]:jdbc:h2:mem:test_getobject_type_mask;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_clob FROM lob_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    // Should work for String.class
+                    assertEquals("[REDACTED]", rs.getObject("secret_clob", String.class));
+                    // Should throw for others
+                    try {
+                        rs.getObject("secret_clob", java.sql.Clob.class);
+                        fail("Expected SQLException");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
+                }
+            }
+        }
+    }
 }
