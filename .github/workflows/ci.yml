@@ -30,7 +30,7 @@ jobs:
       run: mvn -B package -DskipTests
 
     - name: Upload SBOM
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: sbom
         path: |
