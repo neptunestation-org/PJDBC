@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.pjdbc.sql.SqlPatterns;
 import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverParameter;
 import org.pjdbc.annotations.DriverParameter.ParameterType;
@@ -79,25 +80,25 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
     // Pattern to extract table names from SQL
     // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)" + SqlPatterns.SQL_SEP + "([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
         Pattern.CASE_INSENSITIVE
     );
 
     // Pattern to extract column names from SELECT
     private static final Pattern SELECT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSELECT\\s+(.+?)\\s+FROM\\b",
+        "\\bSELECT" + SqlPatterns.SQL_SEP + "(.+?)" + SqlPatterns.SQL_SEP + "FROM\\b",
         Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract columns from INSERT
     private static final Pattern INSERT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bINSERT\\s+INTO\\s+[a-zA-Z_][a-zA-Z0-9_.]*\\s*\\(([^)]+)\\)",
+        "\\bINSERT" + SqlPatterns.SQL_SEP + "INTO" + SqlPatterns.SQL_SEP + "[a-zA-Z_][a-zA-Z0-9_.]*" + SqlPatterns.SQL_SEP_OPT + "\\(([^)]+)\\)",
         Pattern.CASE_INSENSITIVE
     );
 
     // Pattern to extract columns from UPDATE SET
     private static final Pattern UPDATE_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSET\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+        "\\bSET" + SqlPatterns.SQL_SEP + "([a-zA-Z_][a-zA-Z0-9_]*)",
         Pattern.CASE_INSENSITIVE
     );
 
