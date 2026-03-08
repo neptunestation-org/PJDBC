@@ -1,0 +1,4 @@
+## 2026-03-08 - [DataMaskingDriver Alias and LOB Bypass]
+**Vulnerability:** Masking could be bypassed by aliasing columns in SQL (e.g., `SELECT secret AS public`) because masking checks were applied to the column label, not the underlying column. Additionally, LOB types (Blob, Clob) and other complex types were not covered by masking, leading to data leaks.
+**Learning:** `AbstractResultSet` does not centralize all getter calls through a single hook like `transformValue`. Security-critical proxy drivers must explicitly override all getter variants (index and label) and all data types (LOBs, complex objects) to ensure fail-secure behavior.
+**Prevention:** In security proxy drivers, refactor label-based getters to always delegate to index-based getters after resolving the index via `findColumn`. This ensures consistent policy enforcement regardless of how the column is referenced.
