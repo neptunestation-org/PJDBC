@@ -1,0 +1,4 @@
+## 2026-03-11 - SQL Comment Bypass in Regex Filters
+**Vulnerability:** Regex-based SQL filters (like `ReadonlyDriver` and `SchemaValidationDriver`) that use `\s+` or `^\s*` for keyword separation can be bypassed by using SQL comments (`/*...*/` or `--...`) as separators.
+**Learning:** SQL standard and most databases treat comments as valid separators between tokens. Simple regexes that only account for whitespace are insufficient for security-critical SQL parsing.
+**Prevention:** Always use a centralized separator pattern that includes both whitespace and SQL comments (`(?:\\s|/\\*[\\s\\S]*?\\*/|--.*)+`) when parsing SQL with regex. Additionally, when using `Matcher.appendReplacement`, ensure the replacement string is properly quoted using `Matcher.quoteReplacement()` if it contains any matched text from the original SQL, as comments or other user input might contain special characters like `$` or `\` that could break the replacement logic.
