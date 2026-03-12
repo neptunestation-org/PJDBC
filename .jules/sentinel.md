@@ -1,0 +1,4 @@
+## 2026-03-12 - [Data Masking Bypass via Aliasing and Missing Type Overrides]
+**Vulnerability:** Data masking in `DataMaskingDriver` could be bypassed by using column aliases (e.g., `SELECT secret AS alias`) or by using specialized JDBC getters (e.g., `getBlob`, `getArray`, `getObject(..., Class)`) that were not explicitly overridden in the proxy `ResultSet`.
+**Learning:** Checking security constraints against user-provided labels in a proxy is insufficient because labels can be changed by the user. Consistent security must be applied at the lowest level possible (the column index) and across the entire interface surface to prevent "leaky" implementations.
+**Prevention:** In JDBC proxy drivers, always resolve labels to indices via `findColumn` and apply security logic to the index-based methods. Ensure total coverage of the interface; any method that returns data must be explicitly handled or securely blocked.
