@@ -752,4 +752,54 @@ public class DataMaskingDriverTest {
             }
         }
     }
+
+    @Test
+    public void testGetBlobMaskedThrows() throws SQLException {
+        try (Connection setupConn = DriverManager.getConnection("jdbc:h2:mem:test_blob;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = setupConn.createStatement()) {
+                stmt.execute("CREATE TABLE lobtest (id INT, secret_blob BLOB)");
+                stmt.execute("INSERT INTO lobtest VALUES (1, X'01020304')");
+            }
+        }
+        String url = "jdbc:mask[columns=secret_blob]:jdbc:h2:mem:test_blob;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_blob FROM lobtest WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    try {
+                        rs.getBlob("secret_blob");
+                        fail("Expected SQLException for masked BLOB column");
+                    } catch (SQLException e) {
+                        assertTrue("Error message should mention 'masked', but was: " + e.getMessage(),
+                                 e.getMessage().contains("masked"));
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetClobMaskedThrows() throws SQLException {
+        try (Connection setupConn = DriverManager.getConnection("jdbc:h2:mem:test_clob;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = setupConn.createStatement()) {
+                stmt.execute("CREATE TABLE lobtest2 (id INT, secret_clob CLOB)");
+                stmt.execute("INSERT INTO lobtest2 VALUES (1, 'very secret')");
+            }
+        }
+        String url = "jdbc:mask[columns=secret_clob]:jdbc:h2:mem:test_clob;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_clob FROM lobtest2 WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    try {
+                        rs.getClob("secret_clob");
+                        fail("Expected SQLException for masked CLOB column");
+                    } catch (SQLException e) {
+                        assertTrue("Error message should mention 'masked', but was: " + e.getMessage(),
+                                 e.getMessage().contains("masked"));
+                    }
+                }
+            }
+        }
+    }
 }
