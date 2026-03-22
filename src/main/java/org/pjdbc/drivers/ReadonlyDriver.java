@@ -20,6 +20,7 @@ import org.pjdbc.sql.AbstractPreparedStatement;
 import org.pjdbc.sql.AbstractProxyDriver;
 import org.pjdbc.sql.AbstractStatement;
 import org.pjdbc.sql.JdbcUrlParser;
+import org.pjdbc.sql.SqlPatterns;
 
 /**
  * ReadonlyDriver enforces read-only database access by blocking write operations.
@@ -56,19 +57,19 @@ public class ReadonlyDriver extends AbstractProxyDriver {
 
     // Pattern to detect DML write operations
     private static final Pattern DML_PATTERN = Pattern.compile(
-        "^\\s*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        "^" + SqlPatterns.SQL_SEP_OPT + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
     // Pattern to detect DDL operations
     private static final Pattern DDL_PATTERN = Pattern.compile(
-        "^\\s*(CREATE|ALTER|DROP|RENAME)\\b",
+        "^" + SqlPatterns.SQL_SEP_OPT + "(CREATE|ALTER|DROP|RENAME)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
     // Pattern to detect DCL operations
     private static final Pattern DCL_PATTERN = Pattern.compile(
-        "^\\s*(GRANT|REVOKE)\\b",
+        "^" + SqlPatterns.SQL_SEP_OPT + "(GRANT|REVOKE)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
