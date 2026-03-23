@@ -1,0 +1,4 @@
+## 2026-03-23 - Comment and CTE Security Bypass
+**Vulnerability:** Security-focused proxy drivers (ReadonlyDriver, SchemaValidationDriver) and SQL transformers were vulnerable to bypasses using SQL comments (e.g., `/* comment */ INSERT...` or `FROM/**/SECRET_TABLE`). ReadonlyDriver was also bypassed by DML wrapped in Common Table Expressions (CTEs) like `WITH x AS (INSERT...) SELECT 1`.
+**Learning:** Regex-based SQL filtering that relies on `^\\s*` for anchoring or `\\s+` for keyword separation is fragile because SQL comments are valid separators in most dialects. Additionally, CTEs (starting with `WITH`) change the "start" of the statement, allowing DML to be hidden from simple keyword-at-start checks.
+**Prevention:** Use a centralized utility (`SqlPatterns`) for SQL parsing that treats comments as valid separators (`SQL_SEP`, `SQL_SEP_OPT`). Always include the `WITH` keyword in DML detection patterns for read-only enforcement to block CTE-based write attempts.
