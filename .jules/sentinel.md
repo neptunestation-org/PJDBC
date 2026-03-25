@@ -1,0 +1,4 @@
+## 2026-03-25 - Fix ReadonlyDriver leading comment bypass
+**Vulnerability:** The `ReadonlyDriver` used a simple `^\\s*` anchor in its regex patterns to detect write operations (DML/DDL/DCL). This allowed attackers to bypass the "readonly" restriction by prefixing SQL statements with comments (e.g., `/* comment */ CREATE TABLE...`).
+**Learning:** SQL parsers that rely on naive whitespace detection are highly vulnerable to comment-based bypasses, as databases treat comments as valid separators. Security-critical regexes must explicitly account for all valid SQL separators, including block and line comments.
+**Prevention:** Use a centralized, robust SQL separator pattern (like `SqlPatterns.SQL_SEP_OPT`) that includes `(?:\\s+|/\\*[\\s\\S]*?\\*/|--.*)*` for all keyword and statement boundary checks.
