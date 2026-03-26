@@ -1,0 +1,4 @@
+## 2026-03-26 - Data Masking Bypass via Aliasing and LOBs
+**Vulnerability:** Data masking in `DataMaskingDriver` could be bypassed using SQL column aliasing (e.g., `SELECT secret AS alias`) when using label-based getters, or by using LOB/complex type getters (e.g., `getBlob`, `getObject(int, Class)`) which were not overridden.
+**Learning:** Security-focused `ResultSet` proxies must resolve column labels to indices using `findColumn()` and delegate to index-based logic to ensure consistent security state application regardless of SQL-level aliasing. Furthermore, any method in a delegated interface that returns data must be explicitly handled (either masked or blocked) to prevent "fail-open" bypasses.
+**Prevention:** In security proxies, refactor all label-based interface methods to delegate to index-based ones. Perform a complete audit of the delegated interface (e.g., `ResultSet`) to ensure no data-retrieval methods are left with default pass-through behavior.
