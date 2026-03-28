@@ -4,6 +4,8 @@ import java.sql.SQLException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.pjdbc.sql.SqlPatterns;
+
 /**
  * Transformer that appends conditions to WHERE clauses in SQL.
  *
@@ -49,13 +51,13 @@ public class WhereTransformer extends AbstractJdbcTransformer {
     // Pattern to find insertion point for new WHERE clause
     // Matches: GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET, UNION, INTERSECT, EXCEPT, or end
     private static final Pattern WHERE_INSERTION_POINT = Pattern.compile(
-        "\\s+(GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR\\s+UPDATE|FOR\\s+SHARE)\\b",
+        SqlPatterns.SQL_SEP + "(GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR\\s+UPDATE|FOR\\s+SHARE)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
     // Pattern to detect SELECT/UPDATE/DELETE statements (not INSERT)
     private static final Pattern MODIFIABLE_STATEMENT = Pattern.compile(
-        "^\\s*(SELECT|UPDATE|DELETE)\\b",
+        "^" + SqlPatterns.SQL_SEP_OPT + "(SELECT|UPDATE|DELETE)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -129,6 +131,7 @@ public class WhereTransformer extends AbstractJdbcTransformer {
         if (matcher.find()) {
             // Insert WHERE before GROUP BY, ORDER BY, etc.
             int insertPos = matcher.start();
+            // Preserve the separator (which might include a comment)
             return sql.substring(0, insertPos) + " WHERE " + condition + sql.substring(insertPos);
         }
 
