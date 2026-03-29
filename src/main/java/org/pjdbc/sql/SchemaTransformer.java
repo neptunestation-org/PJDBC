@@ -4,6 +4,8 @@ import java.sql.SQLException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.pjdbc.sql.SqlPatterns;
+
 /**
  * Transformer that adds a schema prefix to table names in SQL.
  *
@@ -44,7 +46,7 @@ public class SchemaTransformer extends AbstractJdbcTransformer {
     // - TABLE tablename (for TRUNCATE TABLE, etc.)
     // Captures: keyword, optional whitespace, table name (not already qualified)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(FROM|JOIN|INTO|UPDATE|TABLE)\\s+(?!\\w+\\.)([a-zA-Z_][a-zA-Z0-9_]*)",
+        "\\b(FROM|JOIN|INTO|UPDATE|TABLE)" + SqlPatterns.SQL_SEP + "(?!\\w+\\.)([a-zA-Z_][a-zA-Z0-9_]*)",
         Pattern.CASE_INSENSITIVE
     );
 
