@@ -49,13 +49,13 @@ public class WhereTransformer extends AbstractJdbcTransformer {
     // Pattern to find insertion point for new WHERE clause
     // Matches: GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET, UNION, INTERSECT, EXCEPT, or end
     private static final Pattern WHERE_INSERTION_POINT = Pattern.compile(
-        "\\s+(GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR\\s+UPDATE|FOR\\s+SHARE)\\b",
+        SqlPatterns.SQL_SEP + "(GROUP" + SqlPatterns.SQL_SEP + "BY|HAVING|ORDER" + SqlPatterns.SQL_SEP + "BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR" + SqlPatterns.SQL_SEP + "UPDATE|FOR" + SqlPatterns.SQL_SEP + "SHARE)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
     // Pattern to detect SELECT/UPDATE/DELETE statements (not INSERT)
     private static final Pattern MODIFIABLE_STATEMENT = Pattern.compile(
-        "^\\s*(SELECT|UPDATE|DELETE)\\b",
+        "^" + SqlPatterns.SQL_SEP_OPT + "(SELECT|UPDATE|DELETE)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -63,7 +63,7 @@ public class WhereTransformer extends AbstractJdbcTransformer {
     // We need to find WHERE that's not inside parentheses (subquery)
     // This is a simplification - we find WHERE and append at the insertion point
     private static final Pattern WHERE_CLAUSE_END = Pattern.compile(
-        "\\bWHERE\\b(.+?)(?=(GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR\\s+UPDATE|FOR\\s+SHARE|$))",
+        "\\bWHERE\\b(.+?)(?=(?:GROUP" + SqlPatterns.SQL_SEP + "BY|HAVING|ORDER" + SqlPatterns.SQL_SEP + "BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR" + SqlPatterns.SQL_SEP + "UPDATE|FOR" + SqlPatterns.SQL_SEP + "SHARE|$))",
         Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
