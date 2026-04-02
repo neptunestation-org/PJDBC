@@ -55,7 +55,7 @@ public class WhereTransformer extends AbstractJdbcTransformer {
 
     // Pattern to detect SELECT/UPDATE/DELETE statements (not INSERT)
     private static final Pattern MODIFIABLE_STATEMENT = Pattern.compile(
-        "^\\s*(SELECT|UPDATE|DELETE)\\b",
+        "^" + SqlPatterns.SQL_SEP_OPT + "(SELECT|UPDATE|DELETE)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
