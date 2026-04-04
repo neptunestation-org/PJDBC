@@ -32,7 +32,7 @@ PJDBC's access control drivers provide **defense-in-depth**, not security bounda
 |--------|------------|
 | `readonly` | CTEs with DML (`WITH x AS (DELETE...) SELECT...`) may bypass detection |
 | `schema` | Subqueries and views (`SELECT * FROM (SELECT secret...)`) may bypass table checks |
-| `mask` | Non-string getters now throw SQLException, but LOB types (Clob, Blob) are not yet covered |
+| `mask` | Non-string getters throw SQLException; LOB and complex types are also covered |
 
 **Use these drivers for:**
 - Preventing accidental writes in read-only contexts
