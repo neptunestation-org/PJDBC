@@ -1,0 +1,4 @@
+## 2026-04-05 - [DataMaskingDriver] Prevent leak via LOB and complex type getters
+**Vulnerability:** DataMaskingDriver only covered a small subset of ResultSet getter methods, allowing users to bypass masking by calling methods like `getBlob()`, `getClob()`, `getArray()`, or generic `getObject(..., Class<T>)`.
+**Learning:** Security-focused ResultSet proxies must ensure *all* potential data retrieval methods are either masked or explicitly disabled (fail-secure). Relying on a small set of common getters like `getString()` is insufficient as JDBC provides many alternative ways to access the same underlying data.
+**Prevention:** When implementing a security proxy for a large interface like `java.sql.ResultSet`, use a comprehensive approach to intercept every method that returns data. Any method not explicitly handled that could return sensitive data should be overridden to throw a `SQLException` with a clear security-related message.
