@@ -97,8 +97,8 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
 
     // Pattern to extract columns from UPDATE SET
     private static final Pattern UPDATE_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSET\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
-        Pattern.CASE_INSENSITIVE
+        "\\bSET(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+([a-zA-Z_][a-zA-Z0-9_]*)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to parse column names (handles table.column and aliases)
