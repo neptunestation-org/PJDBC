@@ -56,20 +56,20 @@ public class ReadonlyDriver extends AbstractProxyDriver {
 
     // Pattern to detect DML write operations
     private static final Pattern DML_PATTERN = Pattern.compile(
-        "^\\s*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
-        Pattern.CASE_INSENSITIVE
+        "^(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to detect DDL operations
     private static final Pattern DDL_PATTERN = Pattern.compile(
-        "^\\s*(CREATE|ALTER|DROP|RENAME)\\b",
-        Pattern.CASE_INSENSITIVE
+        "^(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*(CREATE|ALTER|DROP|RENAME)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to detect DCL operations
     private static final Pattern DCL_PATTERN = Pattern.compile(
-        "^\\s*(GRANT|REVOKE)\\b",
-        Pattern.CASE_INSENSITIVE
+        "^(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*(GRANT|REVOKE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     static {
