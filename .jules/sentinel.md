@@ -1,0 +1,4 @@
+## 2026-04-10 - [Data Masking Bypass via Aliases and Complex Types]
+**Vulnerability:** Data masking in `DataMaskingDriver` could be bypassed by aliasing a column (e.g., `SELECT secret AS public`) or by using complex JDBC type getters like `getBlob()` or `getClob()`.
+**Learning:** `AbstractResultSet` does not route all getters through a single transformation hook. Each getter must be explicitly overridden. Label-based getters should delegate to index-based getters after resolving the index to ensure consistent policy application regardless of the SQL alias used.
+**Prevention:** In security proxies for `ResultSet`, implement a "fail-secure" policy by overriding ALL potential data retrieval methods. Use index-based methods as the single source of truth for security checks and have label-based methods delegate to them.
