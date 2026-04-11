@@ -1,0 +1,4 @@
+## 2026-04-11 - Data Masking Bypass via Aliases and Complex Types
+**Vulnerability:** DataMaskingDriver could be bypassed by using column aliases (e.g., SELECT secret AS alias) or by using methods that were not explicitly overridden in the proxy ResultSet (e.g., getBlob, getClob, getObject(..., Class)).
+**Learning:** Abstract proxy classes like AbstractResultSet only hook into a subset of methods. Security-focused drivers must ensure total coverage of the delegated interface to prevent 'fail-open' scenarios. Additionally, label-based getters should always resolve to index-based getters after findColumn() to ensure consistent security logic regardless of aliasing.
+**Prevention:** In security proxies, override all methods that can return sensitive data. Use a 'fail-secure' approach (throwing SQLException) for data types that cannot be safely transformed. Use automated conformance tests to ensure all drivers follow consistent parameter naming and behavior.
