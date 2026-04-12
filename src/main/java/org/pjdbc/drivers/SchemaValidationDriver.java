@@ -79,8 +79,8 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
     // Pattern to extract table names from SQL
     // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
-        Pattern.CASE_INSENSITIVE
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+([a-zA-Z0-9_.,\\s/\\*\\-]*?)(?=\\b(?:WHERE|GROUP|HAVING|ORDER|LIMIT|OFFSET|UNION|JOIN|ON|USING|VALUES|RETURNING|FOR|SET|\\)|$)|;)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract column names from SELECT
@@ -302,12 +302,22 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
             Set<String> tables = new HashSet<>();
             Matcher matcher = TABLE_PATTERN.matcher(sql);
             while (matcher.find()) {
-                String table = matcher.group(1);
-                // Handle schema.table format - extract just table name
-                if (table.contains(".")) {
-                    table = table.substring(table.lastIndexOf('.') + 1);
+                String group = matcher.group(1);
+                if (group == null) continue;
+                // Handle comma separated tables and potential comments within the list
+                String[] parts = group.split(",");
+                for (String part : parts) {
+                    // Strip comments from the part
+                    String cleanPart = part.replaceAll("/\\*.*?\\*/", "").replaceAll("--.*?(?:\\n|$)", "").trim();
+                    if (cleanPart.isEmpty()) continue;
+                    // Take the first word (handles table aliases)
+                    String table = cleanPart.split("\\s+")[0];
+                    // Handle schema.table format - extract just table name
+                    if (table.contains(".")) {
+                        table = table.substring(table.lastIndexOf('.') + 1);
+                    }
+                    tables.add(caseSensitive ? table : table.toLowerCase());
                 }
-                tables.add(caseSensitive ? table : table.toLowerCase());
             }
             return tables;
         }
