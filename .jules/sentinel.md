@@ -1,0 +1,4 @@
+## 2026-04-13 - SQL Comment-Based Security Bypass
+**Vulnerability:** Security-focused drivers (ReadonlyDriver, SchemaValidationDriver) and SQL transformers could be bypassed by using SQL comments (`/*...*/` or `--...`) as separators instead of whitespace. For example, `/* comment */ INSERT...` bypassed the `^\\s*INSERT` check.
+**Learning:** SQL parsers or filters using regex must treat comments as equivalent to whitespace. Many JDBC drivers and databases accept comments as valid separators between keywords.
+**Prevention:** Use a robust separator pattern: `(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+` combined with `Pattern.DOTALL`. For start-of-string checks, use `^(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*`. Always use `Matcher.quoteReplacement()` when performing transformations to avoid breaking on special characters in original SQL components.
