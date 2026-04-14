@@ -79,13 +79,13 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
     // Pattern to extract table names from SQL
     // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
-        Pattern.CASE_INSENSITIVE
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract column names from SELECT
     private static final Pattern SELECT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSELECT\\s+(.+?)\\s+FROM\\b",
+        "\\bSELECT(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+(.+?)(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+FROM\\b",
         Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
