@@ -1,0 +1,4 @@
+## 2026-04-15 - LOB and complex type bypass in DataMaskingDriver
+**Vulnerability:** Masked columns could still be accessed using specialized JDBC getters like `getBlob()`, `getClob()`, `getArray()`, etc., because `DataMaskingDriver.MaskingResultSet` only overrode common string and numeric getters.
+**Learning:** Security-focused `ResultSet` wrappers must comprehensively override all data retrieval methods in the `ResultSet` interface. Any method not explicitly handled that returns data from the underlying result set represents a potential bypass.
+**Prevention:** When implementing data-masking or access-control proxies for JDBC, ensure total coverage of the delegated interface. For complex types where masking is not feasible, throwing a fail-secure `SQLException` is preferred over allowing potentially sensitive data to leak.
