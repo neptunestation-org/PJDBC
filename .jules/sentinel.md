@@ -1,0 +1,4 @@
+## 2026-04-16 - [Regex SQL Parsing Bypass with Comments]
+**Vulnerability:** Drivers and transformers using regex-based SQL parsing (like `ReadonlyDriver`, `SchemaValidationDriver`, `SchemaTransformer`, and `WhereTransformer`) can be bypassed by using SQL comments (`/*...*/` or `--...`) instead of standard whitespace at the beginning of a statement or between keywords and identifiers.
+**Learning:** `^\\s*KEYWORD` only matches standard whitespace at the start, but SQL engines often ignore leading comments. Similarly, `\\bKEYWORD1\\s+KEYWORD2` fails if keywords are separated by comments.
+**Prevention:** Use a robust whitespace/comment prefix `^(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*` and `Pattern.DOTALL` to ensure that DML/DDL/security-sensitive operations cannot be hidden behind leading SQL comments. When matching separators between keywords, use `(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+` instead of `\\s+`.
