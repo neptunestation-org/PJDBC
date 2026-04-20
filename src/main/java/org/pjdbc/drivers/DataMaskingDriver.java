@@ -807,8 +807,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.sql.Timestamp getTimestamp(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getTimestamp");
-            return super.getTimestamp(columnLabel);
+            return getTimestamp(findColumn(columnLabel));
         }
 
         @Override
@@ -819,8 +818,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.sql.Timestamp getTimestamp(String columnLabel, java.util.Calendar cal) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getTimestamp");
-            return super.getTimestamp(columnLabel, cal);
+            return getTimestamp(findColumn(columnLabel), cal);
         }
 
         // === CHARACTER STREAMS - return stream of masked content ===
@@ -837,12 +835,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.io.Reader getCharacterStream(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                String value = super.getString(columnLabel);
-                if (value == null) return null;
-                return new java.io.StringReader(config.maskValue(value));
-            }
-            return super.getCharacterStream(columnLabel);
+            return getCharacterStream(findColumn(columnLabel));
         }
 
         @Override
@@ -857,12 +850,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.io.Reader getNCharacterStream(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                String value = super.getNString(columnLabel);
-                if (value == null) return null;
-                return new java.io.StringReader(config.maskValue(value));
-            }
-            return super.getNCharacterStream(columnLabel);
+            return getNCharacterStream(findColumn(columnLabel));
         }
 
         // === BINARY STREAMS - return stream of masked bytes ===
@@ -880,13 +868,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.io.InputStream getAsciiStream(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                String value = super.getString(columnLabel);
-                if (value == null) return null;
-                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.US_ASCII);
-                return new java.io.ByteArrayInputStream(maskedBytes);
-            }
-            return super.getAsciiStream(columnLabel);
+            return getAsciiStream(findColumn(columnLabel));
         }
 
         @Override
@@ -902,13 +884,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.io.InputStream getBinaryStream(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                String value = super.getString(columnLabel);
-                if (value == null) return null;
-                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                return new java.io.ByteArrayInputStream(maskedBytes);
-            }
-            return super.getBinaryStream(columnLabel);
+            return getBinaryStream(findColumn(columnLabel));
         }
 
         @Override
@@ -926,13 +902,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         @Override
         @SuppressWarnings("deprecation")
         public java.io.InputStream getUnicodeStream(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                String value = super.getString(columnLabel);
-                if (value == null) return null;
-                byte[] maskedBytes = config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_16);
-                return new java.io.ByteArrayInputStream(maskedBytes);
-            }
-            return super.getUnicodeStream(columnLabel);
+            return getUnicodeStream(findColumn(columnLabel));
         }
     }
 }

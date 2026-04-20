@@ -45,6 +45,10 @@ jobs:
           -DenableExperimental=true \
           -DossIndexAnalyzerEnabled=false \
           -DdataDirectory=~/.m2/repository/org/owasp/dependency-check-data \
+          -DnvdApiDelay=8000 \
+          -DnvdApiMaxRetryCount=10 \
+          -DnvdConnectionTimeout=60000 \
+          -DnvdReadTimeout=60000 \
           ${NVD_API_KEY:+-DnvdApiKey=$NVD_API_KEY}
 
     - name: Upload Dependency-Check report
@@ -57,5 +61,6 @@ jobs:
     - name: Upload SARIF to GitHub Security
       uses: github/codeql-action/upload-sarif@v4
       if: always()
+      continue-on-error: true
       with:
         sarif_file: target/dependency-check-report.sarif
