@@ -102,4 +102,31 @@ public class DataMaskingBypassTest {
             }
         }
     }
+
+    @Test
+    public void testAliasingBypass() throws SQLException {
+        setupLobTable("test_alias_bypass");
+        // Mask secret_blob, but NOT "alias_blob"
+        String url = "jdbc:mask[columns=secret_blob,strategy=REDACT]:jdbc:h2:mem:test_alias_bypass;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                // Aliasing the column - THIS MIGHT BYPASS IF IT CHECKS LABEL INSTEAD OF INDEX
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_blob AS alias_blob FROM lob_data WHERE id = 1")) {
+                    assertTrue(rs.next());
+
+                    try {
+                        Blob blob = rs.getBlob("alias_blob");
+                        // If it doesn't throw, it bypassed masking via aliasing!
+                        byte[] bytes = blob.getBytes(1, (int) blob.length());
+                        String content = new String(bytes);
+                        assertEquals("sensitive blob", content);
+                        fail("Bypassed masking via column aliasing!");
+                    } catch (SQLException e) {
+                        // Desired behavior
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
+                }
+            }
+        }
+    }
 }

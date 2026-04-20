@@ -27,6 +27,14 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
+    - name: Cache OWASP Dependency Check Data
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository/org/owasp/dependency-check-data
+        key: ${{ runner.os }}-dependency-check-${{ github.run_id }}
+        restore-keys: |
+          ${{ runner.os }}-dependency-check-
+
     - name: Run OWASP Dependency-Check
       env:
         NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
@@ -36,6 +44,7 @@ jobs:
           -Dformats=HTML,SARIF \
           -DenableExperimental=true \
           -DossIndexAnalyzerEnabled=false \
+          -DdataDirectory=~/.m2/repository/org/owasp/dependency-check-data \
           ${NVD_API_KEY:+-DnvdApiKey=$NVD_API_KEY}
 
     - name: Upload Dependency-Check report

@@ -475,11 +475,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public String getString(String columnLabel) throws SQLException {
-            String value = super.getString(columnLabel);
-            if (config.shouldMask(columnLabel) && value != null) {
-                return config.maskValue(value);
-            }
-            return value;
+            return getString(findColumn(columnLabel));
         }
 
         @Override
@@ -493,11 +489,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public String getNString(String columnLabel) throws SQLException {
-            String value = super.getNString(columnLabel);
-            if (config.shouldMask(columnLabel) && value != null) {
-                return config.maskValue(value);
-            }
-            return value;
+            return getNString(findColumn(columnLabel));
         }
 
         // === OBJECT METHODS ===
@@ -518,16 +510,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public Object getObject(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                Object value = super.getObject(columnLabel);
-                if (value == null) return null;
-                if (value instanceof String s) {
-                    return config.maskValue(s);
-                }
-                // Non-string type in masked column - throw to prevent data leak
-                throwMaskedColumnException(columnLabel, "getObject");
-            }
-            return super.getObject(columnLabel);
+            return getObject(findColumn(columnLabel));
         }
 
         @Override
@@ -544,14 +527,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                if (type == String.class) {
-                    String value = super.getString(columnLabel);
-                    return value == null ? null : type.cast(config.maskValue(value));
-                }
-                throwMaskedColumnException(columnLabel, "getObject");
-            }
-            return super.getObject(columnLabel, type);
+            return getObject(findColumn(columnLabel), type);
         }
 
         @Override
@@ -562,8 +538,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public Object getObject(String columnLabel, java.util.Map<String, Class<?>> map) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getObject");
-            return super.getObject(columnLabel, map);
+            return getObject(findColumn(columnLabel), map);
         }
 
         // === LOB AND COMPLEX TYPES - throw SQLException for masked columns ===
@@ -576,8 +551,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.sql.Blob getBlob(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getBlob");
-            return super.getBlob(columnLabel);
+            return getBlob(findColumn(columnLabel));
         }
 
         @Override
@@ -588,8 +562,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.sql.Clob getClob(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getClob");
-            return super.getClob(columnLabel);
+            return getClob(findColumn(columnLabel));
         }
 
         @Override
@@ -600,8 +573,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.sql.NClob getNClob(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getNClob");
-            return super.getNClob(columnLabel);
+            return getNClob(findColumn(columnLabel));
         }
 
         @Override
@@ -612,8 +584,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.sql.SQLXML getSQLXML(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getSQLXML");
-            return super.getSQLXML(columnLabel);
+            return getSQLXML(findColumn(columnLabel));
         }
 
         @Override
@@ -624,8 +595,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.sql.Array getArray(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getArray");
-            return super.getArray(columnLabel);
+            return getArray(findColumn(columnLabel));
         }
 
         @Override
@@ -636,8 +606,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.net.URL getURL(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getURL");
-            return super.getURL(columnLabel);
+            return getURL(findColumn(columnLabel));
         }
 
         @Override
@@ -648,8 +617,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.sql.RowId getRowId(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getRowId");
-            return super.getRowId(columnLabel);
+            return getRowId(findColumn(columnLabel));
         }
 
         @Override
@@ -660,8 +628,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.sql.Ref getRef(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getRef");
-            return super.getRef(columnLabel);
+            return getRef(findColumn(columnLabel));
         }
 
         // === NUMERIC METHODS - throw SQLException for masked columns ===
@@ -674,8 +641,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public byte getByte(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getByte");
-            return super.getByte(columnLabel);
+            return getByte(findColumn(columnLabel));
         }
 
         @Override
@@ -686,8 +652,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public short getShort(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getShort");
-            return super.getShort(columnLabel);
+            return getShort(findColumn(columnLabel));
         }
 
         @Override
@@ -698,8 +663,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public int getInt(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getInt");
-            return super.getInt(columnLabel);
+            return getInt(findColumn(columnLabel));
         }
 
         @Override
@@ -710,8 +674,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public long getLong(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getLong");
-            return super.getLong(columnLabel);
+            return getLong(findColumn(columnLabel));
         }
 
         @Override
@@ -722,8 +685,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public float getFloat(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getFloat");
-            return super.getFloat(columnLabel);
+            return getFloat(findColumn(columnLabel));
         }
 
         @Override
@@ -734,8 +696,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public double getDouble(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getDouble");
-            return super.getDouble(columnLabel);
+            return getDouble(findColumn(columnLabel));
         }
 
         @Override
@@ -746,8 +707,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.math.BigDecimal getBigDecimal(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getBigDecimal");
-            return super.getBigDecimal(columnLabel);
+            return getBigDecimal(findColumn(columnLabel));
         }
 
         @Override
@@ -760,8 +720,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         @Override
         @SuppressWarnings("deprecation")
         public java.math.BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getBigDecimal");
-            return super.getBigDecimal(columnLabel, scale);
+            return getBigDecimal(findColumn(columnLabel), scale);
         }
 
         // === BYTES - return masked string as bytes ===
@@ -778,12 +737,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public byte[] getBytes(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                String value = super.getString(columnLabel);
-                if (value == null) return null;
-                return config.maskValue(value).getBytes(java.nio.charset.StandardCharsets.UTF_8);
-            }
-            return super.getBytes(columnLabel);
+            return getBytes(findColumn(columnLabel));
         }
 
         // === BOOLEAN - throw SQLException for masked columns ===
@@ -796,8 +750,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public boolean getBoolean(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getBoolean");
-            return super.getBoolean(columnLabel);
+            return getBoolean(findColumn(columnLabel));
         }
 
         // === DATE/TIME METHODS - throw SQLException for masked columns ===
@@ -810,8 +763,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.sql.Date getDate(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getDate");
-            return super.getDate(columnLabel);
+            return getDate(findColumn(columnLabel));
         }
 
         @Override
@@ -822,8 +774,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.sql.Date getDate(String columnLabel, java.util.Calendar cal) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getDate");
-            return super.getDate(columnLabel, cal);
+            return getDate(findColumn(columnLabel), cal);
         }
 
         @Override
@@ -834,8 +785,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.sql.Time getTime(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getTime");
-            return super.getTime(columnLabel);
+            return getTime(findColumn(columnLabel));
         }
 
         @Override
@@ -846,8 +796,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
 
         @Override
         public java.sql.Time getTime(String columnLabel, java.util.Calendar cal) throws SQLException {
-            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getTime");
-            return super.getTime(columnLabel, cal);
+            return getTime(findColumn(columnLabel), cal);
         }
 
         @Override
