@@ -36,16 +36,19 @@ public class SchemaTransformer extends AbstractJdbcTransformer {
 
     private final String schemaPrefix;
 
+    // Regex for SQL whitespace including comments
+    private static final String SQL_WHITESPACE = "(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))";
+
     // Pattern to match table name contexts:
     // - FROM tablename
     // - JOIN tablename
     // - INTO tablename
     // - UPDATE tablename
     // - TABLE tablename (for TRUNCATE TABLE, etc.)
-    // Captures: keyword, optional whitespace, table name (not already qualified)
+    // Captures: keyword, optional whitespace/comments, table name (not already qualified)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(FROM|JOIN|INTO|UPDATE|TABLE)\\s+(?!\\w+\\.)([a-zA-Z_][a-zA-Z0-9_]*)",
-        Pattern.CASE_INSENSITIVE
+        "\\b(FROM|JOIN|INTO|UPDATE|TABLE)(" + SQL_WHITESPACE + "+)(?!\\w+\\.)([a-zA-Z_][a-zA-Z0-9_]*)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     /**
@@ -71,9 +74,12 @@ public class SchemaTransformer extends AbstractJdbcTransformer {
 
         while (matcher.find()) {
             String keyword = matcher.group(1);
-            String tableName = matcher.group(2);
-            // Replace with: keyword + space + schema.tablename
-            matcher.appendReplacement(result, keyword + " " + schemaPrefix + tableName);
+            String whitespace = matcher.group(2);
+            String tableName = matcher.group(3);
+            // Replace with: keyword + original whitespace/comments + schema.tablename
+            // We use quoteReplacement to handle special characters ($, \) that may appear in comments
+            String replacement = Matcher.quoteReplacement(keyword + whitespace + schemaPrefix + tableName);
+            matcher.appendReplacement(result, replacement);
         }
         matcher.appendTail(result);
 
