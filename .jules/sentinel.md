@@ -1,0 +1,4 @@
+## 2026-04-21 - [Data Masking Bypass via LOB and Complex Types]
+**Vulnerability:** DataMaskingDriver failed to mask or block access to sensitive data when retrieved via LOB-specific getters (getBlob, getClob, etc.) or complex type getters (getArray, getURL, etc.). It also missed the generic getObject(int/String, Class<T>) method.
+**Learning:** Security proxies for ResultSets must comprehensively override all data retrieval methods. Missing specialized getters for LOBs or modern JDBC 4.1+ methods like getObject(..., Class<T>) creates significant security gaps where raw sensitive data can be leaked despite masking rules on String/basic types.
+**Prevention:** When implementing data masking or access control at the JDBC layer, audit the complete ResultSet interface for any method that returns column data. Use a "fail-secure" approach by throwing SQLExceptions on all unsupported or unhandled getters for restricted/masked columns.
