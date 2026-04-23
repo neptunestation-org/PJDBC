@@ -1,0 +1,4 @@
+## 2026-04-23 - SQL Comment Bypass in Regex Filters
+**Vulnerability:** Security-focused proxy drivers (`ReadonlyDriver`, `SchemaValidationDriver`) and SQL transformers (`SchemaTransformer`, `WhereTransformer`) could be bypassed by using SQL comments (`/* ... */` or `-- ...`) where the regexes expected whitespace or the start of the string.
+**Learning:** Naive regexes using `^\\s*` or `\\s+` to delimit SQL keywords are insufficient for security boundaries because SQL parsers treat comments as whitespace, but these regexes do not. Multi-line comments also require `Pattern.DOTALL`.
+**Prevention:** Always use a robust "whitespace or comment" pattern `(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+` and `Pattern.DOTALL` when parsing SQL with regexes for security purposes. Use lookaheads to handle optional separators at the end of statements without requiring trailing whitespace.
