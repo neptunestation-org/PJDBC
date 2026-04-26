@@ -1,0 +1,4 @@
+## 2026-04-26 - Masking bypass via LOB and complex types
+**Vulnerability:** The DataMaskingDriver failed to override several ResultSet getter methods (getBlob, getClob, getArray, getObject(Class), etc.), allowing users to retrieve unmasked sensitive data if they used these specific methods instead of getString() or getObject().
+**Learning:** Security proxies must implement "deny-by-default" for all data access methods in an interface. Simply overriding the most common getters (like getString) is insufficient when the underlying interface (java.sql.ResultSet) is as large as it is.
+**Prevention:** When wrapping a security-sensitive interface, ensure every method that can return data is either explicitly handled or explicitly blocked. Prefer throwing a 'fail-secure' SQLException for unsupported or complex types in a sensitive context.
