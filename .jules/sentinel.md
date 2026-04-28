@@ -1,0 +1,4 @@
+## 2026-04-28 - DataMaskingDriver Bypass via Aliasing and LOBs
+**Vulnerability:** Users could bypass data masking by using SQL column aliases (e.g., `SELECT ssn AS alias`) or by using JDBC methods not covered by the proxy (e.g., `getBlob`, `getObject(int, Class)`).
+**Learning:** The proxy driver only intercepted a subset of getter methods and relied on string-based labels for some checks, which can be easily circumvented in SQL. `AbstractResultSet` does not route all calls through `transformValue`, leaving LOBs and modern `getObject` methods exposed.
+**Prevention:** Always delegate label-based getters to index-based ones in proxies. Ensure total coverage of the delegated interface (`ResultSet`) by overriding all data-retrieval methods, failing secure (throwing `SQLException`) for unsupported or sensitive types.
