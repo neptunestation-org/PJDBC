@@ -1,0 +1,4 @@
+## 2026-04-30 - Masking Bypass via Aliasing and Missing LOB Overrides
+**Vulnerability:** DataMaskingDriver could be bypassed by aliasing sensitive columns (e.g., `SELECT ssn AS public_info`) or by using complex types (BLOB, CLOB, Array) that weren't overridden in the proxy ResultSet.
+**Learning:** Checking security filters against `columnLabel` is insufficient because labels are user-controlled via SQL aliasing. Always resolve labels to stable underlying column indices. Additionally, `AbstractResultSet` transformation hooks only cover a subset of getters; security-critical proxies must explicitly override the entire `ResultSet` interface to ensure no data leaks through unhandled types or streams.
+**Prevention:** 1) Delegate label-based getters to index-based ones via `findColumn()`. 2) Implement "fail-secure" overrides for all data retrieval methods in the proxy, throwing `SQLException` if a secure transformation (like masking) cannot be guaranteed for that type.
