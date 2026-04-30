@@ -1,0 +1,4 @@
+## 2026-04-29 - [DataMaskingDriver Bypasses via Aliasing and LOBs]
+**Vulnerability:** DataMaskingDriver could be bypassed by using SQL aliases (e.g., `SELECT secret AS alias`) or by using complex JDBC types like Blobs/Clobs and `getObject(..., Class<T>)` which were not explicitly overridden.
+**Learning:** Security-focused `ResultSet` wrappers must prioritize index-based over label-based lookups to prevent aliasing bypasses. Additionally, `getObject(int, Class<T>)` should avoid calling the underlying delegate if the target type is not handled (like `String.class` for masked columns), as some drivers throw conversion errors even if the value would eventually be masked.
+**Prevention:** Always implement a complete set of `ResultSet` overrides in security proxies, delegating label-based methods to their index-based counterparts after resolving the index. Standardize 'fail-secure' behavior by throwing `SQLException` for unsupported data types on sensitive columns.
