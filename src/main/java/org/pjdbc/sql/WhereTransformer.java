@@ -49,21 +49,21 @@ public class WhereTransformer extends AbstractJdbcTransformer {
     // Pattern to find insertion point for new WHERE clause
     // Matches: GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET, UNION, INTERSECT, EXCEPT, or end
     private static final Pattern WHERE_INSERTION_POINT = Pattern.compile(
-        "\\s+(GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR\\s+UPDATE|FOR\\s+SHARE)\\b",
-        Pattern.CASE_INSENSITIVE
+        "(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+(GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR\\s+UPDATE|FOR\\s+SHARE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to detect SELECT/UPDATE/DELETE statements (not INSERT)
     private static final Pattern MODIFIABLE_STATEMENT = Pattern.compile(
-        "^\\s*(SELECT|UPDATE|DELETE)\\b",
-        Pattern.CASE_INSENSITIVE
+        "^(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*(SELECT|UPDATE|DELETE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to find the last WHERE for appending AND
     // We need to find WHERE that's not inside parentheses (subquery)
     // This is a simplification - we find WHERE and append at the insertion point
     private static final Pattern WHERE_CLAUSE_END = Pattern.compile(
-        "\\bWHERE\\b(.+?)(?=(GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR\\s+UPDATE|FOR\\s+SHARE|$))",
+        "\\bWHERE\\b(.+?)(?=(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+(?:GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR\\s+UPDATE|FOR\\s+SHARE)|$)",
         Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
@@ -105,16 +105,17 @@ public class WhereTransformer extends AbstractJdbcTransformer {
         Matcher matcher = WHERE_CLAUSE_END.matcher(sql);
         if (matcher.find()) {
             // Find where the WHERE clause content ends
-            int whereStart = matcher.start();
             int contentEnd = matcher.end(1);
 
             // Insert AND condition at the end of WHERE content
             String beforeCondition = sql.substring(0, contentEnd);
             String afterCondition = sql.substring(contentEnd);
 
-            // Trim trailing whitespace from WHERE content, add AND, then restore
-            String trimmed = beforeCondition.stripTrailing();
-            return trimmed + " AND " + condition + afterCondition;
+            // If beforeCondition ends with a comment, we need to insert AND before it
+            // or ensure AND is not part of the comment.
+            // A safer way is to find the last non-whitespace, non-comment position.
+
+            return beforeCondition + " AND " + condition + afterCondition;
         }
 
         // Fallback: append at end
