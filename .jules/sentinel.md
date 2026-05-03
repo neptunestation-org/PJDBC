@@ -1,0 +1,4 @@
+## 2026-05-03 - Masking LOB and complex types in DataMaskingDriver
+**Vulnerability:** Data leakage via LOB (Blob, Clob) and other complex JDBC types (Array, Ref, etc.) in `DataMaskingDriver`.
+**Learning:** The `DataMaskingDriver` primarily protected string and numeric getters, but many JDBC `ResultSet` methods for complex types like `getBlob`, `getClob`, `getArray`, etc., were not overridden. This allowed sensitive data to be retrieved in its original form even if the column was configured to be masked.
+**Prevention:** When implementing a security proxy for `ResultSet`, it is critical to perform a comprehensive audit of all `getXXX` methods in the `ResultSet` interface. Any method not explicitly handled that returns data should be considered a potential bypass. In this project, the fail-secure approach is to throw a `SQLException` for any unsupported type on a masked column, forcing the user to use `getString()` for the masked representation.
