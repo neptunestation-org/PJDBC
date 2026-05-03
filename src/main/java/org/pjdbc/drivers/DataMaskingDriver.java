@@ -500,7 +500,7 @@ public class DataMaskingDriver extends AbstractProxyDriver {
             return value;
         }
 
-        // === OBJECT METHODS ===
+        // === OBJECT & LOB METHODS ===
 
         @Override
         public Object getObject(int columnIndex) throws SQLException {
@@ -528,6 +528,102 @@ public class DataMaskingDriver extends AbstractProxyDriver {
                 throwMaskedColumnException(columnLabel, "getObject");
             }
             return super.getObject(columnLabel);
+        }
+
+        @Override
+        public java.sql.Blob getBlob(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getBlob");
+            return super.getBlob(columnIndex);
+        }
+
+        @Override
+        public java.sql.Blob getBlob(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getBlob");
+            return super.getBlob(columnLabel);
+        }
+
+        @Override
+        public java.sql.Clob getClob(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getClob");
+            return super.getClob(columnIndex);
+        }
+
+        @Override
+        public java.sql.Clob getClob(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getClob");
+            return super.getClob(columnLabel);
+        }
+
+        @Override
+        public java.sql.NClob getNClob(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getNClob");
+            return super.getNClob(columnIndex);
+        }
+
+        @Override
+        public java.sql.NClob getNClob(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getNClob");
+            return super.getNClob(columnLabel);
+        }
+
+        @Override
+        public java.sql.Array getArray(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getArray");
+            return super.getArray(columnIndex);
+        }
+
+        @Override
+        public java.sql.Array getArray(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getArray");
+            return super.getArray(columnLabel);
+        }
+
+        @Override
+        public java.sql.Ref getRef(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getRef");
+            return super.getRef(columnIndex);
+        }
+
+        @Override
+        public java.sql.Ref getRef(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getRef");
+            return super.getRef(columnLabel);
+        }
+
+        @Override
+        public java.sql.RowId getRowId(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getRowId");
+            return super.getRowId(columnIndex);
+        }
+
+        @Override
+        public java.sql.RowId getRowId(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getRowId");
+            return super.getRowId(columnLabel);
+        }
+
+        @Override
+        public java.sql.SQLXML getSQLXML(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getSQLXML");
+            return super.getSQLXML(columnIndex);
+        }
+
+        @Override
+        public java.sql.SQLXML getSQLXML(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getSQLXML");
+            return super.getSQLXML(columnLabel);
+        }
+
+        @Override
+        public java.net.URL getURL(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getURL");
+            return super.getURL(columnIndex);
+        }
+
+        @Override
+        public java.net.URL getURL(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getURL");
+            return super.getURL(columnLabel);
         }
 
         // === NUMERIC METHODS - throw SQLException for masked columns ===
