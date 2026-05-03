@@ -531,6 +531,30 @@ public class DataMaskingDriver extends AbstractProxyDriver {
         }
 
         @Override
+        public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) {
+                if (type == String.class) {
+                    String value = super.getString(columnIndex);
+                    return type.cast(value == null ? null : config.maskValue(value));
+                }
+                throwMaskedColumnException(String.valueOf(columnIndex), "getObject");
+            }
+            return super.getObject(columnIndex, type);
+        }
+
+        @Override
+        public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
+            if (config.shouldMask(columnLabel)) {
+                if (type == String.class) {
+                    String value = super.getString(columnLabel);
+                    return type.cast(value == null ? null : config.maskValue(value));
+                }
+                throwMaskedColumnException(columnLabel, "getObject");
+            }
+            return super.getObject(columnLabel, type);
+        }
+
+        @Override
         public java.sql.Blob getBlob(int columnIndex) throws SQLException {
             if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getBlob");
             return super.getBlob(columnIndex);

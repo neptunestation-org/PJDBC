@@ -31,10 +31,9 @@ public class DataMaskingLobBypassTest {
                     "secret_clob CLOB)");
 
                 // Insert some data
-                java.sql.PreparedStatement pstmt = conn.prepareStatement("INSERT INTO lob_data VALUES (1, ?, ?)");
-                pstmt.setInt(1, 1);
-                pstmt.setBytes(2, "secret binary data".getBytes());
-                pstmt.setString(3, "secret character data");
+                java.sql.PreparedStatement pstmt = conn.prepareStatement("INSERT INTO lob_data (id, secret_blob, secret_clob) VALUES (1, ?, ?)");
+                pstmt.setBytes(1, "secret binary data".getBytes());
+                pstmt.setString(2, "secret character data");
                 pstmt.executeUpdate();
             }
         }
