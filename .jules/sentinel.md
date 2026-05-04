@@ -1,0 +1,4 @@
+## 2026-05-04 - [DataMaskingDriver Bypass via Complex JDBC Types]
+**Vulnerability:** Sensitive data in columns marked for masking could be retrieved unmasked by using specific JDBC ResultSet methods like getBlob(), getClob(), getArray(), or the JDBC 4.1 getObject(index, Class) variant.
+**Learning:** PJDBC's AbstractResultSet only provides transformation hooks (transformValue) for a subset of common getters (String, Int, Boolean, etc.). Methods returning complex types or using newer JDBC overloads often delegate directly to the underlying driver, bypassing proxy-level security filters if not explicitly overridden.
+**Prevention:** When developing security-focused proxy drivers, ensure 100% coverage of the delegated interface. Any method not explicitly handled that returns data is a potential bypass. Use a "fail-secure" approach by throwing a SQLException for any data retrieval method that hasn't been specifically hardened for that driver.
