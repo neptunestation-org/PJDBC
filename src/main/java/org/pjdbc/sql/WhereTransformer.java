@@ -46,24 +46,27 @@ public class WhereTransformer extends AbstractJdbcTransformer {
         Pattern.CASE_INSENSITIVE
     );
 
+    // Shared pattern for SQL separators (whitespace and comments)
+    private static final String SQL_SEP = "(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))";
+
     // Pattern to find insertion point for new WHERE clause
     // Matches: GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET, UNION, INTERSECT, EXCEPT, or end
     private static final Pattern WHERE_INSERTION_POINT = Pattern.compile(
-        "\\s+(GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR\\s+UPDATE|FOR\\s+SHARE)\\b",
-        Pattern.CASE_INSENSITIVE
+        SQL_SEP + "+(GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR\\s+UPDATE|FOR\\s+SHARE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to detect SELECT/UPDATE/DELETE statements (not INSERT)
     private static final Pattern MODIFIABLE_STATEMENT = Pattern.compile(
-        "^\\s*(SELECT|UPDATE|DELETE)\\b",
-        Pattern.CASE_INSENSITIVE
+        "^" + SQL_SEP + "*(SELECT|UPDATE|DELETE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to find the last WHERE for appending AND
     // We need to find WHERE that's not inside parentheses (subquery)
     // This is a simplification - we find WHERE and append at the insertion point
     private static final Pattern WHERE_CLAUSE_END = Pattern.compile(
-        "\\bWHERE\\b(.+?)(?=(GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR\\s+UPDATE|FOR\\s+SHARE|$))",
+        "\\bWHERE\\b(.+?)(?=(?:" + SQL_SEP + "+(?:GROUP\\s+BY|HAVING|ORDER\\s+BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|FOR\\s+UPDATE|FOR\\s+SHARE))|$)",
         Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
