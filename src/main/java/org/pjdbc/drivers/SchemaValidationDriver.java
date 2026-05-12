@@ -79,26 +79,26 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
     // Pattern to extract table names from SQL
     // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
-        Pattern.CASE_INSENSITIVE
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract column names from SELECT
     private static final Pattern SELECT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSELECT\\s+(.+?)\\s+FROM\\b",
+        "\\bSELECT(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+(.+?)(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+FROM\\b",
         Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract columns from INSERT
     private static final Pattern INSERT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bINSERT\\s+INTO\\s+[a-zA-Z_][a-zA-Z0-9_.]*\\s*\\(([^)]+)\\)",
-        Pattern.CASE_INSENSITIVE
+        "\\bINSERT(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+INTO(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+[a-zA-Z_][a-zA-Z0-9_.]*\\s*\\(([^)]+)\\)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract columns from UPDATE SET
     private static final Pattern UPDATE_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSET\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
-        Pattern.CASE_INSENSITIVE
+        "\\bSET(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+([a-zA-Z_][a-zA-Z0-9_]*)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to parse column names (handles table.column and aliases)
