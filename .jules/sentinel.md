@@ -1,0 +1,4 @@
+## 2026-05-12 - SQL Comment Bypass in Proxy Drivers and Transformers
+**Vulnerability:** SQL comments (`/* ... */` or `-- ...`) could be used as separators (e.g., `FROM/**/table`) or as leading characters (e.g., `/* comment */ INSERT`) to bypass regex-based security filters that only looked for whitespace delimiters (`\\s+` or `^\\s*`).
+**Learning:** Standard Java regex `\s` does not match SQL comments. Attackers can use comments where whitespace is expected by the parser but not by the security filter. Also, `Pattern.DOTALL` is necessary for `.` to match newlines in multi-line block comments.
+**Prevention:** Use a robust whitespace/comment pattern like `(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+` for separators and `^(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*` for prefixes, combined with `Pattern.DOTALL`. Always preserve original separators when performing SQL transformations (like in `SchemaTransformer`) to avoid breaking the query structure or removing intended comments.
