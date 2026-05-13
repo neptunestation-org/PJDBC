@@ -76,16 +76,22 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Semicolon-separated table types for metadata", defaultValue = "TABLE;VIEW")
 public class SchemaValidationDriver extends AbstractProxyDriver {
 
+    // Prefix pattern to handle leading whitespace and SQL comments
+    private static final String PREFIX = "^(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*";
+
+    // Separator pattern to handle whitespace and SQL comments
+    private static final String SEP = "(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+";
+
     // Pattern to extract table names from SQL
     // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
-        Pattern.CASE_INSENSITIVE
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)" + SEP + "([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract column names from SELECT
     private static final Pattern SELECT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSELECT\\s+(.+?)\\s+FROM\\b",
+        PREFIX + "SELECT" + SEP + "(.+?)" + SEP + "FROM\\b",
         Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
@@ -97,8 +103,8 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
 
     // Pattern to extract columns from UPDATE SET
     private static final Pattern UPDATE_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSET\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
-        Pattern.CASE_INSENSITIVE
+        "\\bSET" + SEP + "([a-zA-Z_][a-zA-Z0-9_]*)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to parse column names (handles table.column and aliases)
@@ -284,6 +290,9 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
          */
         public void checkStatement(String sql) throws SQLException {
             if (sql == null || sql.trim().isEmpty()) return;
+
+        // Check for leading comments/whitespace if it's not a SELECT/INSERT/UPDATE/DELETE/MERGE/TRUNCATE
+        // This is a defense-in-depth measure.
 
             // Extract and validate tables
             Set<String> tables = extractTables(sql);
