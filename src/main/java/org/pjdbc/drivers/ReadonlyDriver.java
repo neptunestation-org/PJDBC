@@ -54,22 +54,25 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Custom error message for blocked operations")
 public class ReadonlyDriver extends AbstractProxyDriver {
 
+    // Prefix pattern to handle leading whitespace and SQL comments
+    private static final String PREFIX = "^(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*";
+
     // Pattern to detect DML write operations
     private static final Pattern DML_PATTERN = Pattern.compile(
-        "^\\s*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
-        Pattern.CASE_INSENSITIVE
+        PREFIX + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to detect DDL operations
     private static final Pattern DDL_PATTERN = Pattern.compile(
-        "^\\s*(CREATE|ALTER|DROP|RENAME)\\b",
-        Pattern.CASE_INSENSITIVE
+        PREFIX + "(CREATE|ALTER|DROP|RENAME)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to detect DCL operations
     private static final Pattern DCL_PATTERN = Pattern.compile(
-        "^\\s*(GRANT|REVOKE)\\b",
-        Pattern.CASE_INSENSITIVE
+        PREFIX + "(GRANT|REVOKE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     static {
