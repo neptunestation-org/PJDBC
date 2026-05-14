@@ -79,8 +79,8 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
     // Pattern to extract table names from SQL
     // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
-        Pattern.CASE_INSENSITIVE
+        "\\b(FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract column names from SELECT
@@ -302,7 +302,7 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
             Set<String> tables = new HashSet<>();
             Matcher matcher = TABLE_PATTERN.matcher(sql);
             while (matcher.find()) {
-                String table = matcher.group(1);
+                String table = matcher.group(2);
                 // Handle schema.table format - extract just table name
                 if (table.contains(".")) {
                     table = table.substring(table.lastIndexOf('.') + 1);
