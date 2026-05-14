@@ -102,8 +102,8 @@ public class FederatingDriver extends AbstractDriver {
      * Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
      */
     private static final java.util.regex.Pattern TABLE_PATTERN = java.util.regex.Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
-        java.util.regex.Pattern.CASE_INSENSITIVE
+        "\\b(FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.DOTALL
     );
 
     static {
@@ -130,7 +130,7 @@ public class FederatingDriver extends AbstractDriver {
         if (sql == null) return null;
         java.util.regex.Matcher m = TABLE_PATTERN.matcher(sql);
         if (m.find()) {
-            String table = m.group(1);
+            String table = m.group(2);
             // Handle schema.table format - extract just table name
             if (table.contains(".")) {
                 table = table.substring(table.lastIndexOf('.') + 1);
