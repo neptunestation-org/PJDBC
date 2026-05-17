@@ -752,4 +752,53 @@ public class DataMaskingDriverTest {
             }
         }
     }
+
+    @Test
+    public void testAliasBypass() throws SQLException {
+        setupTestTable("test_alias_bypass");
+        // Mask 'ssn' but not 'alias'
+        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:h2:mem:test_alias_bypass;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT ssn AS alias FROM users WHERE id = 1")) {
+                    assertTrue(rs.next());
+                    // VULNERABILITY: Label-based access with alias currently bypasses masking if alias doesn't match
+                    assertEquals("[REDACTED]", rs.getString("alias"));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testLobLeakage() throws SQLException {
+        try (Connection setupConn = DriverManager.getConnection("jdbc:h2:mem:test_lob;DB_CLOSE_DELAY=-1")) {
+            try (Statement stmt = setupConn.createStatement()) {
+                stmt.execute("CREATE TABLE lobtest (id INT, secret_blob BLOB, secret_clob CLOB)");
+                stmt.execute("INSERT INTO lobtest VALUES (1, CAST('secret blob content' AS BLOB), CAST('secret clob content' AS CLOB))");
+            }
+        }
+
+        String url = "jdbc:mask[columns=secret_.*,strategy=REDACT]:jdbc:h2:mem:test_lob;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT secret_blob, secret_clob FROM lobtest WHERE id = 1")) {
+                    assertTrue(rs.next());
+
+                    try {
+                        rs.getBlob("secret_blob");
+                        fail("Expected SQLException for getBlob on masked column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
+
+                    try {
+                        rs.getClob("secret_clob");
+                        fail("Expected SQLException for getClob on masked column");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("masked"));
+                    }
+                }
+            }
+        }
+    }
 }
