@@ -1,0 +1,4 @@
+## 2026-05-21 - SQL Comment-Based Regex Bypass
+**Vulnerability:** SQL proxy drivers using simple regexes (e.g., `^\\s*INSERT`) were bypassed by prepending SQL comments (e.g., `/* comment */ INSERT`), as the regex only accounted for standard whitespace. This affected `ReadonlyDriver`, `SchemaValidationDriver`, `FederatingDriver`, and SQL transformers.
+**Learning:** SQL comments are functionally equivalent to whitespace in many database contexts but are often overlooked in regex-based security filters. Using `^\\s*` at the start of a statement or `\\s+` as a separator is insufficient.
+**Prevention:** Use a robust whitespace/comment pattern like `(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*` and ensure `Pattern.DOTALL` is enabled to match multiline comments. Always verify that security-critical regexes handle all forms of SQL-legal whitespace and comments.
