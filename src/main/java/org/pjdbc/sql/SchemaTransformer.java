@@ -42,10 +42,10 @@ public class SchemaTransformer extends AbstractJdbcTransformer {
     // - INTO tablename
     // - UPDATE tablename
     // - TABLE tablename (for TRUNCATE TABLE, etc.)
-    // Captures: keyword, optional whitespace, table name (not already qualified)
+    // Captures: keyword, separator (whitespace/comments), table name (not already qualified)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(FROM|JOIN|INTO|UPDATE|TABLE)\\s+(?!\\w+\\.)([a-zA-Z_][a-zA-Z0-9_]*)",
-        Pattern.CASE_INSENSITIVE
+        "\\b(FROM|JOIN|INTO|UPDATE|TABLE)((?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+)(?!\\w+\\.)([a-zA-Z_][a-zA-Z0-9_]*)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     /**
@@ -71,9 +71,11 @@ public class SchemaTransformer extends AbstractJdbcTransformer {
 
         while (matcher.find()) {
             String keyword = matcher.group(1);
-            String tableName = matcher.group(2);
-            // Replace with: keyword + space + schema.tablename
-            matcher.appendReplacement(result, keyword + " " + schemaPrefix + tableName);
+            String separator = matcher.group(2);
+            String tableName = matcher.group(3);
+            // Replace with: keyword + original separator + schema.tablename
+            // We use Matcher.quoteReplacement for schemaPrefix + tableName to be safe
+            matcher.appendReplacement(result, keyword + Matcher.quoteReplacement(separator) + Matcher.quoteReplacement(schemaPrefix + tableName));
         }
         matcher.appendTail(result);
 
