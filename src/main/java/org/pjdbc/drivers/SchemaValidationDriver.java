@@ -76,29 +76,32 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Semicolon-separated table types for metadata", defaultValue = "TABLE;VIEW")
 public class SchemaValidationDriver extends AbstractProxyDriver {
 
+    // Shared patterns for SQL separators (whitespace and comments)
+    private static final String SEP = "(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+";
+
     // Pattern to extract table names from SQL
     // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
-        Pattern.CASE_INSENSITIVE
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)" + SEP + "([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract column names from SELECT
     private static final Pattern SELECT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSELECT\\s+(.+?)\\s+FROM\\b",
+        "\\bSELECT" + SEP + "(.+?)" + SEP + "FROM\\b",
         Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract columns from INSERT
     private static final Pattern INSERT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bINSERT\\s+INTO\\s+[a-zA-Z_][a-zA-Z0-9_.]*\\s*\\(([^)]+)\\)",
-        Pattern.CASE_INSENSITIVE
+        "\\bINSERT" + SEP + "INTO" + SEP + "[a-zA-Z_][a-zA-Z0-9_.]*(?:" + SEP + "|\\s*)\\(([^)]+)\\)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract columns from UPDATE SET
     private static final Pattern UPDATE_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSET\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
-        Pattern.CASE_INSENSITIVE
+        "\\bSET" + SEP + "([a-zA-Z_][a-zA-Z0-9_]*)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to parse column names (handles table.column and aliases)
