@@ -1,0 +1,4 @@
+## 2026-05-23 - Hardening SQL Regex Filters against Comment Bypasses
+**Vulnerability:** Regex-based SQL filters (e.g., ReadonlyDriver, SchemaValidationDriver) that used `\\s+` as a separator between keywords and identifiers were susceptible to bypasses using SQL comments (`/*...*/` or `--...`) which the database treats as whitespace but the regex did not.
+**Learning:** SQL comments are functionally equivalent to whitespace in most contexts. Robust SQL parsing must account for them as separators. Furthermore, `Pattern.DOTALL` is essential when matching comments to ensure that the dot matches newlines in multi-line comments.
+**Prevention:** Use a shared robust separator pattern like `(?:\\s|/\*.*?\*/|--.*?(?:\\n|$))+` and always include `Pattern.DOTALL` when these patterns might encounter multi-line SQL comments. Use capturing groups to extract keywords reliably instead of relying on simple `trim()` or `indexOf(' ')`.
