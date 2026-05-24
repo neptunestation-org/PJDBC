@@ -97,13 +97,15 @@ public class FederatingDriver extends AbstractDriver {
     /** Whether virtual threads are available (Java 21+) */
     private static final boolean VIRTUAL_THREADS_AVAILABLE;
 
+    private static final String SEP = "(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+";
+
     /**
      * Pattern to extract table names from SQL.
      * Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
      */
     private static final java.util.regex.Pattern TABLE_PATTERN = java.util.regex.Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
-        java.util.regex.Pattern.CASE_INSENSITIVE
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)" + SEP + "([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.DOTALL
     );
 
     static {
