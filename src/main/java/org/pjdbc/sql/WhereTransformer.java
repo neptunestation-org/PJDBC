@@ -106,7 +106,6 @@ public class WhereTransformer extends AbstractJdbcTransformer {
         Matcher matcher = WHERE_CLAUSE_END.matcher(sql);
         if (matcher.find()) {
             // Find where the WHERE clause content ends
-            int whereStart = matcher.start();
             int contentEnd = matcher.end(1);
 
             // Insert AND condition at the end of WHERE content
