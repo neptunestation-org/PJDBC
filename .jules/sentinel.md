@@ -1,0 +1,4 @@
+## 2026-05-26 - SQL Comment Bypass in Regex-Based Filters
+**Vulnerability:** Security filters (ReadonlyDriver, SchemaValidationDriver) and SQL transformers (SchemaTransformer, WhereTransformer) used naive whitespace matching (`\s+` or `\s*`), allowing bypasses via SQL comments (e.g., `/* comment */ INSERT...`) that databases treat as whitespace but the regexes did not.
+**Learning:** Naive regex-based SQL parsing is highly susceptible to "WAF-style" bypasses where alternative whitespace representations (like comments) are used to break keyword sequence matching.
+**Prevention:** Use a centralized utility (`SqlPatterns`) for all SQL-related regexes. Ensure patterns explicitly handle both block (`/*...*/`) and line (`--...`) comments, and always use `Pattern.DOTALL` to handle multi-line comments. Distinguish between mandatory separators (`SEP`) and optional whitespace (`PREFIX` / `PREFIX_COMPONENT`).
