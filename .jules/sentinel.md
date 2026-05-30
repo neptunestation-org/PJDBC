@@ -1,0 +1,4 @@
+## 2026-05-30 - [ReadonlyDriver] Comment and CTE Bypass Fixed
+**Vulnerability:** SQL operations like `INSERT` or `DELETE` could bypass `ReadonlyDriver` checks if preceded by SQL comments (e.g., `/* comment */ INSERT...`) or wrapped in a Common Table Expression (CTE) (e.g., `WITH x AS (DELETE...) SELECT...`).
+**Learning:** Regex-based SQL filtering that only anchors to the start of the string or whitespace is easily bypassed by SQL's flexible syntax for comments and advanced features like CTEs.
+**Prevention:** Use a robust `PREFIX` regex that explicitly handles all types of SQL comments and whitespace, and use `Pattern.DOTALL`. For CTEs, specifically look for the `WITH` keyword at the start followed by DML keywords anywhere in the statement (while being careful of false positives in strings).
