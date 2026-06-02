@@ -11,6 +11,7 @@ import java.sql.Statement;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
+import org.pjdbc.util.SqlPatterns;
 import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverParameter;
 import org.pjdbc.annotations.DriverParameter.ParameterType;
@@ -56,20 +57,20 @@ public class ReadonlyDriver extends AbstractProxyDriver {
 
     // Pattern to detect DML write operations
     private static final Pattern DML_PATTERN = Pattern.compile(
-        "^\\s*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
-        Pattern.CASE_INSENSITIVE
+        SqlPatterns.PREFIX + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        SqlPatterns.FLAGS
     );
 
     // Pattern to detect DDL operations
     private static final Pattern DDL_PATTERN = Pattern.compile(
-        "^\\s*(CREATE|ALTER|DROP|RENAME)\\b",
-        Pattern.CASE_INSENSITIVE
+        SqlPatterns.PREFIX + "(CREATE|ALTER|DROP|RENAME)\\b",
+        SqlPatterns.FLAGS
     );
 
     // Pattern to detect DCL operations
     private static final Pattern DCL_PATTERN = Pattern.compile(
-        "^\\s*(GRANT|REVOKE)\\b",
-        Pattern.CASE_INSENSITIVE
+        SqlPatterns.PREFIX + "(GRANT|REVOKE)\\b",
+        SqlPatterns.FLAGS
     );
 
     static {
