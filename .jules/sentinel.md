@@ -1,0 +1,4 @@
+## 2024-06-03 - Robust SQL Security Filters in ReadonlyDriver
+**Vulnerability:** SQL comments (`/*...*/`, `--...`) and Common Table Expressions (CTEs) were used to bypass the `ReadonlyDriver`'s regex-based security filters, allowing unauthorized write operations in a read-only context.
+**Learning:** Simple anchored regexes like `^\\s*INSERT` are insufficient for SQL security as they can be bypassed by leading comments or alternative statement structures like `WITH`. Broad word-boundary checks for nested DML can cause false positives by matching keywords inside string literals or comments.
+**Prevention:** Use a robust `PREFIX` pattern that explicitly accounts for optional whitespace and both block and line comments. For CTEs, specifically detect DML keywords after structural markers like `AS (` or `)` while skipping comments to minimize false positives.

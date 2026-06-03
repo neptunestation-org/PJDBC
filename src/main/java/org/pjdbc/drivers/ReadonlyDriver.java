@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.pjdbc.annotations.DriverCapability;
@@ -54,22 +55,46 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Custom error message for blocked operations")
 public class ReadonlyDriver extends AbstractProxyDriver {
 
+    // Pattern for optional leading whitespace and comments
+    private static final String PREFIX = "^(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*";
+
     // Pattern to detect DML write operations
     private static final Pattern DML_PATTERN = Pattern.compile(
-        "^\\s*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
-        Pattern.CASE_INSENSITIVE
+        PREFIX + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to detect DDL operations
     private static final Pattern DDL_PATTERN = Pattern.compile(
-        "^\\s*(CREATE|ALTER|DROP|RENAME)\\b",
-        Pattern.CASE_INSENSITIVE
+        PREFIX + "(CREATE|ALTER|DROP|RENAME)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to detect DCL operations
     private static final Pattern DCL_PATTERN = Pattern.compile(
-        "^\\s*(GRANT|REVOKE)\\b",
-        Pattern.CASE_INSENSITIVE
+        PREFIX + "(GRANT|REVOKE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+    );
+
+    // Unanchored pattern for whitespace and comments
+    private static final String PREFIX_COMPONENT = "(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*";
+
+    // Pattern to detect DML keywords in CTEs (after AS ( or after the CTE definition )
+    private static final Pattern CTE_DML_PATTERN = Pattern.compile(
+        "(?:AS\\s*\\(|\\))" + PREFIX_COMPONENT + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+    );
+
+    // Pattern to detect WITH clauses (CTEs)
+    private static final Pattern WITH_PATTERN = Pattern.compile(
+        PREFIX + "WITH\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+    );
+
+    // Pattern to detect the statement type, skipping leading comments
+    private static final Pattern STATEMENT_TYPE_PATTERN = Pattern.compile(
+        PREFIX + "([a-zA-Z]+)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     static {
@@ -148,6 +173,14 @@ public class ReadonlyDriver extends AbstractProxyDriver {
         public void checkStatement(String sql) throws SQLException {
             if (sql == null) return;
 
+            // Check for DML within WITH clauses (CTEs)
+            if (!allowDML && isCTE(sql)) {
+                Matcher m = CTE_DML_PATTERN.matcher(sql);
+                if (m.find()) {
+                    throw new SQLException(message + " [DML in CTE blocked: " + m.group(1).toUpperCase() + "]");
+                }
+            }
+
             // Check DML
             if (!allowDML && DML_PATTERN.matcher(sql).find()) {
                 throw new SQLException(message + " [DML blocked: " + getStatementType(sql) + "]");
@@ -164,7 +197,17 @@ public class ReadonlyDriver extends AbstractProxyDriver {
             }
         }
 
+        private boolean isCTE(String sql) {
+            return WITH_PATTERN.matcher(sql).find();
+        }
+
         private String getStatementType(String sql) {
+            // Find the first keyword after optional comments/whitespace
+            Matcher m = STATEMENT_TYPE_PATTERN.matcher(sql);
+            if (m.find()) {
+                return m.group(1).toUpperCase();
+            }
+
             String trimmed = sql.trim();
             int spaceIdx = trimmed.indexOf(' ');
             if (spaceIdx > 0) {
