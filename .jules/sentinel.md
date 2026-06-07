@@ -1,0 +1,4 @@
+## 2026-06-07 - [Harden SQL proxy drivers against comment-based bypasses]
+**Vulnerability:** SQL proxy drivers using regex-based keyword detection (e.g., `ReadonlyDriver`, `SchemaValidationDriver`) could be bypassed by inserting SQL comments (`/*...*/` or `--...`) before or between keywords, as the original regexes only accounted for whitespace.
+**Learning:** Simple `^\\s*KEYWORD` or `KEYWORD1\\s+KEYWORD2` regexes are insufficient for SQL parsing where comments are semantically equivalent to whitespace but not matched by `\\s`.
+**Prevention:** Use a centralized utility like `SqlPatterns` to provide robust regex components for optional (`PREFIX`) and mandatory (`SEP`) separators that explicitly account for both whitespace and SQL comments (block and line styles). Combined with `Pattern.DOTALL`, these patterns ensure security filters are not bypassed by varied SQL formatting.
