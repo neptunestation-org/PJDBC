@@ -1,0 +1,4 @@
+## 2026-06-08 - [HIGH] SQL Security Filter Bypass via Comments
+**Vulnerability:** Security filters in `ReadonlyDriver` and `SchemaValidationDriver` used brittle regexes (e.g. `^\\s*INSERT`) that only accounted for whitespace. Attackers could bypass these filters by using SQL comments (e.g. `/* comment */ INSERT...`) which are ignored by the database but broke the regex anchors.
+**Learning:** SQL parsing with regex is notoriously difficult because SQL allows comments and whitespace almost anywhere. Relying on `^\\s*` or `\\s+` is insufficient for security boundaries.
+**Prevention:** Use a centralized, robust SQL pattern utility that explicitly handles both whitespace and multiple comment styles (`/*...*/`, `--...`). Always use `Pattern.DOTALL` when matching SQL to handle multi-line comments.
