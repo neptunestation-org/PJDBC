@@ -1,0 +1,4 @@
+## 2026-06-10 - Harden DataMaskingDriver against LOB and Object retrieval leaks
+**Vulnerability:** Masking was bypassed when data was retrieved via LOB-specific methods (getBlob, getClob, etc.), generic getObject methods, or via column aliasing in SQL queries.
+**Learning:** Proxy result sets must explicitly override all data retrieval paths, as base implementations or generic methods can bypass specific masking logic. Label-based getters should delegate to index-based getters to ensure consistent masking regardless of how columns are referenced in the query.
+**Prevention:** Implement a fail-secure approach for complex types that cannot be easily masked (throw SQLException). Centralize masking logic in index-based getters and ensure all other retrieval methods delegate to them or are explicitly blocked for masked columns.
