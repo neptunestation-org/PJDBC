@@ -851,5 +851,43 @@ public class DataMaskingDriver extends AbstractProxyDriver {
             }
             return super.getUnicodeStream(columnLabel);
         }
+
+        // === LOB METHODS - throw SQLException for masked columns ===
+
+        @Override
+        public java.sql.Blob getBlob(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getBlob");
+            return super.getBlob(columnIndex);
+        }
+
+        @Override
+        public java.sql.Blob getBlob(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getBlob");
+            return super.getBlob(columnLabel);
+        }
+
+        @Override
+        public java.sql.Clob getClob(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getClob");
+            return super.getClob(columnIndex);
+        }
+
+        @Override
+        public java.sql.Clob getClob(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getClob");
+            return super.getClob(columnLabel);
+        }
+
+        @Override
+        public java.sql.NClob getNClob(int columnIndex) throws SQLException {
+            if (shouldMaskColumn(columnIndex)) throwMaskedColumnException(String.valueOf(columnIndex), "getNClob");
+            return super.getNClob(columnIndex);
+        }
+
+        @Override
+        public java.sql.NClob getNClob(String columnLabel) throws SQLException {
+            if (config.shouldMask(columnLabel)) throwMaskedColumnException(columnLabel, "getNClob");
+            return super.getNClob(columnLabel);
+        }
     }
 }
