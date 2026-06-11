@@ -1,9 +1,12 @@
 package org.pjdbc.drivers;
 
+import java.sql.Blob;
 import java.sql.CallableStatement;
+import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.DriverManager;
+import java.sql.NClob;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -473,62 +476,21 @@ public class DataMaskingDriver extends AbstractProxyDriver {
             return value;
         }
 
-        @Override
-        public String getString(String columnLabel) throws SQLException {
-            String value = super.getString(columnLabel);
-            if (config.shouldMask(columnLabel) && value != null) {
-                return config.maskValue(value);
-            }
-            return value;
-        }
-
-        @Override
-        public String getNString(int columnIndex) throws SQLException {
-            String value = super.getNString(columnIndex);
-            if (shouldMaskColumn(columnIndex) && value != null) {
-                return config.maskValue(value);
-            }
-            return value;
-        }
-
-        @Override
-        public String getNString(String columnLabel) throws SQLException {
-            String value = super.getNString(columnLabel);
-            if (config.shouldMask(columnLabel) && value != null) {
-                return config.maskValue(value);
-            }
-            return value;
-        }
-
-        // === OBJECT METHODS ===
-
-        @Override
-        public Object getObject(int columnIndex) throws SQLException {
-            if (shouldMaskColumn(columnIndex)) {
-                Object value = super.getObject(columnIndex);
-                if (value == null) return null;
-                if (value instanceof String s) {
-                    return config.maskValue(s);
-                }
-                // Non-string type in masked column - throw to prevent data leak
-                throwMaskedColumnException(String.valueOf(columnIndex), "getObject");
-            }
-            return super.getObject(columnIndex);
-        }
-
-        @Override
-        public Object getObject(String columnLabel) throws SQLException {
-            if (config.shouldMask(columnLabel)) {
-                Object value = super.getObject(columnLabel);
-                if (value == null) return null;
-                if (value instanceof String s) {
-                    return config.maskValue(s);
-                }
-                // Non-string type in masked column - throw to prevent data leak
-                throwMaskedColumnException(columnLabel, "getObject");
-            }
-            return super.getObject(columnLabel);
-        }
+        @Override public String getString(String l) throws SQLException { return getString(findColumn(l)); }
+        @Override public String getNString(int i) throws SQLException { String v = super.getNString(i); return (shouldMaskColumn(i) && v != null) ? config.maskValue(v) : v; }
+        @Override public String getNString(String l) throws SQLException { return getNString(findColumn(l)); }
+        @Override public Object getObject(int i) throws SQLException { if (shouldMaskColumn(i)) { Object v = super.getObject(i); if (v instanceof String s) return config.maskValue(s); if (v != null) throwMaskedColumnException(String.valueOf(i), "getObject"); } return super.getObject(i); }
+        @Override public Object getObject(String l) throws SQLException { return getObject(findColumn(l)); }
+        @Override public <T> T getObject(int i, Class<T> t) throws SQLException { if (shouldMaskColumn(i)) { if (t.equals(String.class)) return t.cast(getString(i)); throwMaskedColumnException(String.valueOf(i), "getObject"); } return super.getObject(i, t); }
+        @Override public <T> T getObject(String l, Class<T> t) throws SQLException { return getObject(findColumn(l), t); }
+        @Override public Object getObject(int i, java.util.Map<String, Class<?>> m) throws SQLException { if (shouldMaskColumn(i)) throwMaskedColumnException(String.valueOf(i), "getObject"); return super.getObject(i, m); }
+        @Override public Object getObject(String l, java.util.Map<String, Class<?>> m) throws SQLException { return getObject(findColumn(l), m); }
+        @Override public Blob getBlob(int i) throws SQLException { if (shouldMaskColumn(i)) throwMaskedColumnException(String.valueOf(i), "getBlob"); return super.getBlob(i); }
+        @Override public Blob getBlob(String l) throws SQLException { return getBlob(findColumn(l)); }
+        @Override public Clob getClob(int i) throws SQLException { if (shouldMaskColumn(i)) throwMaskedColumnException(String.valueOf(i), "getClob"); return super.getClob(i); }
+        @Override public Clob getClob(String l) throws SQLException { return getClob(findColumn(l)); }
+        @Override public NClob getNClob(int i) throws SQLException { if (shouldMaskColumn(i)) throwMaskedColumnException(String.valueOf(i), "getNClob"); return super.getNClob(i); }
+        @Override public NClob getNClob(String l) throws SQLException { return getNClob(findColumn(l)); }
 
         // === NUMERIC METHODS - throw SQLException for masked columns ===
 
