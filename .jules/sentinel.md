@@ -1,0 +1,4 @@
+## 2026-06-13 - Data Masking Bypass via Complex Types and Aliasing
+**Vulnerability:** The `DataMaskingDriver` could be bypassed using non-string getters (e.g., `getBlob`, `getArray`), generic `getObject(..., Class)` calls, or SQL aliasing (e.g., `SELECT secret AS public`).
+**Learning:** `AbstractResultSet` does not have a universal transformation hook for all data types; many getters delegate directly to the underlying driver unless explicitly overridden. Regex-based masking on column names/labels can also be bypassed if the alias doesn't match the pattern.
+**Prevention:** Explicitly override all `ResultSet` getters for masked columns. In `DataMaskingDriver`, throw `SQLException` for all non-string getters on masked columns ("fail-secure"). For aliasing protection, resolve column labels to indices via `findColumn` and use a pre-calculated `maskedColumns` bitset.
