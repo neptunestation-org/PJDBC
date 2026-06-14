@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.pjdbc.annotations.DriverCapability;
@@ -20,6 +21,7 @@ import org.pjdbc.sql.AbstractPreparedStatement;
 import org.pjdbc.sql.AbstractProxyDriver;
 import org.pjdbc.sql.AbstractStatement;
 import org.pjdbc.sql.JdbcUrlParser;
+import org.pjdbc.util.SqlPatterns;
 
 /**
  * ReadonlyDriver enforces read-only database access by blocking write operations.
@@ -56,20 +58,27 @@ public class ReadonlyDriver extends AbstractProxyDriver {
 
     // Pattern to detect DML write operations
     private static final Pattern DML_PATTERN = Pattern.compile(
-        "^\\s*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
-        Pattern.CASE_INSENSITIVE
+        SqlPatterns.PREFIX + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        SqlPatterns.FLAGS
     );
 
     // Pattern to detect DDL operations
     private static final Pattern DDL_PATTERN = Pattern.compile(
-        "^\\s*(CREATE|ALTER|DROP|RENAME)\\b",
-        Pattern.CASE_INSENSITIVE
+        SqlPatterns.PREFIX + "(CREATE|ALTER|DROP|RENAME)\\b",
+        SqlPatterns.FLAGS
     );
 
     // Pattern to detect DCL operations
     private static final Pattern DCL_PATTERN = Pattern.compile(
-        "^\\s*(GRANT|REVOKE)\\b",
-        Pattern.CASE_INSENSITIVE
+        SqlPatterns.PREFIX + "(GRANT|REVOKE)\\b",
+        SqlPatterns.FLAGS
+    );
+
+    // Pattern to detect DML keywords within CTEs
+    private static final Pattern CTE_DML_PATTERN = Pattern.compile(
+        "\\bAS" + SqlPatterns.PREFIX_COMPONENT + "\\(" + SqlPatterns.PREFIX_COMPONENT +
+        "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        SqlPatterns.FLAGS
     );
 
     static {
@@ -149,18 +158,27 @@ public class ReadonlyDriver extends AbstractProxyDriver {
             if (sql == null) return;
 
             // Check DML
-            if (!allowDML && DML_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DML blocked: " + getStatementType(sql) + "]");
+            Matcher dmlMatcher = DML_PATTERN.matcher(sql);
+            if (!allowDML && dmlMatcher.find()) {
+                throw new SQLException(message + " [DML blocked: " + dmlMatcher.group(1).toUpperCase() + "]");
+            }
+
+            // Check for DML in CTEs
+            Matcher cteDmlMatcher = CTE_DML_PATTERN.matcher(sql);
+            if (!allowDML && cteDmlMatcher.find()) {
+                throw new SQLException(message + " [DML blocked in CTE: " + cteDmlMatcher.group(1).toUpperCase() + "]");
             }
 
             // Check DDL
-            if (!allowDDL && DDL_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DDL blocked: " + getStatementType(sql) + "]");
+            Matcher ddlMatcher = DDL_PATTERN.matcher(sql);
+            if (!allowDDL && ddlMatcher.find()) {
+                throw new SQLException(message + " [DDL blocked: " + ddlMatcher.group(1).toUpperCase() + "]");
             }
 
             // Always block DCL
-            if (DCL_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DCL blocked: " + getStatementType(sql) + "]");
+            Matcher dclMatcher = DCL_PATTERN.matcher(sql);
+            if (dclMatcher.find()) {
+                throw new SQLException(message + " [DCL blocked: " + dclMatcher.group(1).toUpperCase() + "]");
             }
         }
 
