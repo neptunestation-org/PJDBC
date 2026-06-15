@@ -54,22 +54,34 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Custom error message for blocked operations")
 public class ReadonlyDriver extends AbstractProxyDriver {
 
+    // Pattern segment to match whitespace and comments
+    private static final String WS_AND_COMMENTS = "(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*";
+
+    // Pattern to skip leading whitespace and comments
+    private static final String PREFIX = "^" + WS_AND_COMMENTS;
+
     // Pattern to detect DML write operations
     private static final Pattern DML_PATTERN = Pattern.compile(
-        "^\\s*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
-        Pattern.CASE_INSENSITIVE
+        PREFIX + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to detect DDL operations
     private static final Pattern DDL_PATTERN = Pattern.compile(
-        "^\\s*(CREATE|ALTER|DROP|RENAME)\\b",
-        Pattern.CASE_INSENSITIVE
+        PREFIX + "(CREATE|ALTER|DROP|RENAME)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to detect DCL operations
     private static final Pattern DCL_PATTERN = Pattern.compile(
-        "^\\s*(GRANT|REVOKE)\\b",
-        Pattern.CASE_INSENSITIVE
+        PREFIX + "(GRANT|REVOKE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+    );
+
+    // Pattern to detect DML inside CTEs (WITH clauses)
+    private static final Pattern CTE_DML_PATTERN = Pattern.compile(
+        "\\bWITH\\s+.*\\bAS" + WS_AND_COMMENTS + "\\(" + WS_AND_COMMENTS + "(?:INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     static {
@@ -149,7 +161,7 @@ public class ReadonlyDriver extends AbstractProxyDriver {
             if (sql == null) return;
 
             // Check DML
-            if (!allowDML && DML_PATTERN.matcher(sql).find()) {
+            if (!allowDML && (DML_PATTERN.matcher(sql).find() || CTE_DML_PATTERN.matcher(sql).find())) {
                 throw new SQLException(message + " [DML blocked: " + getStatementType(sql) + "]");
             }
 
