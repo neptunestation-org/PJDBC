@@ -1,0 +1,4 @@
+## 2026-06-15 - SQL Comment and CTE-based Security Bypasses
+**Vulnerability:** Regex-based SQL filters in `ReadonlyDriver` and `SchemaValidationDriver` could be bypassed by prepending SQL comments (e.g., `/* comment */ DELETE ...`) or by embedding DML inside Common Table Expressions (e.g., `WITH x AS (DELETE ...) SELECT 1`).
+**Learning:** Standard regexes anchored with `^` or using `\s+` as a separator fail to account for SQL comments which databases treat as whitespace. CTEs introduce a secondary execution context that standard DML-at-start patterns miss.
+**Prevention:** Use a robust prefix pattern `^(?:\s|/\*.*?\*/|--.*?(?:\n|$))*` and `Pattern.DOTALL` to skip all forms of whitespace and comments before keyword matching. Explicitly check for DML keywords within `WITH (...)` structural markers.
