@@ -1,0 +1,4 @@
+## 2026-06-16 - DataMaskingDriver Security Hardening
+**Vulnerability:** The `DataMaskingDriver` only implemented masking for a few specific label-based methods, allowing attackers to bypass masking using index-based getters (`getString(1)`), complex type getters (`getBlob()`), or SQL aliasing (`SELECT secret AS public`).
+**Learning:** Refactoring label-based JDBC getters to delegate to index-based getters (e.g., `getString(findColumn(label))`) must be paired with explicit implementation of the corresponding index-based getters containing masking logic, as `AbstractResultSet` lacks transformation hooks for most data types.
+**Prevention:** Always use index-based resolution as the source of truth for column-level security policies in `ResultSet` wrappers, and ensure all `getXXX` methods are audited for proper delegation or blocking.
