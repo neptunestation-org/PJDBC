@@ -19,6 +19,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.util.SqlPatterns;
 import org.pjdbc.annotations.DriverParameter;
 import org.pjdbc.annotations.DriverParameter.ParameterType;
 import org.pjdbc.sql.AbstractCallableStatement;
@@ -76,32 +77,29 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Semicolon-separated table types for metadata", defaultValue = "TABLE;VIEW")
 public class SchemaValidationDriver extends AbstractProxyDriver {
 
-    // Separator pattern: whitespace or comments
-    private static final String SEP = "(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))+";
-
     // Pattern to extract table names from SQL
     // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)" + SEP + "([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
-        Pattern.CASE_INSENSITIVE
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)" + SqlPatterns.SEP + "([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        SqlPatterns.FLAGS
     );
 
     // Pattern to extract column names from SELECT
     private static final Pattern SELECT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSELECT" + SEP + "(.+?)" + SEP + "FROM\\b",
-        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+        "\\bSELECT" + SqlPatterns.SEP + "(.+?)" + SqlPatterns.SEP + "FROM\\b",
+        SqlPatterns.FLAGS
     );
 
     // Pattern to extract columns from INSERT
     private static final Pattern INSERT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bINSERT" + SEP + "INTO" + SEP + "[a-zA-Z_][a-zA-Z0-9_.]*" + "(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*" + "\\(([^)]+)\\)",
-        Pattern.CASE_INSENSITIVE
+        "\\bINSERT" + SqlPatterns.SEP + "INTO" + SqlPatterns.SEP + "[a-zA-Z_][a-zA-Z0-9_.]*" + SqlPatterns.PREFIX_COMPONENT + "\\(([^)]+)\\)",
+        SqlPatterns.FLAGS
     );
 
     // Pattern to extract columns from UPDATE SET
     private static final Pattern UPDATE_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSET" + SEP + "([a-zA-Z_][a-zA-Z0-9_]*)",
-        Pattern.CASE_INSENSITIVE
+        "\\bSET" + SqlPatterns.SEP + "([a-zA-Z_][a-zA-Z0-9_]*)",
+        SqlPatterns.FLAGS
     );
 
     // Pattern to parse column names (handles table.column and aliases)

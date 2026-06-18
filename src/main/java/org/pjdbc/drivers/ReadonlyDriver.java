@@ -13,6 +13,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.pjdbc.annotations.DriverCapability;
+import org.pjdbc.util.SqlPatterns;
 import org.pjdbc.annotations.DriverParameter;
 import org.pjdbc.annotations.DriverParameter.ParameterType;
 import org.pjdbc.sql.AbstractCallableStatement;
@@ -56,27 +57,26 @@ import org.pjdbc.sql.JdbcUrlParser;
 public class ReadonlyDriver extends AbstractProxyDriver {
 
     // Patterns to detect blocked operations with support for leading comments
-    private static final String PREFIX = "^(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*";
-
     private static final Pattern DML_PATTERN = Pattern.compile(
-        PREFIX + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
-        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+        SqlPatterns.PREFIX + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        SqlPatterns.FLAGS
     );
 
     private static final Pattern DDL_PATTERN = Pattern.compile(
-        PREFIX + "(CREATE|ALTER|DROP|RENAME)\\b",
-        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+        SqlPatterns.PREFIX + "(CREATE|ALTER|DROP|RENAME)\\b",
+        SqlPatterns.FLAGS
     );
 
     private static final Pattern DCL_PATTERN = Pattern.compile(
-        PREFIX + "(GRANT|REVOKE)\\b",
-        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+        SqlPatterns.PREFIX + "(GRANT|REVOKE)\\b",
+        SqlPatterns.FLAGS
     );
 
     // Pattern to detect DML hidden inside a WITH clause (CTE)
     private static final Pattern CTE_DML_PATTERN = Pattern.compile(
-        "\\bAS(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*\\((?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
-        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+        "\\bAS" + SqlPatterns.PREFIX_COMPONENT + "\\(" + SqlPatterns.PREFIX_COMPONENT +
+        "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        SqlPatterns.FLAGS
     );
 
     static {
