@@ -73,8 +73,10 @@ public class ReadonlyDriver extends AbstractProxyDriver {
     );
 
     // Pattern to detect DML hidden inside a WITH clause (CTE)
+    // Anchored to WITH at the start of the statement to reduce false positives in string literals
     private static final Pattern CTE_DML_PATTERN = Pattern.compile(
-        "\\bAS" + SqlPatterns.PREFIX_COMPONENT + "\\(" + SqlPatterns.PREFIX_COMPONENT +
+        SqlPatterns.PREFIX + "WITH" + SqlPatterns.SEP + ".*?" + SqlPatterns.SEP + "AS" +
+        SqlPatterns.PREFIX_COMPONENT + "\\(" + SqlPatterns.PREFIX_COMPONENT +
         "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
         SqlPatterns.FLAGS
     );
