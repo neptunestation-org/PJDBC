@@ -11,6 +11,7 @@ import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverParameter;
 import org.pjdbc.annotations.DriverParameter.ParameterType;
 import org.pjdbc.annotations.DriverSideEffects;
+import org.pjdbc.util.SqlPatterns;
 import org.pjdbc.sql.*;
 import static org.pjdbc.sql.PjdbcListeners.fireFederatedQuery;
 
@@ -102,8 +103,8 @@ public class FederatingDriver extends AbstractDriver {
      * Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
      */
     private static final java.util.regex.Pattern TABLE_PATTERN = java.util.regex.Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
-        java.util.regex.Pattern.CASE_INSENSITIVE
+        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)" + SqlPatterns.SEP + "([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        SqlPatterns.FLAGS
     );
 
     static {
