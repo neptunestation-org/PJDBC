@@ -75,9 +75,10 @@ public class ReadonlyDriver extends AbstractProxyDriver {
     );
 
     // Pattern to detect DML in Common Table Expressions (CTEs)
+    // Anchored to WITH at the start of statement.
     // Matches 'AS (' or ')' followed by optional comments/whitespace and a DML keyword.
     private static final Pattern CTE_DML_PATTERN = Pattern.compile(
-        "(?:AS" + SqlPatterns.SEP + "\\(|\\))" + SqlPatterns.PREFIX_COMPONENT + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        SqlPatterns.PREFIX + "WITH" + SqlPatterns.SEP + ".+?(?:AS" + SqlPatterns.SEP + "\\(|\\))" + SqlPatterns.PREFIX_COMPONENT + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
         SqlPatterns.FLAGS
     );
 
