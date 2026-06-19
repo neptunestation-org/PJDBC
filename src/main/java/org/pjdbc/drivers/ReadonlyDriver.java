@@ -11,6 +11,7 @@ import java.sql.Statement;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
+import org.pjdbc.util.SqlPatterns;
 import org.pjdbc.annotations.DriverCapability;
 import org.pjdbc.annotations.DriverParameter;
 import org.pjdbc.annotations.DriverParameter.ParameterType;
@@ -56,20 +57,26 @@ public class ReadonlyDriver extends AbstractProxyDriver {
 
     // Pattern to detect DML write operations
     private static final Pattern DML_PATTERN = Pattern.compile(
-        "^\\s*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
-        Pattern.CASE_INSENSITIVE
+        SqlPatterns.PREFIX + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        SqlPatterns.FLAGS
     );
 
     // Pattern to detect DDL operations
     private static final Pattern DDL_PATTERN = Pattern.compile(
-        "^\\s*(CREATE|ALTER|DROP|RENAME)\\b",
-        Pattern.CASE_INSENSITIVE
+        SqlPatterns.PREFIX + "(CREATE|ALTER|DROP|RENAME)\\b",
+        SqlPatterns.FLAGS
     );
 
     // Pattern to detect DCL operations
     private static final Pattern DCL_PATTERN = Pattern.compile(
-        "^\\s*(GRANT|REVOKE)\\b",
-        Pattern.CASE_INSENSITIVE
+        SqlPatterns.PREFIX + "(GRANT|REVOKE)\\b",
+        SqlPatterns.FLAGS
+    );
+
+    // Pattern to detect DML inside CTEs
+    private static final Pattern CTE_DML_PATTERN = Pattern.compile(
+        SqlPatterns.PREFIX + "WITH\\b.*?\\b(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        SqlPatterns.FLAGS
     );
 
     static {
@@ -148,19 +155,21 @@ public class ReadonlyDriver extends AbstractProxyDriver {
         public void checkStatement(String sql) throws SQLException {
             if (sql == null) return;
 
-            // Check DML
-            if (!allowDML && DML_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DML blocked: " + getStatementType(sql) + "]");
+            // Check DML (regular and CTE-based)
+            if (!allowDML) {
+                if (DML_PATTERN.matcher(sql).find() || CTE_DML_PATTERN.matcher(sql).find()) {
+                    throw new SQLException(message + " [DML blocked]");
+                }
             }
 
             // Check DDL
             if (!allowDDL && DDL_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DDL blocked: " + getStatementType(sql) + "]");
+                throw new SQLException(message + " [DDL blocked]");
             }
 
             // Always block DCL
             if (DCL_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DCL blocked: " + getStatementType(sql) + "]");
+                throw new SQLException(message + " [DCL blocked]");
             }
         }
 

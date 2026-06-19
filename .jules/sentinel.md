@@ -1,0 +1,4 @@
+## 2026-06-19 - SQL Comment and CTE Bypasses in Access Control Drivers
+**Vulnerability:** ReadonlyDriver and SchemaValidationDriver used regex patterns that only accounted for whitespace (\s), allowing attackers to bypass security checks by using SQL comments (e.g., /* comment */) or Common Table Expressions (CTEs).
+**Learning:** Simple regex-based SQL parsing is fragile. Leading comments or comments between keywords can easily break patterns anchored with ^\s*. Additionally, Pattern.DOTALL is required to correctly match multi-line block comments.
+**Prevention:** Use a centralized utility (SqlPatterns) for all SQL parsing to ensure comments and whitespace are handled consistently. Use anchored patterns for statement starts and mandatory separator patterns (SEP) between keywords. Implement specific detection for CTE-based DML (e.g., WITH ... DELETE).
