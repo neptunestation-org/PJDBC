@@ -73,4 +73,20 @@ public class ReadonlyBypassTest {
             }
         }
     }
+
+    @Test
+    public void testCteNoSpaceBypass() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:readonly_cte_nospace;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try {
+                    stmt.execute("WITH cte AS(INSERT INTO test VALUES (1) RETURNING id) SELECT * FROM cte");
+                    fail("Should have blocked INSERT within CTE with no space after AS");
+                } catch (SQLException e) {
+                    assertTrue("Expected readonly block message, got: " + e.getMessage(),
+                        e.getMessage().contains("ReadonlyDriver: Write operation not permitted"));
+                }
+            }
+        }
+    }
 }

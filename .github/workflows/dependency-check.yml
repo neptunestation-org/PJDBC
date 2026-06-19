@@ -35,16 +35,31 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-owasp-data
 
+    - name: Cleanup Stale Locks
+      run: rm -f ~/.owasp/*.lock.db 2>/dev/null || true
+
     - name: Run OWASP Dependency-Check
       env:
         NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
       run: |
-        mvn -B org.owasp:dependency-check-maven:check \
-          -DfailBuildOnCVSS=7 \
-          -Dformats=HTML,SARIF \
-          -DenableExperimental=true \
-          -DossIndexAnalyzerEnabled=false \
-          ${NVD_API_KEY:+-DnvdApiKey=$NVD_API_KEY}
+        MAX_RETRIES=3
+        RETRY_COUNT=0
+        until [ $RETRY_COUNT -ge $MAX_RETRIES ]
+        do
+          mvn -B org.owasp:dependency-check-maven:check \
+            -DfailBuildOnCVSS=7 \
+            -Dformats=HTML,SARIF \
+            -DenableExperimental=true \
+            -DossIndexAnalyzerEnabled=false \
+            ${NVD_API_KEY:+-DnvdApiKey=$NVD_API_KEY} && break
+          RETRY_COUNT=$((RETRY_COUNT+1))
+          echo "Scan failed, retrying ($RETRY_COUNT/$MAX_RETRIES)..."
+          sleep 30
+        done
+        if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+          echo "Scan failed after $MAX_RETRIES attempts."
+          exit 1
+        fi
 
     - name: Upload Dependency-Check report
       uses: actions/upload-artifact@v4
