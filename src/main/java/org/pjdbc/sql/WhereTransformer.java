@@ -40,6 +40,8 @@ public class WhereTransformer extends AbstractJdbcTransformer {
 
     private final String condition;
 
+    private static final String PREFIX = "(?:\\s|/\\*.*?\\*/|--.*?(?:\\n|$))*";
+
     // Pattern to detect if statement already has WHERE
     private static final Pattern HAS_WHERE = Pattern.compile(
         "\\bWHERE\\b",
@@ -55,8 +57,8 @@ public class WhereTransformer extends AbstractJdbcTransformer {
 
     // Pattern to detect SELECT/UPDATE/DELETE statements (not INSERT)
     private static final Pattern MODIFIABLE_STATEMENT = Pattern.compile(
-        "^\\s*(SELECT|UPDATE|DELETE)\\b",
-        Pattern.CASE_INSENSITIVE
+        "^" + PREFIX + "(SELECT|UPDATE|DELETE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to find the last WHERE for appending AND
