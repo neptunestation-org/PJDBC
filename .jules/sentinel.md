@@ -1,0 +1,4 @@
+## 2026-06-26 - [Hardening] Consistent Masking via Index-Based Delegation
+**Vulnerability:** DataMaskingDriver could be bypassed by using column aliases (labels) that didn't match the masking regex, even if the underlying column did. It could also be bypassed by using specialized getters like `getBlob()` or `getObject(..., Class)` which were not overridden in the proxy ResultSet.
+**Learning:** In JDBC proxy drivers, applying security logic (like masking or access control) in both label-based and index-based getters leads to duplication and potential bypasses if they get out of sync or if aliases are used.
+**Prevention:** Always refactor label-based getters to delegate to their index-based counterparts (e.g., `getString(String label) { return getString(findColumn(label)); }`). Centralize security logic in the index-based getters. Ensure all relevant JDBC getter overloads are covered.
