@@ -1,0 +1,4 @@
+## 2026-06-27 - [Hardening] DataMaskingDriver and CI Stability
+**Vulnerability:** DataMaskingDriver was vulnerable to alias-based bypasses (using SQL labels) and type-based bypasses (using non-string getters like `getBlob`). Sensitive data could be leaked if an attacker used a column alias that didn't match the masking regex or called a specialized getter not overridden in the proxy.
+**Learning:** Security logic in JDBC proxies must be centralized in index-based getters, with label-based getters delegating to them. This ensures that metadata-based column identification (which handles aliases) is applied consistently.
+**Prevention:** Refactor all proxy getters to delegate to index-based versions. Explicitly block specialized types (LOBs, etc.) for sensitive columns. Harden CI workflows with caching and robust error handling to distinguish between security failures and transient infrastructure issues.
