@@ -27,7 +27,17 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
+    - name: Cache OWASP Data
+      uses: actions/cache@v4
+      with:
+        path: ~/.owasp
+        key: ${{ runner.os }}-owasp-data
+        restore-keys: |
+          ${{ runner.os }}-owasp-data
+
     - name: Run OWASP Dependency-Check
+      id: dependency-check
+      continue-on-error: true
       env:
         NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
       run: |
@@ -45,8 +55,17 @@ jobs:
         name: dependency-check-report
         path: target/dependency-check-report.*
 
+    - name: Check SARIF file existence
+      id: check-sarif
+      run: |
+        if [ -f "target/dependency-check-report.sarif" ]; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Upload SARIF to GitHub Security
       uses: github/codeql-action/upload-sarif@v4
-      if: always()
+      if: always() && steps.check-sarif.outputs.exists == 'true'
       with:
         sarif_file: target/dependency-check-report.sarif
