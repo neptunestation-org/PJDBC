@@ -1,0 +1,6 @@
+## 2026-07-03 - [Security Filter Regressions and SQL Comment Bypasses]
+**Vulnerability:** Several security-critical drivers (ReadonlyDriver, SchemaValidationDriver) and transformers (WhereTransformer) used simplistic regex anchors (like `^\s*` or `\s+`) that failed to account for SQL comments (`/* ... */` and `-- ...`). This allowed attackers to bypass DML blocks, table whitelists, and tenant isolation filters by prepending or injecting comments.
+
+**Learning:** In a JDBC proxy that relies on regex for SQL analysis, whitespace is not the only separator. SQL comments are legally allowed almost anywhere whitespace is, and they can be used to hide keywords from naive regex patterns while still being executed by the underlying database. Additionally, Common Table Expressions (CTEs) can hide DML operations if the filter only looks at the start of the statement.
+
+**Prevention:** Always use a robust regex prefix or separator that explicitly handles both whitespace and SQL comments (both block and single-line). For PJDBC, this pattern is `(?:\\s|/\\*.*?\\*/|--[^\\n]*?(?:\\n|$))*`. When using this pattern to match keywords at the start of a string, ensure `Pattern.DOTALL` is used so that multi-line comments are correctly handled. For DML filters, also consider detecting keywords following the `AS (` marker in CTEs.
