@@ -54,22 +54,30 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Custom error message for blocked operations")
 public class ReadonlyDriver extends AbstractProxyDriver {
 
+    private static final String PREFIX = "(?:\\s|/\\*.*?\\*/|--[^\\n]*?(?:\\n|$))*";
+
     // Pattern to detect DML write operations
     private static final Pattern DML_PATTERN = Pattern.compile(
-        "^\\s*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
-        Pattern.CASE_INSENSITIVE
+        "^" + PREFIX + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to detect DDL operations
     private static final Pattern DDL_PATTERN = Pattern.compile(
-        "^\\s*(CREATE|ALTER|DROP|RENAME)\\b",
-        Pattern.CASE_INSENSITIVE
+        "^" + PREFIX + "(CREATE|ALTER|DROP|RENAME)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to detect DCL operations
     private static final Pattern DCL_PATTERN = Pattern.compile(
-        "^\\s*(GRANT|REVOKE)\\b",
-        Pattern.CASE_INSENSITIVE
+        "^" + PREFIX + "(GRANT|REVOKE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+    );
+
+    // Pattern to detect DML inside CTEs
+    private static final Pattern CTE_DML_PATTERN = Pattern.compile(
+        "\\bAS\\s*\\(" + PREFIX + "(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     static {
@@ -149,28 +157,30 @@ public class ReadonlyDriver extends AbstractProxyDriver {
             if (sql == null) return;
 
             // Check DML
-            if (!allowDML && DML_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DML blocked: " + getStatementType(sql) + "]");
+            if (!allowDML) {
+                java.util.regex.Matcher m = DML_PATTERN.matcher(sql);
+                if (m.find()) {
+                    throw new SQLException(message + " [DML blocked: " + m.group(1).toUpperCase() + "]");
+                }
+                m = CTE_DML_PATTERN.matcher(sql);
+                if (m.find()) {
+                    throw new SQLException(message + " [DML blocked: " + m.group(1).toUpperCase() + "]");
+                }
             }
 
             // Check DDL
-            if (!allowDDL && DDL_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DDL blocked: " + getStatementType(sql) + "]");
+            if (!allowDDL) {
+                java.util.regex.Matcher m = DDL_PATTERN.matcher(sql);
+                if (m.find()) {
+                    throw new SQLException(message + " [DDL blocked: " + m.group(1).toUpperCase() + "]");
+                }
             }
 
             // Always block DCL
-            if (DCL_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DCL blocked: " + getStatementType(sql) + "]");
+            java.util.regex.Matcher m = DCL_PATTERN.matcher(sql);
+            if (m.find()) {
+                throw new SQLException(message + " [DCL blocked: " + m.group(1).toUpperCase() + "]");
             }
-        }
-
-        private String getStatementType(String sql) {
-            String trimmed = sql.trim();
-            int spaceIdx = trimmed.indexOf(' ');
-            if (spaceIdx > 0) {
-                return trimmed.substring(0, spaceIdx).toUpperCase();
-            }
-            return trimmed.toUpperCase();
         }
     }
 
