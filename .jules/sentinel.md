@@ -1,0 +1,4 @@
+## 2026-07-05 - Harden ReadonlyDriver against SQL comment and CTE-based bypasses
+**Vulnerability:** Simple regex anchors (^\s*) and start-of-string keyword matching in ReadonlyDriver allowed bypasses via leading SQL comments (e.g., /* comment */ INSERT...) and DML nested within Common Table Expressions (CTEs) (e.g., WITH x AS (DELETE...) SELECT...).
+**Learning:** Simplistic SQL parsing in proxy drivers often fails to account for the flexibility of SQL syntax, particularly where comments can appear and how DML can be embedded in otherwise read-like structures. Regression occurred because previous hardening was either simplistic or not consistently applied across all access control drivers.
+**Prevention:** Use a robust PREFIX regex that explicitly handles both block (/*...*/) and line (--...) comments, combined with Pattern.DOTALL for multi-line support. Additionally, specifically monitor for DML keywords following structural markers like 'AS (' within CTEs.
