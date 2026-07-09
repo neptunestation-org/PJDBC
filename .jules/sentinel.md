@@ -1,0 +1,4 @@
+## 2026-07-09 - SQL Security Filter Regression
+**Vulnerability:** Regex-based SQL security filters (ReadonlyDriver, SchemaValidationDriver) regressed to using simple ^\\s* anchors, allowing bypasses via leading SQL comments (e.g., /* comment */ INSERT ...).
+**Learning:** SQL comments are a primary bypass vector for regex-based filters. Standard whitespace-only matches are insufficient for security boundaries. CTEs (Common Table Expressions) also provide a bypass vector for "starts-with" filters.
+**Prevention:** Always use a robust PREFIX regex that includes whitespace and both block (/*...*/) and line (--...) comments. Use Pattern.DOTALL to ensure multi-line comments are handled. Use capturing groups in security regexes to accurately report the blocked operation. Check for DML inside CTE blocks (WITH ... AS (DML)).
