@@ -53,10 +53,13 @@ public class WhereTransformer extends AbstractJdbcTransformer {
         Pattern.CASE_INSENSITIVE
     );
 
+    // Robust prefix to skip leading comments and whitespace
+    private static final String PREFIX = "(?:\\s|/\\*.*?\\*/|--[^\\n]*?(?:\\n|$))*";
+
     // Pattern to detect SELECT/UPDATE/DELETE statements (not INSERT)
     private static final Pattern MODIFIABLE_STATEMENT = Pattern.compile(
-        "^\\s*(SELECT|UPDATE|DELETE)\\b",
-        Pattern.CASE_INSENSITIVE
+        "^" + PREFIX + "(SELECT|UPDATE|DELETE)\\b",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to find the last WHERE for appending AND
