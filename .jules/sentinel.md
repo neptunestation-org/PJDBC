@@ -1,0 +1,4 @@
+## 2026-07-11 - [Harden SQL Security Filters]
+**Vulnerability:** Regex-based SQL filters in `ReadonlyDriver` and `SchemaValidationDriver` were susceptible to bypasses using SQL comments (e.g., `/* ... */` at the start of a query or between keywords) and DML nested within Common Table Expressions (CTEs).
+**Learning:** Simple `^\s*` anchors are insufficient for SQL parsing as they don't account for multi-line comments or line comments. Additionally, DML is not only found at the beginning of a statement but can be nested in `WITH` clauses.
+**Prevention:** Use a robust `PREFIX` regex `(?:\\s|/\\*.*?\\*/|--[^\\n]*?(?:\\n|$))*` with `Pattern.DOTALL` for all SQL keyword matching. Explicitly check for DML within CTE structures like `AS (...)`. Ensure identifier extraction (e.g., column names) strips comments before parsing.
