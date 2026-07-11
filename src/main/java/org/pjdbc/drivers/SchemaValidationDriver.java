@@ -76,29 +76,34 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Semicolon-separated table types for metadata", defaultValue = "TABLE;VIEW")
 public class SchemaValidationDriver extends AbstractProxyDriver {
 
+    // Patterns to handle SQL comments and whitespace
+    private static final String PREFIX = "(?:\\s|/\\*.*?\\*/|--[^\\n]*?(?:\\n|$))*";
+    private static final String SEP = "(?:\\s|/\\*.*?\\*/|--[^\\n]*?(?:\\n|$))+";
+    private static final String OPT_SEP = "(?:\\s|/\\*.*?\\*/|--[^\\n]*?(?:\\n|$))*";
+
     // Pattern to extract table names from SQL
     // Matches: FROM table, JOIN table, INTO table, UPDATE table, TABLE table (for TRUNCATE)
     private static final Pattern TABLE_PATTERN = Pattern.compile(
-        "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
-        Pattern.CASE_INSENSITIVE
+        "\\b(FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)" + SEP + "([a-zA-Z_][a-zA-Z0-9_]*(?:\\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract column names from SELECT
     private static final Pattern SELECT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSELECT\\s+(.+?)\\s+FROM\\b",
+        "\\bSELECT" + SEP + "(.+?)" + SEP + "FROM\\b",
         Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract columns from INSERT
     private static final Pattern INSERT_COLUMNS_PATTERN = Pattern.compile(
-        "\\bINSERT\\s+INTO\\s+[a-zA-Z_][a-zA-Z0-9_.]*\\s*\\(([^)]+)\\)",
-        Pattern.CASE_INSENSITIVE
+        "\\bINSERT" + SEP + "INTO" + SEP + "[a-zA-Z_][a-zA-Z0-9_.]*" + OPT_SEP + "\\(([^)]+)\\)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to extract columns from UPDATE SET
     private static final Pattern UPDATE_COLUMNS_PATTERN = Pattern.compile(
-        "\\bSET\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
-        Pattern.CASE_INSENSITIVE
+        "\\bSET" + SEP + "([a-zA-Z_][a-zA-Z0-9_]*)",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
     // Pattern to parse column names (handles table.column and aliases)
@@ -302,7 +307,7 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
             Set<String> tables = new HashSet<>();
             Matcher matcher = TABLE_PATTERN.matcher(sql);
             while (matcher.find()) {
-                String table = matcher.group(1);
+                String table = matcher.group(2);
                 // Handle schema.table format - extract just table name
                 if (table.contains(".")) {
                     table = table.substring(table.lastIndexOf('.') + 1);
@@ -341,6 +346,10 @@ public class SchemaValidationDriver extends AbstractProxyDriver {
         }
 
         private void extractColumnNames(String columnList, Set<String> columns) {
+            // Strip SQL comments from the column list
+            columnList = Pattern.compile("/\\*.*?\\*/|--[^\\n]*?(?:\\n|$)", Pattern.DOTALL)
+                                .matcher(columnList).replaceAll(" ");
+
             // Split by comma and extract column names
             for (String part : columnList.split(",")) {
                 // Skip aggregate functions and literals
