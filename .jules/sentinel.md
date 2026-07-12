@@ -1,0 +1,4 @@
+## 2026-07-12 - SQL Bypass via Comments and CTEs in ReadonlyDriver
+**Vulnerability:** Attackers could bypass ReadonlyDriver's security checks by prepending SQL comments (e.g., `/* comment */ DELETE ...`) or nesting DML within Common Table Expressions (e.g., `WITH t AS (DELETE ...) ...`).
+**Learning:** Simple regex anchors like `^\s*` are insufficient for SQL security filters because they don't account for SQL-specific "whitespace" like comments. Furthermore, DML is not always at the top level of a statement.
+**Prevention:** Use a robust `PREFIX` regex that includes `(?:\s|/\*.*?\*/|--[^\n]*?(?:\n|$))*` and `Pattern.DOTALL`. Always check for DML keywords nested within CTE structures (e.g., `AS (...)`). Use capturing groups in regexes to accurately report the blocked keyword in error messages.
