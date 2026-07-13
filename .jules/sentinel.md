@@ -1,0 +1,4 @@
+## 2026-07-13 - [Hardening ReadonlyDriver Against Comment and CTE Bypasses]
+**Vulnerability:** SQL security filters using simplistic `^\\s*` anchors can be bypassed by prefixing statements with SQL comments (`/*...*/` or `--...`). Additionally, DML operations can be nested within Common Table Expressions (`WITH ... AS (DELETE ...)`) or follow a top-level `WITH` clause, bypassing filters that only check the first word of a statement.
+**Learning:** Robust SQL filtering requires explicit handling of all comment types at the start of and between keywords, and must account for structural keywords like `WITH` that can precede DML. Regex-based filters should use `Pattern.DOTALL` and non-greedy matching for comments.
+**Prevention:** Use a centralized or consistent `PREFIX` regex for leading whitespace/comments: `(?:\\s|/\\*.*?\\*/|--[^\\n]*?(?:\\n|$))*`. Update patterns to detect DML within CTE definitions and after top-level CTEs.
