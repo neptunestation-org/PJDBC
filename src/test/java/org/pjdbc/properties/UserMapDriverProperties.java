@@ -142,7 +142,7 @@ class UserMapDriverProperties {
 
     /**
      * Property: Connect with null user property fails gracefully.
-     * Note: UserMapDriver throws NullPointerException when user is null.
+     * Note: UserMapDriver throws secure SQLException when user is null.
      */
     @Property(tries = 10)
     void connectWithNullUserFails(
@@ -152,10 +152,26 @@ class UserMapDriverProperties {
         Properties props = new Properties();
         // No user property set
 
-        // Can throw either SQLException or NullPointerException
-        assertThrows(Exception.class, () -> {
+        SQLException exception = assertThrows(SQLException.class, () -> {
             DriverManager.getConnection(url, props);
         }, "Should throw when user property is missing");
+        assertEquals("PJDBC: Authentication failed", exception.getMessage());
+    }
+
+    /**
+     * Property: Connect with null Properties parameter fails gracefully.
+     * Note: UserMapDriver throws secure SQLException when info is null.
+     */
+    @Property(tries = 10)
+    void connectWithNullPropertiesFails(
+            @ForAll("mockDbNames") String dbName) {
+
+        String url = "jdbc:mapuser:jdbc:mock:" + dbName;
+
+        SQLException exception = assertThrows(SQLException.class, () -> {
+            new UserMapDriver().connect(url, null);
+        }, "Should throw when properties parameter is null");
+        assertEquals("PJDBC: Authentication failed", exception.getMessage());
     }
 
     /**
