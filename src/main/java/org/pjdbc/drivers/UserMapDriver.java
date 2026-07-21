@@ -84,6 +84,11 @@ public class UserMapDriver extends AbstractProxyDriver {
     public Connection connect(String url, Properties info) throws SQLException {
         if (!acceptsURL(url)) return null;
 
+        // Prevent NullPointerException and details leakage when properties are null.
+        if (info == null) {
+            throw new SQLException("PJDBC: Authentication failed");
+        }
+
         String user = info.getProperty("user");
         // Prevent user enumeration by checking for null or empty user property.
         if (user == null || user.trim().isEmpty()) {
