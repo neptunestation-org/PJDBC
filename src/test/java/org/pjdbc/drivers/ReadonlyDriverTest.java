@@ -349,4 +349,48 @@ public class ReadonlyDriverTest {
             }
         }
     }
+
+    @Test
+    public void testCommentBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_comment_bypass";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("/* comment */ INSERT INTO some_table VALUES (1)");
+                fail("Expected SQLException for commented INSERT");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked: INSERT"));
+        }
+
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("-- line comment\nINSERT INTO some_table VALUES (1)");
+                fail("Expected SQLException for commented INSERT");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked: INSERT"));
+        }
+    }
+
+    @Test
+    public void testCteBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_cte_bypass";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("WITH cte AS (SELECT 1) INSERT INTO test_table SELECT * FROM cte;");
+                fail("Expected SQLException for CTE-based DML");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked: INSERT"));
+        }
+
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("WITH cte AS (INSERT INTO test_table VALUES (1) RETURNING id) SELECT * FROM cte;");
+                fail("Expected SQLException for CTE containing DML");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked: INSERT"));
+        }
+    }
 }

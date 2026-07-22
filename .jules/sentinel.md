@@ -1,0 +1,4 @@
+## 2026-07-22 - SQL Comment and CTE Bypass in ReadonlyDriver
+**Vulnerability:** ReadonlyDriver used simple regex anchors (such as `^\s*`) that could be bypassed by starting a write query with a SQL comment (`/* comment */` or `-- comment`) or by nesting a DML statement inside a Common Table Expression (CTE) clause starting with `WITH`.
+**Learning:** Checking only the start of the query for known DML keywords fails to account for leading comments or syntactic structures like CTEs which can execute write operations (e.g. `WITH cte AS (...) INSERT ...` or `WITH cte AS (INSERT ...) SELECT ...`).
+**Prevention:** Always use robust, comment-aware `PREFIX` regex matching and structure-aware patterns like `CTE_DML_PATTERN` combined with `Pattern.DOTALL` to parse the structural markers of the SQL dialect being intercepted.
