@@ -1,0 +1,4 @@
+## 2026-07-21 - ReadonlyDriver SQL Bypass Mitigation
+**Vulnerability:** Simplistic `^\s*` regex anchors in `ReadonlyDriver` allowed attackers/users to bypass write-blocking rules by prefixing queries with block comments `/*...*/` or line comments `--...`. Additionally, DML operations could be nested within Common Table Expressions (CTEs), e.g., `WITH cte AS (DELETE...) SELECT...`, bypassing prefix-only filters.
+**Learning:** Checking for SQL commands using naive string-prefix or basic whitespace matching is highly vulnerable to comment-based and query-structure bypass techniques.
+**Prevention:** Use a robust, standardized `PREFIX` pattern that explicitly matches comments and whitespace. For query structures like CTEs that support nested write statements, use targeted patterns like `CTE_DML_PATTERN` to scan nested clauses (e.g. `AS (...)`) for unauthorized keywords.
