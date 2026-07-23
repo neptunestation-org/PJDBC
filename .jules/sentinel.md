@@ -1,0 +1,6 @@
+# Sentinel Security Journal
+
+## 2026-07-23 - SQL Comment and CTE DML Bypass in ReadonlyDriver
+**Vulnerability:** The ReadonlyDriver was vulnerable to SQL execution bypasses using leading SQL comments (e.g., `/* comment */ INSERT...`) and CTE queries containing DML (e.g., `WITH temp AS (DELETE FROM test) SELECT 1`). This occurred because the driver used a simple anchored regular expression matching the start of the query (`^\s*(INSERT|...)`).
+**Learning:** Simple string-prefix or anchored regex analysis on raw SQL statements is insufficient for access control. Attackers can introduce comments, CTE wrappers, or whitespace/control characters to bypass such anchors. Furthermore, simply checking raw SQL strings anywhere with regex word boundaries could cause false positives if prohibited keywords are included inside valid string literals or comments (e.g., `SELECT 'INSERT'`).
+**Prevention:** Always sanitize the SQL string first using a robust, linear-time character-by-character state-machine parser (`cleanSql`) to strip block/line comments, string literals, and quoted identifiers. Once cleaned, perform unanchored word-boundary searches (`\bKeyword\b`) on the cleaned SQL to guarantee that no prohibited keywords are executed, completely avoiding ReDoS risks.
