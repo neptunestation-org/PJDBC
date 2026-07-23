@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.pjdbc.annotations.DriverCapability;
@@ -54,23 +55,83 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Custom error message for blocked operations")
 public class ReadonlyDriver extends AbstractProxyDriver {
 
-    // Pattern to detect DML write operations
-    private static final Pattern DML_PATTERN = Pattern.compile(
-        "^\\s*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+    // Patterns to detect operations on cleaned SQL
+    private static final Pattern CLEAN_DML_PATTERN = Pattern.compile(
+        "\\b(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
-    // Pattern to detect DDL operations
-    private static final Pattern DDL_PATTERN = Pattern.compile(
-        "^\\s*(CREATE|ALTER|DROP|RENAME)\\b",
+    private static final Pattern CLEAN_DDL_PATTERN = Pattern.compile(
+        "\\b(CREATE|ALTER|DROP|RENAME)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
-    // Pattern to detect DCL operations
-    private static final Pattern DCL_PATTERN = Pattern.compile(
-        "^\\s*(GRANT|REVOKE)\\b",
+    private static final Pattern CLEAN_DCL_PATTERN = Pattern.compile(
+        "\\b(GRANT|REVOKE)\\b",
         Pattern.CASE_INSENSITIVE
     );
+
+    /**
+     * Helper to clean SQL statements by stripping comments and string/identifier literals.
+     * This prevents comment-based and CTE-based bypasses while avoiding ReDoS.
+     */
+    private static String cleanSql(String sql) {
+        if (sql == null) return null;
+        StringBuilder sb = new StringBuilder();
+        int len = sql.length();
+        int state = 0; // 0=normal, 1=line-comment, 2=block-comment, 3=string, 4=double-quote, 5=backtick
+        for (int i = 0; i < len; i++) {
+            char c = sql.charAt(i);
+            if (state == 0) {
+                if (c == '/' && i + 1 < len && sql.charAt(i + 1) == '*') {
+                    state = 2;
+                    i++;
+                } else if (c == '-' && i + 1 < len && sql.charAt(i + 1) == '-') {
+                    state = 1;
+                    i++;
+                } else if (c == '\'') {
+                    state = 3;
+                    sb.append(' ');
+                } else if (c == '"') {
+                    state = 4;
+                    sb.append(' ');
+                } else if (c == '`') {
+                    state = 5;
+                    sb.append(' ');
+                } else {
+                    sb.append(c);
+                }
+            } else if (state == 1) { // line comment
+                if (c == '\n' || c == '\r') {
+                    state = 0;
+                    sb.append(c);
+                }
+            } else if (state == 2) { // block comment
+                if (c == '*' && i + 1 < len && sql.charAt(i + 1) == '/') {
+                    state = 0;
+                    i++;
+                    sb.append(' ');
+                }
+            } else if (state == 3) { // single-quote string
+                if (c == '\\' && i + 1 < len) {
+                    i++;
+                } else if (c == '\'') {
+                    state = 0;
+                }
+            } else if (state == 4) { // double-quote identifier
+                if (c == '\\' && i + 1 < len) {
+                    i++;
+                } else if (c == '"') {
+                    state = 0;
+                }
+            } else if (state == 5) { // backtick identifier
+                if (c == '`') {
+                    state = 0;
+                }
+            }
+        }
+        return sb.toString();
+    }
 
     static {
         try {
@@ -148,29 +209,29 @@ public class ReadonlyDriver extends AbstractProxyDriver {
         public void checkStatement(String sql) throws SQLException {
             if (sql == null) return;
 
+            String cleaned = cleanSql(sql);
+
             // Check DML
-            if (!allowDML && DML_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DML blocked: " + getStatementType(sql) + "]");
+            if (!allowDML) {
+                Matcher m = CLEAN_DML_PATTERN.matcher(cleaned);
+                if (m.find()) {
+                    throw new SQLException(message + " [DML blocked: " + m.group(1).toUpperCase() + "]");
+                }
             }
 
             // Check DDL
-            if (!allowDDL && DDL_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DDL blocked: " + getStatementType(sql) + "]");
+            if (!allowDDL) {
+                Matcher m = CLEAN_DDL_PATTERN.matcher(cleaned);
+                if (m.find()) {
+                    throw new SQLException(message + " [DDL blocked: " + m.group(1).toUpperCase() + "]");
+                }
             }
 
             // Always block DCL
-            if (DCL_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DCL blocked: " + getStatementType(sql) + "]");
+            Matcher m = CLEAN_DCL_PATTERN.matcher(cleaned);
+            if (m.find()) {
+                throw new SQLException(message + " [DCL blocked: " + m.group(1).toUpperCase() + "]");
             }
-        }
-
-        private String getStatementType(String sql) {
-            String trimmed = sql.trim();
-            int spaceIdx = trimmed.indexOf(' ');
-            if (spaceIdx > 0) {
-                return trimmed.substring(0, spaceIdx).toUpperCase();
-            }
-            return trimmed.toUpperCase();
         }
     }
 
