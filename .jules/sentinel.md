@@ -1,0 +1,4 @@
+## 2026-07-26 - Auxiliary ResultSet Getter Masking Bypass
+**Vulnerability:** The DataMaskingDriver failed to override auxiliary and typed ResultSet getters (e.g., `getBlob`, `getClob`, `getNClob`, `getSQLXML`, `getURL`, `getArray`, `getRef`, `getRowId`, and typed/mapped `getObject`), allowing callers to bypass configured data masking and retrieve original sensitive values.
+**Learning:** Delegation-based JDBC proxy wrappers like AbstractResultSet only forward calls to the delegate by default. If subclass overrides are incomplete, any new or less common getter methods will default to delegating without intercepting, resulting in severe security/data leaks.
+**Prevention:** Always audit and explicitly override all data retrieval methods (including auxiliary, typed, and stream-based getters) in proxy ResultSet wrappers, throwing an SQLException on restricted/masked columns unless specifically supported (like `getObject` with `String.class`).

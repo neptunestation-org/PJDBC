@@ -752,4 +752,96 @@ public class DataMaskingDriverTest {
             }
         }
     }
+
+    @Test
+    public void testAuxiliaryGettersOnMaskedColumnThrow() throws SQLException {
+        setupTestTable("test_aux_masked");
+        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:h2:mem:test_aux_masked;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT ssn FROM users WHERE id = 1")) {
+                    assertTrue(rs.next());
+
+                    // getBlob(int)
+                    try {
+                        rs.getBlob(1);
+                        fail("Expected SQLException for getBlob(int)");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("is masked"));
+                        assertTrue(e.getMessage().contains("getBlob"));
+                    }
+
+                    // getBlob(String)
+                    try {
+                        rs.getBlob("ssn");
+                        fail("Expected SQLException for getBlob(String)");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("is masked"));
+                        assertTrue(e.getMessage().contains("getBlob"));
+                    }
+
+                    // getClob(int)
+                    try {
+                        rs.getClob(1);
+                        fail("Expected SQLException for getClob(int)");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("is masked"));
+                        assertTrue(e.getMessage().contains("getClob"));
+                    }
+
+                    // getURL(int)
+                    try {
+                        rs.getURL(1);
+                        fail("Expected SQLException for getURL(int)");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("is masked"));
+                        assertTrue(e.getMessage().contains("getURL"));
+                    }
+
+                    // getArray(int)
+                    try {
+                        rs.getArray(1);
+                        fail("Expected SQLException for getArray(int)");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("is masked"));
+                        assertTrue(e.getMessage().contains("getArray"));
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testGetObjectWithClassOnMaskedColumn() throws SQLException {
+        setupTestTable("test_getobj_class");
+        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:h2:mem:test_getobj_class;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT ssn FROM users WHERE id = 1")) {
+                    assertTrue(rs.next());
+
+                    // getObject(..., String.class) should work and return masked value
+                    assertEquals("[REDACTED]", rs.getObject(1, String.class));
+                    assertEquals("[REDACTED]", rs.getObject("ssn", String.class));
+
+                    // getObject(..., Integer.class) should throw SQLException
+                    try {
+                        rs.getObject(1, Integer.class);
+                        fail("Expected SQLException for getObject(int, Class)");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("is masked"));
+                        assertTrue(e.getMessage().contains("getObject(Class)"));
+                    }
+
+                    try {
+                        rs.getObject("ssn", Integer.class);
+                        fail("Expected SQLException for getObject(String, Class)");
+                    } catch (SQLException e) {
+                        assertTrue(e.getMessage().contains("is masked"));
+                        assertTrue(e.getMessage().contains("getObject(Class)"));
+                    }
+                }
+            }
+        }
+    }
 }
