@@ -1,0 +1,4 @@
+## 2026-07-27 - Fail-Secure Connection Parameter Validation
+**Vulnerability:** Unhandled NullPointerException in UserMapDriver when invoked with null connection Properties.
+**Learning:** Proxy drivers that wrap or intercept database credentials via JDBC URL parameters and Properties maps often assume a non-null `Properties` input is provided by the client application. However, JDBC specifications permit `null` Properties maps, and untrusted/malformed inputs can trigger unhandled runtime exceptions.
+**Prevention:** Always validate critical connection parameters (like `Properties info`) at the outer driver boundary before attempting key lookups. Implement secure, generic error messages (such as `PJDBC: Authentication failed`) to avoid exposing internal runtime details or driver execution contexts.
