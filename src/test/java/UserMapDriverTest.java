@@ -125,6 +125,19 @@ public class UserMapDriverTest {
     }
 
     @Test
+    public void nullPropertiesThrowsException () {
+	try {
+	    new UserMapDriver().connect("jdbc:mapuser:jdbc:mock:testdb", null);
+	    fail("Should throw exception for null properties");}
+	catch (SQLException e) {
+            assertEquals("PJDBC: Authentication failed", e.getMessage());
+	}
+	catch (Exception e) {
+            fail("Threw wrong exception type for null properties");
+        }
+    }
+
+    @Test
     public void malformedUserMappingThrowsException() {
         try {
             Properties props = new Properties();
