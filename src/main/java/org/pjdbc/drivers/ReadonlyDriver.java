@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.pjdbc.annotations.DriverCapability;
@@ -71,6 +72,133 @@ public class ReadonlyDriver extends AbstractProxyDriver {
         "^\\s*(GRANT|REVOKE)\\b",
         Pattern.CASE_INSENSITIVE
     );
+
+    // Patterns to detect write operations in cleaned SQL (using word boundary without ^\s* anchor)
+    private static final Pattern CLEAN_DML_PATTERN = Pattern.compile(
+        "\\b(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    private static final Pattern CLEAN_DDL_PATTERN = Pattern.compile(
+        "\\b(CREATE|ALTER|DROP|RENAME)\\b",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    private static final Pattern CLEAN_DCL_PATTERN = Pattern.compile(
+        "\\b(GRANT|REVOKE)\\b",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    /**
+     * Clean comments and literals from SQL character-by-character to prevent bypasses.
+     */
+    public static String cleanSql(String sql) {
+        if (sql == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        int len = sql.length();
+        boolean inBlockComment = false;
+        boolean inLineComment = false;
+        boolean inSingleQuote = false;
+        boolean inDoubleQuote = false;
+        boolean inBacktick = false;
+
+        for (int i = 0; i < len; i++) {
+            char c = sql.charAt(i);
+
+            if (inBlockComment) {
+                if (c == '*' && i + 1 < len && sql.charAt(i + 1) == '/') {
+                    inBlockComment = false;
+                    i++; // skip '/'
+                    sb.append(' ');
+                }
+                continue;
+            }
+
+            if (inLineComment) {
+                if (c == '\n' || c == '\r') {
+                    inLineComment = false;
+                    sb.append(c);
+                }
+                continue;
+            }
+
+            if (inSingleQuote) {
+                if (c == '\'') {
+                    if (i + 1 < len && sql.charAt(i + 1) == '\'') {
+                        i++; // skip escaped quote
+                    } else {
+                        inSingleQuote = false;
+                    }
+                } else if (c == '\\') {
+                    i++; // skip escaped character
+                }
+                continue;
+            }
+
+            if (inDoubleQuote) {
+                if (c == '"') {
+                    if (i + 1 < len && sql.charAt(i + 1) == '"') {
+                        i++;
+                    } else {
+                        inDoubleQuote = false;
+                    }
+                } else if (c == '\\') {
+                    i++;
+                }
+                continue;
+            }
+
+            if (inBacktick) {
+                if (c == '`') {
+                    if (i + 1 < len && sql.charAt(i + 1) == '`') {
+                        i++;
+                    } else {
+                        inBacktick = false;
+                    }
+                }
+                continue;
+            }
+
+            // Check for comments/literals starting
+            if (c == '/' && i + 1 < len && sql.charAt(i + 1) == '*') {
+                inBlockComment = true;
+                i++;
+                continue;
+            }
+
+            if (c == '-' && i + 1 < len && sql.charAt(i + 1) == '-') {
+                inLineComment = true;
+                i++;
+                continue;
+            }
+
+            if (c == '#') {
+                inLineComment = true;
+                continue;
+            }
+
+            if (c == '\'') {
+                inSingleQuote = true;
+                continue;
+            }
+
+            if (c == '"') {
+                inDoubleQuote = true;
+                continue;
+            }
+
+            if (c == '`') {
+                inBacktick = true;
+                continue;
+            }
+
+            sb.append(c);
+        }
+
+        return sb.toString();
+    }
 
     static {
         try {
@@ -148,19 +276,28 @@ public class ReadonlyDriver extends AbstractProxyDriver {
         public void checkStatement(String sql) throws SQLException {
             if (sql == null) return;
 
+            String cleaned = cleanSql(sql);
+
             // Check DML
-            if (!allowDML && DML_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DML blocked: " + getStatementType(sql) + "]");
+            if (!allowDML) {
+                Matcher m = CLEAN_DML_PATTERN.matcher(cleaned);
+                if (m.find()) {
+                    throw new SQLException(message + " [DML blocked: " + m.group(1).toUpperCase() + "]");
+                }
             }
 
             // Check DDL
-            if (!allowDDL && DDL_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DDL blocked: " + getStatementType(sql) + "]");
+            if (!allowDDL) {
+                Matcher m = CLEAN_DDL_PATTERN.matcher(cleaned);
+                if (m.find()) {
+                    throw new SQLException(message + " [DDL blocked: " + m.group(1).toUpperCase() + "]");
+                }
             }
 
             // Always block DCL
-            if (DCL_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DCL blocked: " + getStatementType(sql) + "]");
+            Matcher m = CLEAN_DCL_PATTERN.matcher(cleaned);
+            if (m.find()) {
+                throw new SQLException(message + " [DCL blocked: " + m.group(1).toUpperCase() + "]");
             }
         }
 
