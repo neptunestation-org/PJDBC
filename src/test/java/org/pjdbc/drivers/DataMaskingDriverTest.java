@@ -752,4 +752,62 @@ public class DataMaskingDriverTest {
             }
         }
     }
+
+    @Test
+    public void testAuxiliaryAndLobGettersMaskedThrows() throws SQLException {
+        setupTestTable("test_aux_masked");
+        String url = "jdbc:mask[columns=ssn,strategy=REDACT]:jdbc:h2:mem:test_aux_masked;DB_CLOSE_DELAY=-1";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT ssn FROM users WHERE id = 1")) {
+                    assertTrue(rs.next());
+
+                    // getBlob
+                    try { rs.getBlob("ssn"); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getBlob")); }
+                    try { rs.getBlob(1); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getBlob")); }
+
+                    // getClob
+                    try { rs.getClob("ssn"); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getClob")); }
+                    try { rs.getClob(1); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getClob")); }
+
+                    // getNClob
+                    try { rs.getNClob("ssn"); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getNClob")); }
+                    try { rs.getNClob(1); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getNClob")); }
+
+                    // getSQLXML
+                    try { rs.getSQLXML("ssn"); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getSQLXML")); }
+                    try { rs.getSQLXML(1); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getSQLXML")); }
+
+                    // getURL
+                    try { rs.getURL("ssn"); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getURL")); }
+                    try { rs.getURL(1); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getURL")); }
+
+                    // getArray
+                    try { rs.getArray("ssn"); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getArray")); }
+                    try { rs.getArray(1); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getArray")); }
+
+                    // getRef
+                    try { rs.getRef("ssn"); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getRef")); }
+                    try { rs.getRef(1); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getRef")); }
+
+                    // getRowId
+                    try { rs.getRowId("ssn"); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getRowId")); }
+                    try { rs.getRowId(1); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getRowId")); }
+
+                    // getObject with Map
+                    java.util.Map<String, Class<?>> map = new java.util.HashMap<>();
+                    try { rs.getObject("ssn", map); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getObject")); }
+                    try { rs.getObject(1, map); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getObject")); }
+
+                    // getObject with Class type
+                    try { rs.getObject("ssn", Integer.class); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getObject")); }
+                    try { rs.getObject(1, Integer.class); fail(); } catch (SQLException e) { assertTrue(e.getMessage().contains("getObject")); }
+
+                    // getObject with String.class should work!
+                    assertEquals("[REDACTED]", rs.getObject("ssn", String.class));
+                    assertEquals("[REDACTED]", rs.getObject(1, String.class));
+                }
+            }
+        }
+    }
 }
