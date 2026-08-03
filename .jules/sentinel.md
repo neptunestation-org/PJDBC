@@ -1,0 +1,4 @@
+## 2026-08-03 - [Secure info Validation in UserMapDriver]
+**Vulnerability:** In `UserMapDriver.connect`, passing a `null` value for the `Properties info` parameter caused an unhandled `NullPointerException` when trying to retrieve properties, which can expose execution flow details and internal stack traces.
+**Learning:** External libraries and applications interacting with the database driver can pass a `null` `Properties` object if they don't have connection properties to provide. The driver should fail securely and return a standardized SQLException rather than crash with a runtime NPE.
+**Prevention:** Always validate that incoming context or configuration arguments, such as JDBC connection `Properties` parameters, are non-null and correctly populated before invoking any methods on them.
