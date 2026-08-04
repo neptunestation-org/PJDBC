@@ -54,21 +54,19 @@ import org.pjdbc.sql.JdbcUrlParser;
     description = "Custom error message for blocked operations")
 public class ReadonlyDriver extends AbstractProxyDriver {
 
-    // Pattern to detect DML write operations
-    private static final Pattern DML_PATTERN = Pattern.compile(
-        "^\\s*(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
+    // Patterns on cleaned SQL
+    private static final Pattern CLEAN_DML_PATTERN = Pattern.compile(
+        "\\b(INSERT|UPDATE|DELETE|MERGE|UPSERT|REPLACE|TRUNCATE)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
-    // Pattern to detect DDL operations
-    private static final Pattern DDL_PATTERN = Pattern.compile(
-        "^\\s*(CREATE|ALTER|DROP|RENAME)\\b",
+    private static final Pattern CLEAN_DDL_PATTERN = Pattern.compile(
+        "\\b(CREATE|ALTER|DROP|RENAME)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
-    // Pattern to detect DCL operations
-    private static final Pattern DCL_PATTERN = Pattern.compile(
-        "^\\s*(GRANT|REVOKE)\\b",
+    private static final Pattern CLEAN_DCL_PATTERN = Pattern.compile(
+        "\\b(GRANT|REVOKE)\\b",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -147,30 +145,17 @@ public class ReadonlyDriver extends AbstractProxyDriver {
          */
         public void checkStatement(String sql) throws SQLException {
             if (sql == null) return;
-
-            // Check DML
-            if (!allowDML && DML_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DML blocked: " + getStatementType(sql) + "]");
+            String cleaned = cleanSql(sql);
+            java.util.regex.Matcher m;
+            if (!allowDML && (m = CLEAN_DML_PATTERN.matcher(cleaned)).find()) {
+                throw new SQLException(message + " [DML blocked: " + m.group(1).toUpperCase() + "]");
             }
-
-            // Check DDL
-            if (!allowDDL && DDL_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DDL blocked: " + getStatementType(sql) + "]");
+            if (!allowDDL && (m = CLEAN_DDL_PATTERN.matcher(cleaned)).find()) {
+                throw new SQLException(message + " [DDL blocked: " + m.group(1).toUpperCase() + "]");
             }
-
-            // Always block DCL
-            if (DCL_PATTERN.matcher(sql).find()) {
-                throw new SQLException(message + " [DCL blocked: " + getStatementType(sql) + "]");
+            if ((m = CLEAN_DCL_PATTERN.matcher(cleaned)).find()) {
+                throw new SQLException(message + " [DCL blocked: " + m.group(1).toUpperCase() + "]");
             }
-        }
-
-        private String getStatementType(String sql) {
-            String trimmed = sql.trim();
-            int spaceIdx = trimmed.indexOf(' ');
-            if (spaceIdx > 0) {
-                return trimmed.substring(0, spaceIdx).toUpperCase();
-            }
-            return trimmed.toUpperCase();
         }
     }
 
@@ -327,5 +312,29 @@ public class ReadonlyDriver extends AbstractProxyDriver {
         public ReadonlyCallableStatement(CallableStatement delegate, Connection conn) throws SQLException {
             super(delegate, conn);
         }
+    }
+
+    /**
+     * Clean comments and string literals from SQL to prevent security bypasses.
+     */
+    public static String cleanSql(String sql) {
+        if (sql == null) return "";
+        StringBuilder sb = new StringBuilder();
+        boolean inSingle = false, inDouble = false, inBack = false, inLine = false, inBlock = false;
+        for (int i = 0; i < sql.length(); i++) {
+            char c = sql.charAt(i), next = (i + 1 < sql.length()) ? sql.charAt(i + 1) : '\0';
+            if (inLine) { if (c == '\n' || c == '\r') { inLine = false; sb.append(' '); } continue; }
+            if (inBlock) { if (c == '*' && next == '/') { inBlock = false; i++; sb.append(' '); } continue; }
+            if (inSingle) { if (c == '\\') i++; else if (c == '\'') { if (next == '\'') i++; else inSingle = false; } continue; }
+            if (inDouble) { if (c == '\\') i++; else if (c == '"') inDouble = false; continue; }
+            if (inBack) { if (c == '\\') i++; else if (c == '`') inBack = false; continue; }
+            if (c == '-' && next == '-') { inLine = true; i++; continue; }
+            if (c == '/' && next == '*') { inBlock = true; i++; continue; }
+            if (c == '\'') { inSingle = true; continue; }
+            if (c == '"') { inDouble = true; continue; }
+            if (c == '`') { inBack = true; continue; }
+            sb.append(c);
+        }
+        return sb.toString();
     }
 }

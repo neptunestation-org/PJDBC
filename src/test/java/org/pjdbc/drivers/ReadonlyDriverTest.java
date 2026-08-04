@@ -349,4 +349,56 @@ public class ReadonlyDriverTest {
             }
         }
     }
+
+    @Test
+    public void testBlockCommentBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_block_comment";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("/* comment */ INSERT INTO some_table VALUES (1)");
+                fail("Expected SQLException for INSERT containing block comment");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked"));
+        }
+    }
+
+    @Test
+    public void testLineCommentBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_line_comment";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("-- comment\nINSERT INTO some_table VALUES (1)");
+                fail("Expected SQLException for INSERT containing line comment");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked"));
+        }
+    }
+
+    @Test
+    public void testCteBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_cte";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("WITH cte AS (SELECT 1) INSERT INTO some_table VALUES (1)");
+                fail("Expected SQLException for CTE-based INSERT");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked"));
+        }
+    }
+
+    @Test
+    public void testKeywordsInLiteralsAllowed() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_literals";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT 'INSERT'")) {
+                    assertTrue(rs.next());
+                    assertEquals("INSERT", rs.getString(1));
+                }
+            }
+        }
+    }
 }
