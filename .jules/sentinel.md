@@ -1,0 +1,4 @@
+## 2026-08-04 - SQL Comment and CTE Bypass in ReadonlyDriver
+**Vulnerability:** The `ReadonlyDriver` relied on simple regex patterns with leading whitespace anchors (`^\s*...`) to check for blocked statements, which allowed attackers to easily bypass security checks by placing SQL comments (e.g., `/* comment */`) or CTE clauses (e.g., `WITH cte AS (...)`) before DML/DDL statements.
+**Learning:** Regex-based SQL security enforcement is highly susceptible to comment-based and syntax-based bypasses. Standard database drivers or parsers treat comments as whitespace or parse complex structures, whereas basic regular expressions fail to understand state-based SQL syntax context.
+**Prevention:** Utilize a lightweight $O(N)$ lexical analyzer (`cleanSql`) to strip out comments (block and line), string literals (single/double quotes), and quoted identifiers before matching keyword boundaries. Always verify security assertions with regression/bypass unit tests.
