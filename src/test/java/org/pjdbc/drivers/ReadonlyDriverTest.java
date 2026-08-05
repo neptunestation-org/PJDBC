@@ -349,4 +349,56 @@ public class ReadonlyDriverTest {
             }
         }
     }
+
+    @Test
+    public void testBlockCommentBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_block_comment_bypass";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("/* comment */ INSERT INTO test VALUES (1)");
+                fail("Expected SQLException");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked"));
+        }
+    }
+
+    @Test
+    public void testLineCommentBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_line_comment_bypass";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("-- line comment\nINSERT INTO test VALUES (1)");
+                fail("Expected SQLException");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked"));
+        }
+    }
+
+    @Test
+    public void testCteBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_cte_bypass";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("WITH cte AS (INSERT INTO test VALUES (1)) SELECT 1");
+                fail("Expected SQLException");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked"));
+        }
+    }
+
+    @Test
+    public void testKeywordInLiteralAllowed() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_keyword_literal";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT 'My INSERT'")) {
+                    assertTrue(rs.next());
+                    assertEquals("My INSERT", rs.getString(1));
+                }
+            }
+        }
+    }
 }

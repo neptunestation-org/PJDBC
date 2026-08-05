@@ -1,0 +1,4 @@
+## 2026-08-05 - SQL Comment and CTE-Based DML Bypass in ReadonlyDriver
+**Vulnerability:** ReadonlyDriver's security patterns (`DML_PATTERN`, `DDL_PATTERN`, `DCL_PATTERN`) used a naive prefix anchor (`^\s*(KEYWORD)`) which allowed write operations to bypass read-only enforcement when prefixed with leading comments (e.g. `/* comment */ INSERT...`) or executed within Common Table Expressions (CTEs, e.g. `WITH x AS (INSERT...) SELECT...`).
+**Learning:** Naive regex matching that expects SQL commands to start with specific keywords is highly susceptible to comment-based and query-structure-based bypasses. Security-sensitive JDBC drivers must parse or strip metadata comments and literals before validation.
+**Prevention:** Always sanitize the SQL string by stripping single-line comments, block comments, and string/identifier literals via a safe $O(N)$ state-machine parser before checking for word boundaries of forbidden statements.
