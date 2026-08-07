@@ -349,4 +349,56 @@ public class ReadonlyDriverTest {
             }
         }
     }
+
+    @Test
+    public void testBlockCommentBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_block_comment_bypass";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("/*delete*/INSERT INTO test_table VALUES (1)");
+                fail("Expected SQLException for INSERT with leading block comment");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked: INSERT"));
+        }
+    }
+
+    @Test
+    public void testLineCommentBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_line_comment_bypass";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("-- some line comment\nINSERT INTO test_table VALUES (1)");
+                fail("Expected SQLException for INSERT with leading line comment");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked: INSERT"));
+        }
+    }
+
+    @Test
+    public void testCteDmlBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_cte_dml_bypass";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("WITH x AS (DELETE FROM test_table) SELECT 1");
+                fail("Expected SQLException for DELETE inside CTE");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked: DELETE"));
+        }
+    }
+
+    @Test
+    public void testKeywordInsideLiteralAllowed() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_keyword_in_literal";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT 'This is an INSERT operation'")) {
+                    assertTrue(rs.next());
+                    assertEquals("This is an INSERT operation", rs.getString(1));
+                }
+            }
+        }
+    }
 }
