@@ -349,4 +349,56 @@ public class ReadonlyDriverTest {
             }
         }
     }
+
+    @Test
+    public void testBlockCommentBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_block_comment";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("/* some block comment */ INSERT INTO test VALUES (1)");
+                fail("Expected SQLException for INSERT with leading block comment");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked"));
+        }
+    }
+
+    @Test
+    public void testLineCommentBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_line_comment";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("-- some line comment \n INSERT INTO test VALUES (1)");
+                fail("Expected SQLException for INSERT with leading line comment");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked"));
+        }
+    }
+
+    @Test
+    public void testCteBypassBlocked() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_cte";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate("WITH cte AS (SELECT 1) INSERT INTO test VALUES (1)");
+                fail("Expected SQLException for INSERT with CTE prefix");
+            }
+        } catch (SQLException e) {
+            assertTrue(e.getMessage().contains("DML blocked: INSERT"));
+        }
+    }
+
+    @Test
+    public void testValidSelectWithKeywordsInStringsAllowed() throws SQLException {
+        String url = "jdbc:readonly:jdbc:h2:mem:test_select_keywords";
+        try (Connection conn = DriverManager.getConnection(url)) {
+            try (Statement stmt = conn.createStatement()) {
+                try (ResultSet rs = stmt.executeQuery("SELECT 'this is an insert' AS val")) {
+                    assertTrue(rs.next());
+                    assertEquals("this is an insert", rs.getString(1));
+                }
+            }
+        }
+    }
 }
