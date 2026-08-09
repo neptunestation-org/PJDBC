@@ -1,0 +1,4 @@
+## 2026-08-09 - SQL Comment and CTE Bypass in ReadonlyDriver
+**Vulnerability:** ReadonlyDriver blocked DML/DDL/DCL write operations by matching regexes starting with anchors (e.g. `^\s*`). Attackers could easily bypass this protection using leading SQL block comments (e.g., `/* comment */ INSERT...`), line comments (e.g., `-- comment \n INSERT...`), or Common Table Expressions (CTEs, e.g., `WITH cte AS (...) INSERT...`).
+**Learning:** Raw SQL statement analysis with anchored regexes is highly fragile and vulnerable to bypasses because SQL allows complex syntax and comments before the actual query keywords. A character-by-character cleaning parser in O(N) time avoids both regular expression bypass vulnerabilities and ReDoS risks.
+**Prevention:** Preprocess and clean SQL statements to strip out comments and literal blocks before applying security validation rules.
