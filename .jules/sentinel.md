@@ -1,0 +1,4 @@
+## 2026-08-10 - Preventing Readonly SQL Bypasses via State Machine Cleaning
+**Vulnerability:** Regular expression-based SQL validation filters can be bypassed using leading/trailing comments, SQL block/line comments, Common Table Expressions (CTEs), subqueries, or keywords embedded in string literals.
+**Learning:** Naive regular expressions with anchors (`^\\s*INSERT`) fail to detect DML/DDL when nested in CTEs or preceded by comments, while simple substring matches introduce false positives by blocking valid SELECT statements containing keywords inside quotes or comments.
+**Prevention:** Implement a robust, character-by-character O(N) state machine parser (`cleanSql`) that strips out all comments and single/double/backtick quoted literals prior to checking for restricted keywords anywhere in the "active" SQL text, thus completely blocking bypass vectors without performance overhead or false positives.
