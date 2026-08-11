@@ -1,0 +1,4 @@
+## 2026-08-11 - SQL Comment and CTE Bypass in ReadonlyDriver
+**Vulnerability:** ReadonlyDriver's write-protection could be bypassed by preceding SQL statements with comments (e.g., `/* comment */ INSERT...`) or by using data-modifying CTEs (e.g., `WITH t AS (DELETE...) SELECT...` or `WITH t AS (SELECT 1) INSERT...`).
+**Learning:** Simple anchored regexes like `^\s*...` are insufficient for SQL security filters because SQL allows leading comments. Furthermore, SQL's recursive structure (like CTEs) allows DML to be nested or follow top-level keywords that the filter might consider safe.
+**Prevention:** Use a robust `PREFIX` regex that explicitly handles all types of SQL comments and whitespace. Hardened patterns must account for top-level `WITH` clauses and nested DML within `AS (...)` blocks. Always use `Pattern.DOTALL` when matching SQL to ensure multiline comments/statements are correctly handled.
