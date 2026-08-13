@@ -188,4 +188,16 @@ public class UserMapDriverTest {
 	    assertNotNull(c2);
 	    assertNotSame(c1, c2);}
 	catch (Exception e) {fail(e.getMessage());}}
+
+    @Test
+    public void testNullPropertiesThrowsSecureException() {
+        try {
+            new UserMapDriver().connect("jdbc:mapuser:jdbc:mock:testdb", null);
+            fail("Should throw exception for null properties");
+        } catch (SQLException e) {
+            assertEquals("PJDBC: Authentication failed", e.getMessage());
+        } catch (Exception e) {
+            fail("Threw wrong exception type for null properties");
+        }
+    }
 }
